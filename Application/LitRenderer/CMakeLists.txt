@@ -6,7 +6,9 @@ project(LitRenderer)
 if(MSVC)
 
 set(LitRenderer_SourceFiles
-    WinMain.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/LitRenderer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/LitRenderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/WinMain.cpp
     
 #   经过了多种尝试，发现直接加入项目里是最方便的。
     ${FoundationBase_SourceFiles}
