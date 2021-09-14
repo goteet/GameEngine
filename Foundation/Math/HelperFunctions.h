@@ -16,16 +16,16 @@ namespace math
         return f - static_cast<int>(f);
     }
 
-    template<typename value_type>
-    constexpr int floor2int(value_type f)
+    template<typename n_value_type, typename value_type, typename = std::enable_if_t<std::is_integral_v<n_value_type>>>
+    constexpr int floor2(value_type f)
     {
-        return static_cast<int>(f);
+        return static_cast<n_value_type>(f);
     }
 
-    template<typename value_type>
-    constexpr int ceil2int(value_type f)
+    template<typename n_value_type, typename value_type, typename = std::enable_if_t<std::is_integral_v<n_value_type>>>
+    constexpr int ceil2(value_type f)
     {
-        return static_cast<int>(std::ceil(f));
+        return static_cast<n_value_type>(std::ceil(f));
     }
 
     template<typename value_type>
