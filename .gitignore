@@ -1,0 +1,27 @@
+# Folders
+.vs/
+[Bb]uild
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+x64/
+x86/
+
+# Visual Studio User-specific files
+*.suo
+*.user
+*.rsuser
+*.userosscache
+*.sln.docstates
+
+# Visual Studio cache files
+*.db
+*.opendb
+*.aps
+*.pch
+*.sdf
