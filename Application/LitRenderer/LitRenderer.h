@@ -4,6 +4,7 @@
 #include <Foundation/Math/Rotation.h>
 #include <Foundation/Math/Geometry.h>
 
+using F = double;
 class RenderCanvas
 {
 public:
@@ -12,7 +13,7 @@ public:
 
     bool NeedUpdate();
 
-    math::float3* GetBackbufferPtr() { return mBackbuffer; }
+    math::vector3<F>* GetBackbufferPtr() { return mBackbuffer; }
     bool NeedFlushBackbuffer = true;
     const int CanvasWidth;
     const int CanvasHeight;
@@ -23,22 +24,22 @@ private:
 
     bool mNeedUpdateWindowRect = false;
     unsigned char *mOutCanvasDataPtr;
-    math::float3* mBackbuffer = nullptr;
+    math::vector3<F>* mBackbuffer = nullptr;
 };
 
 class SimpleBackCamera
 {
     struct DegreeClampHelper
     {
-        DegreeClampHelper(math::degree<float> degree)
+        DegreeClampHelper(math::degree<F> degree)
             : value(math::clamp(degree.value, 1.0f, 179.0f)) { }
-        const float value;
+        const F value;
     };
 public:
-    SimpleBackCamera(math::degree<float> verticalFov);
-    math::point3d<float> Position;
-    const math::radian<float> HalfVerticalFov;
-    const float HalfVerticalFovTangent;
+    SimpleBackCamera(math::degree<F> verticalFov);
+    math::point3d<F> Position;
+    const math::radian<F> HalfVerticalFov;
+    const F HalfVerticalFovTangent;
 };
 
 class LitRenderer
@@ -56,7 +57,7 @@ private:
 
     struct Sample
     {
-        math::ray3d<float> ray;
+        math::ray3d<F> ray;
         int pixelRow, pixelCol;
     };
 

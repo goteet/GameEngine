@@ -35,14 +35,14 @@ RenderCanvas::RenderCanvas(unsigned char *canvasDataPtr, int width, int height, 
     , CanvasHeight(height)
     , CanvasLinePitch(linePitch)
 {
-    mBackbuffer = new math::float3[CanvasWidth * CanvasHeight];
+    mBackbuffer = new math::vector3<F>[CanvasWidth * CanvasHeight];
 
     for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
     {
         for (int colIndex = 0; colIndex < CanvasWidth; colIndex++)
         {
             int pixelIndex = colIndex + rowIndex * CanvasWidth;
-            mBackbuffer[pixelIndex].set(0.5, 0.5, 0.5);
+            mBackbuffer[pixelIndex].set(F(0.5), F(0.5), F(0.5));
         }
     }
 }
@@ -76,12 +76,13 @@ void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData()
             int bufferIndex = colIndex + bufferRowOffset;
             int canvasIndex = colIndex * 3 + canvasRowOffset;
 
-            const math::float3& color = mBackbuffer[bufferIndex];
+            const math::vector3<F>& color = mBackbuffer[bufferIndex];
             for (int compIndex = 2; compIndex >= 0; compIndex--)
             {
-                float c = LinearToGammaCorrected22(color.v[compIndex]);
+                F c = LinearToGammaCorrected22(color.v[compIndex]);
+                c = math::clamp(c, F(0.0), F(1.0));
                 assert(canvasIndex < (rowIndex + 1) * CanvasLinePitch);
-                mOutCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(c * 256.0f - math::EPSILON<float>);
+                mOutCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(c * F(256.0) - math::EPSILON<F>);
             }
         }
     }
@@ -90,7 +91,7 @@ void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData()
 
 LitRenderer::LitRenderer(unsigned char * canvasDataPtr, int canvasWidth, int canvasHeight, int canvasLinePitch)
     : mCanvas(canvasDataPtr, canvasWidth, canvasHeight, canvasLinePitch)
-    , mCamera(math::degree<float>(60))
+    , mCamera(math::degree<F>(60))
     , mSampleArrayCount(canvasWidth * canvasHeight)
 
 {
@@ -120,32 +121,32 @@ bool LitRenderer::NeedUpdate()
 
 void LitRenderer::GenerateSamples()
 {
-    const float PixelSize = 0.5f;
-    const float HalfPixelSize = PixelSize * 0.5f;
-    float halfWidth = mCanvas.CanvasWidth * 0.5f * PixelSize;
-    float halfHeight = mCanvas.CanvasHeight * 0.5f * PixelSize;
+    const F PixelSize = F(0.5);
+    const F HalfPixelSize = PixelSize * F(0.5);
+    F halfWidth = mCanvas.CanvasWidth * F(0.5) * PixelSize;
+    F halfHeight = mCanvas.CanvasHeight * F(0.5) * PixelSize;
     //     <---> (half height)
     //  +  o----.¡¡(o=origin)
     //  |  |  /   Asumed canvas is at origin(0,0,0),
     //  |  | /    and camera is placed at neg-z-axis,
     //  +  |/
     // (z) .      tan(half_fov) = halfHeight / cameraZ.
-    float cameraZ = halfHeight / mCamera.HalfVerticalFovTangent;
+    F cameraZ = halfHeight / mCamera.HalfVerticalFovTangent;
     mCamera.Position.set(0, 0, -cameraZ);
 
     Sample sample;
     sample.ray.set_origin(mCamera.Position);
 
 
-    auto canvasPositionToRay = [&cameraZ](float x, float y) -> math::float3 {
-        //float3(x,y,0) - camera.position;
+    auto canvasPositionToRay = [&cameraZ](F x, F y) -> math::vector3<F> {
+        //vector3<float>(x,y,0) - camera.position;
         //  x = x - 0;
         //  y = y - 0;
         //  z = 0 - camera.position.z
-        return math::float3(x, y, cameraZ);
+        return math::vector3<F>(x, y, cameraZ);
     };
 
-    const float QuaterPixelSize = 0.5f * HalfPixelSize;
+    const F QuaterPixelSize = F(0.5) * HalfPixelSize;
     for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
     {
         int rowOffset = rowIndex * mCanvas.CanvasWidth;
@@ -156,8 +157,8 @@ void LitRenderer::GenerateSamples()
             sample.pixelCol = colIndex;
             sample.pixelRow = rowIndex;
 
-            const float pixelCenterX = colIndex * PixelSize + HalfPixelSize - halfWidth;
-            const float pixelCenterY = rowIndex * PixelSize + HalfPixelSize - halfHeight;
+            const F pixelCenterX = colIndex * PixelSize + HalfPixelSize - halfWidth;
+            const F pixelCenterY = rowIndex * PixelSize + HalfPixelSize - halfHeight;
 
             sample.ray.set_direction(canvasPositionToRay(pixelCenterX - QuaterPixelSize, pixelCenterY));
             samples.push_back(sample);
@@ -176,30 +177,30 @@ void LitRenderer::GenerateSamples()
 
 void LitRenderer::ResolveSamples()
 {
-    math::float3* canvasDataPtr = mCanvas.GetBackbufferPtr();
+    math::vector3<F>* canvasDataPtr = mCanvas.GetBackbufferPtr();
     for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
     {
         int rowOffset = rowIndex * mCanvas.CanvasWidth;
         for (int colIndex = 0; colIndex < mCanvas.CanvasWidth; colIndex++)
         {
             std::vector<Sample>& samples = mImageSamples[colIndex + rowOffset];
-            math::float3& canvasPixel = canvasDataPtr[colIndex + rowOffset];
+            math::vector3<F>& canvasPixel = canvasDataPtr[colIndex + rowOffset];
 
             const size_t sampleCount = samples.size();
-            math::float3 direction;
+            math::vector3<F> accSpectral(0, 0, 0);
             for (const Sample& sample : samples)
             {
-                direction += sample.ray.direction();
+                accSpectral += sample.ray.direction();
             }
-            direction *= (1.0f / sampleCount);
-            auto c = direction * 0.5f + 0.5f;
-            canvasPixel.set(c.x, c.y, 0.0f);
+            accSpectral *= (F(1) / sampleCount);
+            auto c = accSpectral * F(0.5) + F(0.5);
+            canvasPixel.set(c.x, c.y, 0);
         }
     }
 }
 
-SimpleBackCamera::SimpleBackCamera(math::degree<float> verticalFov)
-    : HalfVerticalFov(DegreeClampHelper(verticalFov).value * 0.5f)
-    , HalfVerticalFovTangent(::tan(DegreeClampHelper(verticalFov).value * 0.5f))
+SimpleBackCamera::SimpleBackCamera(math::degree<F> verticalFov)
+    : HalfVerticalFov(DegreeClampHelper(verticalFov).value * F(0.5))
+    , HalfVerticalFovTangent(::tan(DegreeClampHelper(verticalFov).value * F(0.5)))
     , Position(0, 0, 0)
 { }
