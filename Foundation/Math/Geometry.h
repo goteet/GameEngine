@@ -4,6 +4,7 @@
 namespace math
 {
     enum normalize_hint { norm };
+    enum dual_face_hint { dual_face };
     template<typename value_type, EDim> struct point;
     template<typename value_type, EDim, typename> struct ray;
 
@@ -43,6 +44,7 @@ namespace math
         ray(const point<value_type, dimension>& o, const vector_t<value_type, dimension>& d, normalize_hint) : _origin(o), _direction(d) { }
         ray(const vector_t<value_type, (EDim)(dimension + 1)>& o, const vector_t<value_type, dimension>& d, normalize_hint) : _origin(o), _direction(d) { }
         constexpr const point<value_type, dimension>& origin() const { return _origin; }
+        constexpr point<value_type, dimension>& origin() { return _origin; }
         constexpr const vector_t<value_type, dimension>& direction() const { return _direction; }
         constexpr void set_origin(const point<value_type, dimension>& o) { _origin = o; }
         constexpr void set_direction(const vector_t<value_type, dimension>& dir) { _direction = normalized(dir); }
@@ -61,11 +63,28 @@ namespace math
         void set_center(const point<value_type, EDim::_3>& c) { _center = c; }
         void set_radius(value_type r) { if (r <= value_type(0)) r = EPSILON<value_type>; _radius = r; _radius_sqr = r * r; }
         constexpr const point<value_type, EDim::_3>& center() const { return _center; }
+        constexpr point<value_type, EDim::_3>& center() { return _center; }
         constexpr value_type radius() const { return _radius; }
         constexpr value_type radius_sqr() const { return _radius_sqr; }
     private:
         point<value_type, EDim::_3> _center;
         value_type _radius, _radius_sqr;
+    };
+
+    template<typename value_type>
+    struct plane
+    {
+        plane(const point<value_type, EDim::_3>& p, const vector_t<value_type, EDim::_3>& n) :_position(p), _normal(normalized(n)) {}
+        plane(const point<value_type, EDim::_3>& p, const vector_t<value_type, EDim::_3>& n, normalize_hint) :_position(p), _normal(n) {}
+        void set_position(const point<value_type, EDim::_3>& p) { _position = p; }
+        void set_normal(const vector_t<value_type, EDim::_3>& n) { _normal = normalized(n); }
+        void set_normal(const vector_t<value_type, EDim::_3>& n, normalize_hint) { _normal = n; }
+        constexpr const point<value_type, EDim::_3>& position() const { return _position; }
+        constexpr point<value_type, EDim::_3>& position() { return _position; }
+        constexpr const vector_t<value_type, EDim::_3>& normal() const { return _normal; }
+    private:
+        point<value_type, EDim::_3> _position;
+        vector_t<value_type, EDim::_3> _normal;
     };
 
 
@@ -75,6 +94,39 @@ namespace math
         inside, contain,
         intersect, tangent
     };
+
+    template<typename value_type>
+    intersection intersect(const ray<value_type, EDim::_3>& ray,
+        const point<value_type, EDim::_3>& pos, const vector_t<value_type, EDim::_3>& normal, bool dualface,
+        value_type& t)
+    {
+        value_type Dr_dot_N = dot(ray.direction(), normal);
+
+        if (Dr_dot_N < value_type(0) || (Dr_dot_N > value_type(0) && dualface))
+        {
+            //t = -dot(N, Pp) / dot(Dr, N);
+            t = dot(pos - ray.origin(), normal) / Dr_dot_N;
+            return t >= value_type(0)
+                ? intersection::intersect
+                : intersection::none;
+        }
+        return intersection::none;
+    }
+
+    template<typename value_type>
+    intersection intersect(const ray<value_type, EDim::_3>& ray,
+        const plane<value_type>& plane, dual_face_hint,
+        value_type& t)
+    {
+        return intersect(ray, plane.position(), plane.normal(), true, t);
+    }
+
+    template<typename value_type>
+    intersection intersect(const ray<value_type, EDim::_3>& ray,
+        const plane<value_type>& plane, value_type& t)
+    {
+        return intersect(ray, plane.position(), plane.normal(), false, t);
+    }
 
     template<typename value_type>
     intersection intersect(const ray<value_type, EDim::_3>& ray, const sphere<value_type>& sphere,
