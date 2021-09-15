@@ -204,47 +204,49 @@ namespace math
         int parallelMask = 0;
         bool found = false;
 
-        vector_t<value_type, EDim::_3> dirDotAxis;
-        vector_t<value_type, EDim::_3> ocDotAxis;
-        vector_t<value_type, EDim::_3> oc = position - ray.origin();
+        vector_t<value_type, EDim::_3> Dr_dot_Axis;
+        vector_t<value_type, EDim::_3> OC_dot_Axis;
+        vector_t<value_type, EDim::_3> P_Or = position - ray.origin();
         vector_t<value_type, EDim::_3> axis[3] = { axis_x, axis_y, axis_z };
         value_type extend[3] = { extend_x, extend_y, extend_z };
 
         for (int i = 0; i < 3; ++i)
         {
-            dirDotAxis[i] = dot(ray.direction(), axis[i]);
-            ocDotAxis[i] = dot(oc, axis[i]);
+            Dr_dot_Axis.v[i] = dot(ray.direction(), axis[i]);
+            OC_dot_Axis.v[i] = dot(P_Or, axis[i]);
 
-            if (dirDotAxis[i] == value_type(0))
+            if (fabs(Dr_dot_Axis[i]) < EPSILON<value_type>)
             {
                 parallelMask |= 1 << i;
             }
             else
             {
-                value_type extend_i = (dirDotAxis[i] > value_type(0)) ? extend[i] : -extend[i];
-                value_type invDA = value_type(1) / dirDotAxis[i];
+                value_type sign = Dr_dot_Axis[i] > value_type(0) ? 1 : -1;
+                value_type extend_i = sign * extend[i];
+                value_type invDA = value_type(1) / Dr_dot_Axis[i];
 
                 if (!found)
                 {
-                    t0 = (ocDotAxis[i] - extend_i) * invDA;
-                    t1 = (ocDotAxis[i] + extend_i) * invDA;
-                    n1 = n0 = axis[i];
+                    t0 = (OC_dot_Axis[i] - extend_i) * invDA;
+                    t1 = (OC_dot_Axis[i] + extend_i) * invDA;
+                    n0 = -axis[i] * sign;
+                    n1 = axis[i] * sign;
                     found = true;
                 }
                 else
                 {
-                    value_type s = (ocDotAxis[i] - extend_i) * invDA;
+                    value_type s = (OC_dot_Axis[i] - extend_i) * invDA;
                     if (s > t0)
                     {
                         t0 = s;
-                        n0 = axis[i];
+                        n0 = -axis[i] * sign;
                     }
 
-                    s = (ocDotAxis[i] + extend_i) * invDA;
+                    s = (OC_dot_Axis[i] + extend_i) * invDA;
                     if (s < t1)
                     {
                         t1 = s;
-                        n1 = axis[i];
+                        n1 = axis[i] * sign;
                     }
 
                     if (t0 > t1)
@@ -261,8 +263,8 @@ namespace math
             {
                 if (parallelMask & (1 << i))
                 {
-                    if (fabs(ocDotAxis[i] - t0 * dirDotAxis[i]) > extend[i] ||
-                        fabs(ocDotAxis[i] - t1 * dirDotAxis[i]) > extend[i])
+                    if (fabs(OC_dot_Axis[i] - t0 * Dr_dot_Axis[i]) > extend[i] ||
+                        fabs(OC_dot_Axis[i] - t1 * Dr_dot_Axis[i]) > extend[i])
                     {
                         return intersection::none;
                     }
@@ -276,7 +278,6 @@ namespace math
         }
         else if (t0 < value_type(0))
         {
-            t0 = t1;
             return intersection::inside;
         }
         else
