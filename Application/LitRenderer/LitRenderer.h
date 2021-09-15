@@ -27,6 +27,54 @@ private:
     math::vector3<F>* mBackbuffer = nullptr;
 };
 
+class SceneObject;
+
+struct IntersectingInfo
+{
+    IntersectingInfo(const SceneObject* o, math::vector3<F> n, F d)
+        : Object(o), SurfaceNormal(n), Distance(d) { }
+
+    const SceneObject* Object;
+    const math::vector3<F> SurfaceNormal;
+    const F Distance;
+};
+
+struct Light
+{
+    Light() = default;
+    math::vector3<F> Position = math::vector3<F>::zero();
+    math::vector3<F> Color = math::vector3<F>::zero();
+    F Intensity = 1.0;
+};
+
+class SceneObject
+{
+public:
+    SceneObject() : Sphere(math::point3d<F>(), 1) { }
+
+    IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const;
+
+    math::sphere<F> Sphere;
+};
+
+class Scene
+{
+public:
+    Scene();
+
+    IntersectingInfo DetectIntersecting(const math::ray3d<F>& ray);
+
+    unsigned int GetLightCount() const { return (unsigned int)mLights.size(); }
+
+    const Light&  GetLightByIndex(unsigned int index) const;
+
+    math::vector3<F> AmbientColor;
+
+private:
+    std::vector<Light> mLights;
+    std::vector<SceneObject> mSceneObjects;
+};
+
 class SimpleBackCamera
 {
     struct DegreeClampHelper
@@ -62,8 +110,10 @@ private:
     };
 
     const int mSampleArrayCount;
+    math::vector3<F> mClearColor;
     RenderCanvas mCanvas;
     SimpleBackCamera mCamera;
+    Scene mScene;
 
     std::vector<Sample>* mImageSamples = nullptr;
 };

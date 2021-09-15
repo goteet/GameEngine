@@ -3,6 +3,57 @@
 #include <Foundation/Math/PredefinedConstantValues.h>
 #include "LitRenderer.h"
 
+const int MaxRecursiveDepth = 5;
+const F RayBias = math::EPSILON<F> * 2.0f;
+
+bool Trace(Scene& scene, const math::ray3d<F>& ray, math::vector3<F>& outSpectral, int recursiveDepth)
+{
+    if (recursiveDepth == MaxRecursiveDepth)
+        return false;
+
+    IntersectingInfo objInfo = scene.DetectIntersecting(ray);
+    if (objInfo.Object == nullptr)
+    {
+        return false;
+    }
+
+    math::point3d<F> intersetionWorldPos = ray.calc_offset(objInfo.Distance);
+
+    math::ray3d<F> shadowRay;
+    shadowRay.set_origin(intersetionWorldPos + objInfo.SurfaceNormal * RayBias);
+
+    for (int lightIndex = 0, lightCount = scene.GetLightCount(); lightIndex < lightCount; ++lightIndex)
+    {
+        const Light& light = scene.GetLightByIndex(lightIndex);
+
+        math::vector3<F> towardLight = light.Position - intersetionWorldPos;
+        F distanceSqr = math::magnitude_sqr(towardLight);
+        normalize(towardLight);
+        shadowRay.set_direction(towardLight, math::norm);
+
+        IntersectingInfo shadowInfo = scene.DetectIntersecting(shadowRay);
+        if (shadowInfo.Object == nullptr || (shadowInfo.Distance * shadowInfo.Distance) < distanceSqr)
+        {
+            //Lambertion
+            F NdotL = math::dot(objInfo.SurfaceNormal, towardLight);
+            NdotL = math::max2(NdotL, 0);
+
+            F shadowDistance = sqrt(distanceSqr);
+            F attenuation = light.Intensity / (shadowDistance*shadowDistance);
+            math::vector3<F> diffuseTerm = light.Color * NdotL * attenuation;
+            outSpectral += scene.AmbientColor + diffuseTerm;
+        }
+        else
+        {
+            //in shadow.
+            outSpectral += scene.AmbientColor;
+        }
+    }
+
+    return true;
+}
+
+
 template<typename value_type>
 value_type LinearToGammaCorrected22(value_type value)
 {
@@ -80,9 +131,8 @@ void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData()
             for (int compIndex = 2; compIndex >= 0; compIndex--)
             {
                 F c = LinearToGammaCorrected22(color.v[compIndex]);
-                c = math::clamp(c, F(0.0), F(1.0));
-                assert(canvasIndex < (rowIndex + 1) * CanvasLinePitch);
-                mOutCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(c * F(256.0) - math::EPSILON<F>);
+                c = math::clamp(c, F(0.0), F(1.0) - math::EPSILON<F>);
+                mOutCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(c * F(256.0));
             }
         }
     }
@@ -91,6 +141,7 @@ void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData()
 
 LitRenderer::LitRenderer(unsigned char * canvasDataPtr, int canvasWidth, int canvasHeight, int canvasLinePitch)
     : mCanvas(canvasDataPtr, canvasWidth, canvasHeight, canvasLinePitch)
+    , mClearColor(0, 0, 0)
     , mCamera(math::degree<F>(60))
     , mSampleArrayCount(canvasWidth * canvasHeight)
 
@@ -121,7 +172,7 @@ bool LitRenderer::NeedUpdate()
 
 void LitRenderer::GenerateSamples()
 {
-    const F PixelSize = F(0.5);
+    const F PixelSize = F(0.1);
     const F HalfPixelSize = PixelSize * F(0.5);
     F halfWidth = mCanvas.CanvasWidth * F(0.5) * PixelSize;
     F halfHeight = mCanvas.CanvasHeight * F(0.5) * PixelSize;
@@ -132,7 +183,7 @@ void LitRenderer::GenerateSamples()
     //  +  |/
     // (z) .      tan(half_fov) = halfHeight / cameraZ.
     F cameraZ = halfHeight / mCamera.HalfVerticalFovTangent;
-    mCamera.Position.set(0, 0, -cameraZ);
+    mCamera.Position.z = -cameraZ;
 
     Sample sample;
     sample.ray.set_origin(mCamera.Position);
@@ -177,6 +228,7 @@ void LitRenderer::GenerateSamples()
 
 void LitRenderer::ResolveSamples()
 {
+    const int StartRecursiveDepth = 0;
     math::vector3<F>* canvasDataPtr = mCanvas.GetBackbufferPtr();
     for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
     {
@@ -188,19 +240,108 @@ void LitRenderer::ResolveSamples()
 
             const size_t sampleCount = samples.size();
             math::vector3<F> accSpectral(0, 0, 0);
+            math::vector3<F> traceSpectral;
+            int hittedSampleCount = 0;
             for (const Sample& sample : samples)
             {
-                accSpectral += sample.ray.direction();
+                traceSpectral.set(0, 0, 0);
+                if (Trace(mScene, sample.ray, traceSpectral, StartRecursiveDepth))
+                {
+                    accSpectral += traceSpectral;
+                    hittedSampleCount++;
+                }
+
             }
-            accSpectral *= (F(1) / sampleCount);
-            auto c = accSpectral * F(0.5) + F(0.5);
-            canvasPixel.set(c.x, c.y, 0);
+            if (hittedSampleCount > 0)
+            {
+                accSpectral *= (F(1) / sampleCount);
+            }
+            else
+            {
+                accSpectral = mClearColor;
+            }
+            canvasPixel = accSpectral;
         }
     }
 }
 
 SimpleBackCamera::SimpleBackCamera(math::degree<F> verticalFov)
     : HalfVerticalFov(DegreeClampHelper(verticalFov).value * F(0.5))
-    , HalfVerticalFovTangent(::tan(DegreeClampHelper(verticalFov).value * F(0.5)))
+    , HalfVerticalFovTangent(math::tan(math::degree<F>(DegreeClampHelper(verticalFov).value * F(0.5))))
     , Position(0, 0, 0)
 { }
+
+
+Scene::Scene()
+    : AmbientColor(F(0.01), F(0.01), F(0.01))
+{
+    const F SceneDistance = 5;
+    const F lSphereRadius = 10;
+    const F rSphereRadius = lSphereRadius * F(0.5);
+    const F LightHeight = lSphereRadius * 4;
+    const F GroundHeight = -5;
+
+    Light mainLight;
+    mainLight.Position.set(0, GroundHeight + LightHeight, SceneDistance);
+    mainLight.Color.set(1, 1, 1);
+    mainLight.Intensity = 100;
+
+    mLights.push_back(mainLight);
+
+    SceneObject lSphere;
+
+    lSphere.Sphere.set_center(math::point3d<F>(-2 - lSphereRadius, GroundHeight + lSphereRadius, SceneDistance + 1));
+    lSphere.Sphere.set_radius(lSphereRadius);
+    mSceneObjects.push_back(lSphere);
+
+    SceneObject rSphere;
+    rSphere.Sphere.set_center(math::point3d<F>(+2 + rSphereRadius, GroundHeight + rSphereRadius, SceneDistance + 1));
+    rSphere.Sphere.set_radius(rSphereRadius);
+    mSceneObjects.push_back(rSphere);
+}
+
+IntersectingInfo Scene::DetectIntersecting(const math::ray3d<F>& ray)
+{
+    for (const SceneObject& obj : mSceneObjects)
+    {
+        IntersectingInfo info = obj.IntersectWithRay(ray);
+        if (info.Object != nullptr)
+        {
+            return info;
+        }
+    }
+    return IntersectingInfo(nullptr, math::vector3<F>::zero(), 0);
+}
+
+const Light & Scene::GetLightByIndex(unsigned int index) const
+{
+    static Light l;
+    if (index >= GetLightCount())
+    {
+        return l;
+    }
+    else
+    {
+        return mLights[index];
+    }
+}
+
+IntersectingInfo SceneObject::IntersectWithRay(const math::ray3d<F>& ray) const
+{
+    F t0, t1;
+    math::intersection result = math::intersect(ray, Sphere, t0, t1);
+    if (result == math::intersection::none)
+    {
+        return IntersectingInfo(nullptr, math::vector3<F>::zero(), 0);
+    }
+
+    if (result == math::intersection::inside)
+    {
+        t0 = t1;
+    }
+
+    math::point3d<F> intersectPosition = ray.calc_offset(t0);
+    math::vector3<F> surfaceNormal = normalized(intersectPosition - Sphere.center());
+
+    return IntersectingInfo(this, surfaceNormal, t0);
+}
