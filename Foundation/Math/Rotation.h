@@ -10,7 +10,7 @@ namespace math
     namespace math_impl
     {
         template<class value_type> constexpr value_type r2d_factor = value_type(180) / PI<value_type>;
-        template<class value_type> constexpr value_type d2r_factor = PI::pi / value_type(180);
+        template<class value_type> constexpr value_type d2r_factor = PI<value_type> / value_type(180);
     }
 
     template<typename value_type>
