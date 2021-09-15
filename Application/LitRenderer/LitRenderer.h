@@ -69,6 +69,13 @@ struct ScenePlane : SceneObject
     math::plane<F> Plane;
 };
 
+struct SceneCube : SceneObject
+{
+    SceneCube() : Cube(math::point3d<F>(), math::vector3<F>::one()) { }
+    virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
+    math::cube<F> Cube;
+};
+
 class Scene
 {
 public:

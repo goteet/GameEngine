@@ -291,13 +291,25 @@ Scene::Scene()
     SceneSphere* lSphere = new SceneSphere();
     SceneSphere* rSphere = new SceneSphere();
 
-    lSphere->Sphere.center().set(-2 - lSphereRadius, GroundHeight + lSphereRadius, SceneDistance);
+    lSphere->Sphere.center().set(-10 - lSphereRadius, GroundHeight + lSphereRadius, SceneDistance - lSphereRadius);
     lSphere->Sphere.set_radius(lSphereRadius);
 
-    rSphere->Sphere.center().set(+2 + rSphereRadius, GroundHeight + rSphereRadius, SceneDistance);
+    rSphere->Sphere.center().set(-10 + rSphereRadius, GroundHeight + rSphereRadius, SceneDistance - 10 - rSphereRadius);
     rSphere->Sphere.set_radius(rSphereRadius);
     mSceneObjects.push_back(rSphere);
     mSceneObjects.push_back(lSphere);
+
+
+    SceneCube* lCube = new SceneCube();
+    SceneCube* rCube = new SceneCube();
+
+    lCube->Cube.center().set(10 + lSphereRadius, GroundHeight + lSphereRadius, SceneDistance + 10 + lSphereRadius);
+    rCube->Cube.center().set(6 + rSphereRadius, GroundHeight + rSphereRadius, SceneDistance);
+
+    lCube->Cube.set_extends(rSphereRadius, lSphereRadius, rSphereRadius);
+    rCube->Cube.set_extends(rSphereRadius, rSphereRadius, rSphereRadius);
+    mSceneObjects.push_back(lCube);
+    mSceneObjects.push_back(rCube);
 
     ScenePlane* lWall = new ScenePlane();
     ScenePlane* rWall = new ScenePlane();
@@ -400,5 +412,26 @@ IntersectingInfo ScenePlane::IntersectWithRay(const math::ray3d<F>& ray) const
     else
     {
         return IntersectingInfo(const_cast<ScenePlane*>(this), Plane.normal(), t);
+    }
+}
+
+IntersectingInfo SceneCube::IntersectWithRay(const math::ray3d<F>& ray) const
+{
+    F t0, t1;
+    math::vector3<F> n0, n1;
+    math::intersection result = math::intersect(ray, Cube, t0, t1, n0, n1);
+    if (result == math::intersection::none)
+    {
+        return IntersectingInfo();
+    }
+
+    if (result == math::intersection::inside)
+    {
+
+        return IntersectingInfo(const_cast<SceneCube*>(this), n1, t1);
+    }
+    else
+    {
+        return IntersectingInfo(const_cast<SceneCube*>(this), n0, t0);
     }
 }
