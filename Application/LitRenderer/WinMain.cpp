@@ -22,7 +22,7 @@ const wchar_t* AppWindowName = L"Soft Renderer";
 HWND hWindow;
 HDC	hdcBitmapDC = NULL;
 HBITMAP hCanvasDIB = NULL;
-RenderCanvas* pRenderCanvas = nullptr;
+LitRenderer* Renderer = nullptr;
 
 
 ATOM MyRegisterClass(HINSTANCE hInstance);
@@ -37,12 +37,12 @@ void Uninitialize(HWND)
     hdcBitmapDC = NULL;
     hCanvasDIB = NULL;
 
-    SafeDelete(pRenderCanvas);
+    SafeDelete(Renderer);
 }
 
 bool NeedUpdate() 
 { 
-    return pRenderCanvas->NeedUpdate();
+    return Renderer->NeedUpdate();
 }
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -116,7 +116,9 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
     hWindow = CreateWindow(AppClassName, AppWindowName, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        BitmapCanvasWidth, BitmapCanvasHeight,
+        NULL, NULL, hInstance, NULL);
 
     if (!hWindow)
     {
@@ -182,12 +184,12 @@ HBITMAP CreateDIB(HDC hdcWindowDC, int canvasWidth, int canvasHeight, VOID** can
 {
     if (canvasWidth == 0)
     {
-        canvasWidth = canvasWidth;
+        canvasWidth = BitmapCanvasWidth;
     }
 
     if (canvasHeight == 0)
     {
-        canvasHeight = canvasHeight;
+        canvasHeight = BitmapCanvasHeight;
     }
 
     BITMAPINFO bmpInfo;
@@ -220,8 +222,7 @@ bool Initialize(HWND hWindow)
     ::SelectObject(hdcBitmapDC, hCanvasDIB);
     ::ReleaseDC(hWindow, hdcWindowDC);
 
-    memset(canvasDIBDataPtr, 127, sizeof(char) * BitmapCanvasLinePitch * BitmapCanvasHeight);
-
-    pRenderCanvas = new RenderCanvas(canvasDIBDataPtr, BitmapCanvasWidth, BitmapCanvasHeight, BitmapCanvasLinePitch);
+    Renderer = new LitRenderer(canvasDIBDataPtr, BitmapCanvasWidth, BitmapCanvasHeight, BitmapCanvasLinePitch);
+    Renderer->GenerateImage();
     return true;
 }
