@@ -27,16 +27,17 @@ private:
     math::vector3<F>* mBackbuffer = nullptr;
 };
 
-class SceneObject;
+struct SceneObject;
 
 struct IntersectingInfo
 {
-    IntersectingInfo(const SceneObject* o, math::vector3<F> n, F d)
+    IntersectingInfo() = default;
+    IntersectingInfo(SceneObject* o, math::vector3<F> n, F d)
         : Object(o), SurfaceNormal(n), Distance(d) { }
 
-    const SceneObject* Object;
-    const math::vector3<F> SurfaceNormal;
-    const F Distance;
+    SceneObject* Object = nullptr;
+    math::vector3<F> SurfaceNormal;
+    F Distance = F(0);
 };
 
 struct Light
@@ -47,22 +48,34 @@ struct Light
     F Intensity = 1.0;
 };
 
-class SceneObject
+struct SceneObject
 {
-public:
-    SceneObject() : Sphere(math::point3d<F>(), 1) { }
+    virtual ~SceneObject() { }
+    virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const = 0;
+};
 
-    IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const;
 
+struct SceneSphere : SceneObject
+{
+    SceneSphere() : Sphere(math::point3d<F>(), 1) { }
+    virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
     math::sphere<F> Sphere;
+};
+
+struct ScenePlane : SceneObject
+{
+    ScenePlane() : Plane(math::point3d<F>(), math::vector3<F>::unit_x()) { }
+    virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
+    math::plane<F> Plane;
 };
 
 class Scene
 {
 public:
     Scene();
+    ~Scene();
 
-    IntersectingInfo DetectIntersecting(const math::ray3d<F>& ray);
+    IntersectingInfo DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject);
 
     unsigned int GetLightCount() const { return (unsigned int)mLights.size(); }
 
@@ -72,7 +85,7 @@ public:
 
 private:
     std::vector<Light> mLights;
-    std::vector<SceneObject> mSceneObjects;
+    std::vector<SceneObject*> mSceneObjects;
 };
 
 class SimpleBackCamera

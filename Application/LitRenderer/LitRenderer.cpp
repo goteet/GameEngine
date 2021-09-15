@@ -6,12 +6,12 @@
 const int MaxRecursiveDepth = 5;
 const F RayBias = math::EPSILON<F> * 2.0f;
 
-bool Trace(Scene& scene, const math::ray3d<F>& ray, math::vector3<F>& outSpectral, int recursiveDepth)
+bool Trace(Scene& scene, const math::ray3d<F>& ray, math::vector3<F>& outSpectral, const SceneObject* excludeObject, int recursiveDepth)
 {
     if (recursiveDepth == MaxRecursiveDepth)
         return false;
 
-    IntersectingInfo objInfo = scene.DetectIntersecting(ray);
+    IntersectingInfo objInfo = scene.DetectIntersecting(ray, nullptr);
     if (objInfo.Object == nullptr)
     {
         return false;
@@ -27,19 +27,18 @@ bool Trace(Scene& scene, const math::ray3d<F>& ray, math::vector3<F>& outSpectra
         const Light& light = scene.GetLightByIndex(lightIndex);
 
         math::vector3<F> towardLight = light.Position - intersetionWorldPos;
-        F distanceSqr = math::magnitude_sqr(towardLight);
+        F lightDistanceSqr = math::magnitude_sqr(towardLight);
         normalize(towardLight);
         shadowRay.set_direction(towardLight, math::norm);
 
-        IntersectingInfo shadowInfo = scene.DetectIntersecting(shadowRay);
-        if (shadowInfo.Object == nullptr || (shadowInfo.Distance * shadowInfo.Distance) < distanceSqr)
+        IntersectingInfo shadowInfo = scene.DetectIntersecting(shadowRay, objInfo.Object);
+        if (shadowInfo.Object == nullptr || (shadowInfo.Distance * shadowInfo.Distance) > lightDistanceSqr)
         {
             //Lambertion
             F NdotL = math::dot(objInfo.SurfaceNormal, towardLight);
             NdotL = math::max2(NdotL, 0);
 
-            F shadowDistance = sqrt(distanceSqr);
-            F attenuation = light.Intensity / (shadowDistance*shadowDistance);
+            F attenuation = light.Intensity / lightDistanceSqr;
             math::vector3<F> diffuseTerm = light.Color * NdotL * attenuation;
             outSpectral += scene.AmbientColor + diffuseTerm;
         }
@@ -245,7 +244,7 @@ void LitRenderer::ResolveSamples()
             for (const Sample& sample : samples)
             {
                 traceSpectral.set(0, 0, 0);
-                if (Trace(mScene, sample.ray, traceSpectral, StartRecursiveDepth))
+                if (Trace(mScene, sample.ray, traceSpectral, nullptr, StartRecursiveDepth))
                 {
                     accSpectral += traceSpectral;
                     hittedSampleCount++;
@@ -279,38 +278,82 @@ Scene::Scene()
     const F lSphereRadius = 10;
     const F rSphereRadius = lSphereRadius * F(0.5);
     const F LightHeight = lSphereRadius * 4;
-    const F GroundHeight = -5;
+    const F SceneSize = 40;
+    const F GroundHeight = -SceneSize;
 
     Light mainLight;
-    mainLight.Position.set(0, GroundHeight + LightHeight, SceneDistance);
+    mainLight.Position.set(0, GroundHeight + F(1.99) * SceneSize, SceneDistance);
     mainLight.Color.set(1, 1, 1);
-    mainLight.Intensity = 100;
+    mainLight.Intensity = 400;
 
     mLights.push_back(mainLight);
 
-    SceneObject lSphere;
+    SceneSphere* lSphere = new SceneSphere();
+    SceneSphere* rSphere = new SceneSphere();
 
-    lSphere.Sphere.set_center(math::point3d<F>(-2 - lSphereRadius, GroundHeight + lSphereRadius, SceneDistance + 1));
-    lSphere.Sphere.set_radius(lSphereRadius);
+    lSphere->Sphere.center().set(-2 - lSphereRadius, GroundHeight + lSphereRadius, SceneDistance);
+    lSphere->Sphere.set_radius(lSphereRadius);
+
+    rSphere->Sphere.center().set(+2 + rSphereRadius, GroundHeight + rSphereRadius, SceneDistance);
+    rSphere->Sphere.set_radius(rSphereRadius);
+    mSceneObjects.push_back(rSphere);
     mSceneObjects.push_back(lSphere);
 
-    SceneObject rSphere;
-    rSphere.Sphere.set_center(math::point3d<F>(+2 + rSphereRadius, GroundHeight + rSphereRadius, SceneDistance + 1));
-    rSphere.Sphere.set_radius(rSphereRadius);
-    mSceneObjects.push_back(rSphere);
+    ScenePlane* lWall = new ScenePlane();
+    ScenePlane* rWall = new ScenePlane();
+    ScenePlane* tWall = new ScenePlane();
+    ScenePlane* bWall = new ScenePlane();
+    ScenePlane* fWall = new ScenePlane();
+
+    lWall->Plane.position().set(-SceneSize, 0, 0);
+    lWall->Plane.set_normal(math::vector3<F>::unit_x(), math::norm);
+
+    rWall->Plane.position().set(SceneSize, 0, 0);
+    rWall->Plane.set_normal(math::vector3<F>::unit_x_neg(), math::norm);
+
+    tWall->Plane.position().set(0, GroundHeight + 2 * SceneSize, 0);
+    tWall->Plane.set_normal(math::vector3<F>::unit_y_neg(), math::norm);
+
+    bWall->Plane.position().set(0, GroundHeight, 0);
+    bWall->Plane.set_normal(math::vector3<F>::unit_y(), math::norm);
+
+    fWall->Plane.position().set(0, 0, F(1.5) * SceneSize);
+    fWall->Plane.set_normal(math::vector3<F>::unit_z_neg(), math::norm);
+
+    mSceneObjects.push_back(lWall);
+    mSceneObjects.push_back(rWall);
+    mSceneObjects.push_back(tWall);
+    mSceneObjects.push_back(bWall);
+    mSceneObjects.push_back(fWall);
 }
 
-IntersectingInfo Scene::DetectIntersecting(const math::ray3d<F>& ray)
+Scene::~Scene()
 {
-    for (const SceneObject& obj : mSceneObjects)
+    for (const SceneObject* obj : mSceneObjects)
     {
-        IntersectingInfo info = obj.IntersectWithRay(ray);
-        if (info.Object != nullptr)
+        SafeDelete(obj);
+    }
+    mSceneObjects.clear();
+}
+
+IntersectingInfo Scene::DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject)
+{
+    IntersectingInfo result;
+    for (const SceneObject* obj : mSceneObjects)
+    {
+        if (excludeObject != obj)
         {
-            return info;
+            IntersectingInfo info = obj->IntersectWithRay(ray);
+            if (info.Object != nullptr)
+            {
+                if (result.Object == nullptr || result.Distance > info.Distance)
+                {
+                    result = info;
+                }
+            }
         }
     }
-    return IntersectingInfo(nullptr, math::vector3<F>::zero(), 0);
+    return result;
 }
 
 const Light & Scene::GetLightByIndex(unsigned int index) const
@@ -326,13 +369,13 @@ const Light & Scene::GetLightByIndex(unsigned int index) const
     }
 }
 
-IntersectingInfo SceneObject::IntersectWithRay(const math::ray3d<F>& ray) const
+IntersectingInfo SceneSphere::IntersectWithRay(const math::ray3d<F>& ray) const
 {
     F t0, t1;
     math::intersection result = math::intersect(ray, Sphere, t0, t1);
     if (result == math::intersection::none)
     {
-        return IntersectingInfo(nullptr, math::vector3<F>::zero(), 0);
+        return IntersectingInfo();
     }
 
     if (result == math::intersection::inside)
@@ -343,5 +386,19 @@ IntersectingInfo SceneObject::IntersectWithRay(const math::ray3d<F>& ray) const
     math::point3d<F> intersectPosition = ray.calc_offset(t0);
     math::vector3<F> surfaceNormal = normalized(intersectPosition - Sphere.center());
 
-    return IntersectingInfo(this, surfaceNormal, t0);
+    return IntersectingInfo(const_cast<SceneSphere*>(this), surfaceNormal, t0);
+}
+
+IntersectingInfo ScenePlane::IntersectWithRay(const math::ray3d<F>& ray) const
+{
+    F t;
+    math::intersection result = math::intersect(ray, Plane, t);
+    if (result == math::intersection::none)
+    {
+        return IntersectingInfo();
+    }
+    else
+    {
+        return IntersectingInfo(const_cast<ScenePlane*>(this), Plane.normal(), t);
+    }
 }
