@@ -196,7 +196,7 @@ HBITMAP CreateDIB(HDC hdcWindowDC, int canvasWidth, int canvasHeight, VOID** can
     ZeroMemory(&bmpInfo, sizeof(BITMAPINFO));
     bmpInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmpInfo.bmiHeader.biWidth = canvasWidth;
-    bmpInfo.bmiHeader.biHeight = -canvasHeight;
+    bmpInfo.bmiHeader.biHeight = canvasHeight;
     bmpInfo.bmiHeader.biPlanes = 1;
     bmpInfo.bmiHeader.biBitCount = ColorDepth;
     bmpInfo.bmiHeader.biCompression = BI_RGB;
