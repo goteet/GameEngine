@@ -212,6 +212,30 @@ namespace math
     }
 
     template<typename value_type>
+    constexpr vector_t<value_type, EDim::_2> operator+(const vector_t<value_type, EDim::_2>& l, scaler_t<value_type> r)
+    {
+        return vector_t<value_type, EDim::_2>(l.x + r, l.y + r);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_3> operator+(const vector_t<value_type, EDim::_3>& l, scaler_t<value_type> r)
+    {
+        return vector_t<value_type, EDim::_3>(l.x + r, l.y + r, l.z + r);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_4> operator+(const vector_t<value_type, EDim::_4>& l, scaler_t<value_type> r)
+    {
+        return vector_t<value_type, EDim::_4>(l.x + r, l.y + r, l.z + r, l.w + r);
+    }
+
+    template<typename value_type, EDim dimension>
+    constexpr vector_t<value_type, dimension> operator+(scaler_t<value_type> l, const vector_t<value_type, dimension>& r)
+    {
+        return r + l;
+    }
+
+    template<typename value_type>
     constexpr vector_t<value_type, EDim::_2> operator-(const vector_t<value_type, EDim::_2>& l, const vector_t<value_type, EDim::_2>& r)
     {
         return vector_t<value_type, EDim::_2>(l.x - r.x, l.y - r.y);
@@ -227,6 +251,42 @@ namespace math
     constexpr vector_t<value_type, EDim::_4> operator-(const vector_t<value_type, EDim::_4>& l, const vector_t<value_type, EDim::_4>& r)
     {
         return vector_t<value_type, EDim::_4>(l.x - r.x, l.y - r.y, l.z - r.z, l.w - r.w);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_2> operator-(const vector_t<value_type, EDim::_2>& l, scaler_t<value_type> r)
+    {
+        return vector_t<value_type, EDim::_2>(l.x - r, l.y - r);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_3> operator-(const vector_t<value_type, EDim::_3>& l, scaler_t<value_type> r)
+    {
+        return vector_t<value_type, EDim::_3>(l.x - r, l.y - r, l.z - r);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_4> operator-(const vector_t<value_type, EDim::_4>& l, scaler_t<value_type> r)
+    {
+        return vector_t<value_type, EDim::_4>(l.x - r, l.y - r, l.z - r, l.w - r);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_2> operator-(scaler_t<value_type> l, const vector_t<value_type, EDim::_2>& r)
+    {
+        return vector_t<value_type, EDim::_2>(l - r.x, l - r.y);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_3> operator-(scaler_t<value_type> l, const vector_t<value_type, EDim::_3>& r)
+    {
+        return vector_t<value_type, EDim::_3>(l - r.x, l - r.y, l - r.z);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_4> operator-(scaler_t<value_type> l, const vector_t<value_type, EDim::_4>& r)
+    {
+        return vector_t<value_type, EDim::_4>(l - r.x, l - r.y, l - r.z, l - r.w);
     }
 
     template<typename value_type>
@@ -246,7 +306,6 @@ namespace math
     {
         return vector_t<value_type, EDim::_4>(l.x * r.x, l.y * r.y, l.z * r.z, l.w * r.w);
     }
-
     template<typename value_type>
     constexpr vector_t<value_type, EDim::_2> operator*(const vector_t<value_type, EDim::_2>& l, scaler_t<value_type> r)
     {
