@@ -50,7 +50,7 @@ namespace math
         constexpr void set_origin(const point<value_type, dimension>& o) { _origin = o; }
         constexpr void set_direction(const vector_t<value_type, dimension>& dir) { _direction = normalized(dir); _inv_direction = inversed(_direction); }
         constexpr void set_direction(const vector_t<value_type, dimension>& dir, normalize_hint) { _direction = dir; _inv_direction = inversed(_direction); }
-        constexpr vector_t<value_type, dimension> calc_offset(scaler_t<value_type> length) const { return _origin + _direction * length; }
+        constexpr point<value_type, dimension> calc_offset(scaler_t<value_type> length) const { return _origin + _direction * length; }
 
     private:
         point<value_type, dimension> _origin;
@@ -86,6 +86,79 @@ namespace math
     private:
         point<value_type, EDim::_3> _position;
         vector_t<value_type, EDim::_3> _normal;
+    };
+
+    template<typename value_type>
+    struct rect : private plane<value_type>
+    {
+        //n,t,e
+        rect(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n,
+            const vector_t<value_type, EDim::_3>& t,
+            const vector_t<value_type, EDim::_2>& e) : plane<value_type>(p, n) { set_tangent(t); set_extends(e); }
+
+        //norm n, t, e
+        rect(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n, normalize_hint,
+            const vector_t<value_type, EDim::_3>& t,
+            const vector_t<value_type, EDim::_2>& e) : plane<value_type>(p, n, norm) { set_tangent(t); set_extends(e); }
+
+        //n, norm t, e
+        rect(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n,
+            const vector_t<value_type, EDim::_3>& t, normalize_hint,
+            const vector_t<value_type, EDim::_2>& e) : plane<value_type>(p, n), _tangent(t), _extends(e) { }
+
+        //n, t, norm e
+        rect(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n,
+            const vector_t<value_type, EDim::_3>& t,
+            const vector_t<value_type, EDim::_2>& e, normalize_hint) : plane<value_type>(p, n), _extends(e) { set_tangent(t); }
+
+        //norm n, norm t, e
+        rect(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n, normalize_hint,
+            const vector_t<value_type, EDim::_3>& t, normalize_hint,
+            const vector_t<value_type, EDim::_2>& e) : plane<value_type>(p, n, norm), _tangent(t) { set_extends(e); }
+
+        //norm n, t, norm e
+        rect(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n, normalize_hint,
+            const vector_t<value_type, EDim::_3>& t,
+            const vector_t<value_type, EDim::_2>& e, normalize_hint) : plane<value_type>(p, n, norm), _extends(e) { set_tangent(t); }
+
+        //n, norm t, norm e
+        rect(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n,
+            const vector_t<value_type, EDim::_3>& t, normalize_hint,
+            const vector_t<value_type, EDim::_2>& e, normalize_hint) : plane<value_type>(p, n), _tangent(t), _extends(e) { }
+
+        //norm n, norm t, norm e
+        rect(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n, normalize_hint,
+            const vector_t<value_type, EDim::_3>& t, normalize_hint,
+            const vector_t<value_type, EDim::_2>& e, normalize_hint) : plane<value_type>(p, n, norm), _tangent(t), _extends(e) { }
+
+        void set_position(const point<value_type, EDim::_3>& p) { plane<value_type>::set_position(p); }
+        void set_normal(const vector_t<value_type, EDim::_3>& n) { plane<value_type>::set_normal(n); }
+        void set_normal(const vector_t<value_type, EDim::_3>& n, normalize_hint) { plane<value_type>::set_normal(n, normalize_hint::norm); }
+        void set_tangent(const vector_t<value_type, EDim::_2>& t) { _tangent = normalized(_tangent - dot(_tangent, _normal) * _normal); }
+        void set_tangent(const vector_t<value_type, EDim::_2>& t, normalize_hint) { _tangent = t; }
+        void set_width(value_type w) { _extends.x = max2(w, value_type(0)); }
+        void set_height(value_type h) { _extends.y = max2(h, value_type(0)); }
+        void set_extends(value_type w, value_type h) { set_width(w); set_height(h); }
+        void set_extends(const vector_t<value_type, EDim::_2>& e) { set_width(e.x); set_height(e.y); }
+        void set_extends(const vector_t<value_type, EDim::_2>& e, normalize_hint) { _extends = e; }
+        constexpr const point<value_type, EDim::_3>& position() const { return plane<value_type>::position(); }
+        constexpr point<value_type, EDim::_3>& position() { return plane<value_type>::position(); }
+        constexpr const vector_t<value_type, EDim::_3>& normal() const { return plane<value_type>::normal(); }
+        constexpr const vector_t<value_type, EDim::_3>& tangent() const { return _tangent; }
+        const vector_t<value_type, EDim::_2>& extends() const { return _extends; }
+        value_type width() const { return _extends.x; }
+        value_type height() const { return _extends.y; }
+    private:
+        vector_t<value_type, EDim::_3> _tangent;
+        vector_t<value_type, EDim::_2> _extends;
     };
 
     template<typename value_type>
@@ -145,10 +218,52 @@ namespace math
         {
             //t = -dot(N, Pp) / dot(Dr, N);
             t = dot(pos - ray.origin(), normal) / Dr_dot_N;
-            return t >= value_type(0)
-                ? intersection::intersect
-                : intersection::none;
+            if (t > value_type(0))
+            {
+                return intersection::intersect;
+            }
+            else if (t > value_type(0))
+            {
+                return intersection::none;
+            }
+            else
+            {
+                return intersection::inside;
+            }
         }
+        return intersection::none;
+    }
+
+    template<typename value_type>
+    intersection intersect_rect(const ray<value_type, EDim::_3>& ray,
+        const point<value_type, EDim::_3>& pos,
+        const vector_t<value_type, EDim::_3>& normal,
+        const vector_t<value_type, EDim::_3>& tangent,
+        const vector_t<value_type, EDim::_2>& extends, bool dualface,
+        value_type& t)
+    {
+        intersection r = intersect_plane(ray, pos, normal, dualface, t);
+        if (r != intersection::none)
+        {
+            point<value_type, EDim::_3> intersection = ray.calc_offset(t);
+            vector_t<value_type, EDim::_3> offset = (intersection - pos);
+            vector3<value_type> projection = dot(offset, tangent) * tangent;
+            value_type x = magnitude(projection);
+            value_type y = magnitude(offset - projection);
+            if (x > extends.x || y > extends.y)
+            {
+                intersection::none;
+            }
+            else if (x < extends.x && y < extends.y)
+            {
+                return intersection::inside;
+            }
+            else
+            {
+                return intersection::tangent;
+            }
+        }
+
         return intersection::none;
     }
 
@@ -190,6 +305,12 @@ namespace math
             value_type inv2a = value_type(0.5) / a;
             t0 = (-b - det) * inv2a;
             t1 = (-b + det) * inv2a;
+            if (t1 < value_type(0))
+            {
+                return intersection::none;
+            }
+
+            if (t1 < t0) { std::swap(t0, t1); }
             return (t0 < 0)
                 ? intersection::inside
                 : intersection::intersect;
@@ -201,7 +322,8 @@ namespace math
         else
         {
             t0 = t1 = -b * value_type(0.5) / a;
-            return intersection::tangent;
+
+            return t0 > 0 ? intersection::tangent : intersection::none;
         }
     }
 
