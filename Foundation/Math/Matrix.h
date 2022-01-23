@@ -7,6 +7,16 @@ namespace math
     template<typename value_type, EDim row_dim, EDim col_dim>
     struct matrix_t;
 
+    template<typename value_type, EDim row_dim, EDim col_dim>
+    struct translation_matrix_t;
+
+    template<typename value_type, EDim row_dim, EDim col_dim>
+    struct rotation_matrix_t;
+
+    template<typename value_type, EDim row_dim, EDim col_dim>
+    struct scale_matrix_t;
+
+
     template<typename value_type>
     struct matrix_t<value_type, EDim::_2, EDim::_2>
     {
@@ -73,20 +83,8 @@ namespace math
         // static utilities
         static constexpr matrix_t identity()
         {
-            return matrix_t(
-                value_type(1), value_type(0),
-                value_type(0), value_type(1));
+            return matrix_t();
         }
-
-        static constexpr matrix_t scale(value_type sx, value_type sy)
-        {
-            return matrix_t(
-                sx, value_type(0),
-                value_type(0), sy);
-        }
-
-        static constexpr matrix_t scale(value_type s) { return scale(s, s); }
-        static constexpr matrix_t scale(const vector_t<value_type, EDim::_2>& s) { return scale(s.x, s.y); }
 
         static constexpr matrix_t flip_x()
         {
@@ -102,14 +100,10 @@ namespace math
                 value_type(0), -value_type(1));
         }
 
-        static inline matrix_t rotate(const radian<value_type>& r)
-        {
-            value_type cosr = cos(r);
-            value_type sinr = sin(r);
-            return matrix_t(
-                cosr, -sinr,
-                sinr, cosr);
-        }
+        static inline matrix_t rotation(const radian<value_type>& r);
+        static constexpr matrix_t scale(value_type sx, value_type sy);
+        static constexpr matrix_t scale(value_type s);
+        static constexpr matrix_t scale(const vector_t<value_type, EDim::_2>& s);
     };
 
     template<typename value_type>
@@ -185,20 +179,8 @@ namespace math
         //static utilities
         static constexpr matrix_t identity()
         {
-            return matrix_t(
-                value_type(1), value_type(0), value_type(0),
-                value_type(0), value_type(1), value_type(0));
+            return matrix_t();
         }
-
-        static constexpr matrix_t scale(value_type sx, value_type sy)
-        {
-            return matrix_t(
-                sx, value_type(0), value_type(0),
-                value_type(0), sy, value_type(0));
-        }
-
-        static constexpr matrix_t scale(value_type s) { return scale(s, s); }
-        static constexpr matrix_t scale(const vector_t<value_type, EDim::_2>& s) { return scale(s.x, s.y); }
 
         static constexpr matrix_t flip_x()
         {
@@ -212,25 +194,6 @@ namespace math
             return matrix_t(
                 value_type(1), value_type(0), value_type(0),
                 value_type(0), -value_type(1), value_type(0));
-        }
-
-        static constexpr matrix_t translate(value_type tx, value_type ty)
-
-        {
-            return matrix_t(
-                value_type(1), value_type(0), tx,
-                value_type(0), value_type(1), ty);
-        }
-
-        static constexpr matrix_t translate(const vector_t < value_type, EDim::_2>& t) { return translate(t.x, t.y); }
-
-        static inline matrix_t rotate(const radian<value_type>& r)
-        {
-            value_type cosr = cos(r);
-            value_type sinr = sin(r);
-            return matrix_t(
-                cosr, -sinr, value_type(0),
-                sinr, cosr, value_type(0));
         }
 
         static inline matrix_t trs_inversed(const vector_t<value_type, EDim::_2>& t, const radian<value_type>& r, const vector_t<value_type, EDim::_2>& s)
@@ -249,8 +212,8 @@ namespace math
             value_type sinr = sin(r);
 
             return matrix_t(
-                +s.x*cosr, s.x*sinr, -s.x*(cosr*t.x - sinr * t.y),
-                -s.y*sinr, s.y*cosr, +s.y*(sinr*t.x - cosr * t.y));
+                +s.x * cosr, s.x * sinr, -s.x * (cosr * t.x - sinr * t.y),
+                -s.y * sinr, s.y * cosr, +s.y * (sinr * t.x - cosr * t.y));
         }
 
         static inline matrix_t trs(const vector_t<value_type, EDim::_2>& t, const radian<value_type>& r, const vector_t<value_type, EDim::_2>& s)
@@ -287,12 +250,12 @@ namespace math
             */
             value_type cosr = cos(r);
             value_type sinr = sin(r);
-            value_type spx = -s.x*p.x;
-            value_type spy = -s.y*p.y;
+            value_type spx = -s.x * p.x;
+            value_type spy = -s.y * p.y;
 
             return matrix_t(
-                cosr * s.x, -sinr * s.y, cosr*spx - sinr * spy + t.x,
-                sinr * s.x, +cosr * s.y, sinr*spx + cosr * spy + t.y);
+                cosr * s.x, -sinr * s.y, cosr * spx - sinr * spy + t.x,
+                sinr * s.x, +cosr * s.y, sinr * spx + cosr * spy + t.y);
         }
 
         static inline matrix_t trps(const vector_t<value_type, EDim::_2>& t, const radian<value_type>& r, const vector_t<value_type, EDim::_2>& p, const vector_t<value_type, EDim::_2>& s)
@@ -314,6 +277,13 @@ namespace math
                 cosr * s.x, -sinr * s.y, -cosr * p.x + sinr * p.y + t.x,
                 sinr * s.x, +cosr * s.y, -sinr * p.x - cosr * p.y + t.y);
         }
+
+        static constexpr matrix_t translation(value_type tx, value_type ty);
+        static constexpr matrix_t translation(const vector_t < value_type, EDim::_2>& t);
+        static inline matrix_t rotation(const radian<value_type>& r);
+        static constexpr matrix_t scale(value_type sx, value_type sy);
+        static constexpr matrix_t scale(value_type s);
+        static constexpr matrix_t scale(const vector_t<value_type, EDim::_2>& s);
     };
 
     template<typename value_type>
@@ -397,22 +367,8 @@ namespace math
         // static utilities
         static constexpr matrix_t identity()
         {
-            return matrix_t(
-                value_type(1), value_type(0), value_type(0),
-                value_type(0), value_type(1), value_type(0),
-                value_type(0), value_type(0), value_type(1));
+            return matrix_t();
         }
-
-        static constexpr matrix_t scale(value_type sx, value_type sy, value_type sz)
-        {
-            return matrix_t(
-                sx, value_type(0), value_type(0),
-                value_type(0), sy, value_type(0),
-                value_type(0), value_type(0), sz);
-        }
-
-        static constexpr matrix_t scale(value_type s) { return scale(s, s, s); }
-        static constexpr matrix_t scale(const vector_t<value_type, EDim::_3>& s) { return scale(s.x, s.y, s.z); }
 
         static constexpr matrix_t flip_x()
         {
@@ -469,23 +425,6 @@ namespace math
                 cosr, -sinr, value_type(0),
                 sinr, cosr, value_type(0),
                 value_type(0), value_type(0), value_type(1));
-        }static constexpr matrix_t translate(value_type tx, value_type ty)
-
-        {
-            return matrix_t(
-                value_type(1), value_type(0), tx,
-                value_type(0), value_type(1), ty);
-        }
-
-        static constexpr matrix_t translate(const vector_t < value_type, EDim::_2>& t) { return translate(t.x, t.y); }
-
-        static inline matrix_t rotate(const radian<value_type>& r)
-        {
-            value_type cosr = cos(r);
-            value_type sinr = sin(r);
-            return matrix_t(
-                cosr, -sinr, value_type(0),
-                sinr, cosr, value_type(0));
         }
 
         static inline matrix_t trs_inversed(const vector_t<value_type, EDim::_2>& t, const radian<value_type>& r, const vector_t<value_type, EDim::_2>& s)
@@ -504,8 +443,8 @@ namespace math
             value_type sinr = sin(r);
 
             return matrix_t(
-                +s.x*cosr, s.x*sinr, -s.x*(cosr*t.x - sinr * t.y),
-                -s.y*sinr, s.y*cosr, +s.y*(sinr*t.x - cosr * t.y),
+                +s.x * cosr, s.x * sinr, -s.x * (cosr * t.x - sinr * t.y),
+                -s.y * sinr, s.y * cosr, +s.y * (sinr * t.x - cosr * t.y),
                 value_type(0), value_type(0), value_type(1));
         }
 
@@ -529,6 +468,17 @@ namespace math
                 sinr * s.x, +cosr * s.y, t.y,
                 value_type(0), value_type(0), value_type(1));
         }
+
+        static constexpr matrix_t translation(value_type tx, value_type ty);
+        static constexpr matrix_t translation(const vector_t < value_type, EDim::_2>& t);
+        static inline matrix_t rotation(const radian<value_type>& r);
+        static constexpr matrix_t rotation(const quaternion<value_type>& q);
+        static constexpr matrix_t scale(value_type sx, value_type sy, value_type sz);
+        static constexpr matrix_t scale(value_type s);
+        static constexpr matrix_t scale(const vector_t<value_type, EDim::_3>& s);
+        static constexpr matrix_t scale2d(value_type sx, value_type sy);
+        static constexpr matrix_t scale2d(value_type s);
+        static constexpr matrix_t scale2d(const vector_t<value_type, EDim::_2>& s);
     };
 
     template<typename value_type>
@@ -636,24 +586,8 @@ namespace math
         // static utilities
         static constexpr matrix_t identity()
         {
-            return matrix_t(
-                value_type(1), value_type(0), value_type(0), value_type(0),
-                value_type(0), value_type(1), value_type(0), value_type(0),
-                value_type(0), value_type(0), value_type(1), value_type(0),
-                value_type(0), value_type(0), value_type(0), value_type(1));
+            return matrix_t();
         }
-
-        static constexpr matrix_t scale(value_type sx, value_type sy, value_type sz)
-        {
-            return matrix_t(
-                sx, value_type(0), value_type(0), value_type(0),
-                value_type(0), sy, value_type(0), value_type(0),
-                value_type(0), value_type(0), sz, value_type(0),
-                value_type(0), value_type(0), value_type(0), value_type(1));
-        }
-
-        static constexpr matrix_t scale(value_type s) { return scale(s, s, s); }
-        static constexpr matrix_t scale(const vector_t<value_type, EDim::_3>& s) { return scale(s.x, s.y, s.z); }
 
         static constexpr matrix_t flip_x()
         {
@@ -681,17 +615,6 @@ namespace math
                 value_type(0), value_type(0), -value_type(1), value_type(0),
                 value_type(0), value_type(0), value_type(0), value_type(1));
         }
-
-        static constexpr matrix_t translate(value_type tx, value_type ty, value_type tz)
-        {
-            return matrix_t(
-                value_type(1), value_type(0), value_type(0), tx,
-                value_type(0), value_type(1), value_type(0), ty,
-                value_type(0), value_type(0), value_type(1), tz,
-                value_type(0), value_type(0), value_type(0), value_type(1));
-        }
-
-        static constexpr matrix_t translate(const vector_t<value_type, EDim::_3>& t) { return translate(t.x, t.y, t.z); }
 
         static inline matrix_t rotate_x(const radian<value_type>& r)
         {
@@ -732,20 +655,20 @@ namespace math
             );
         }
 
-        static inline matrix_t TR(const vector_t<value_type, EDim::_3>& t, const quaternion<value_type>& r)
+        static inline matrix_t tr(const vector_t<value_type, EDim::_3>& t, const quaternion<value_type>& r)
         {
-            matrix_t matt = translate(t);
-            matrix_t matr = convert_to_matrix4x4(r);
+            translation_matrix_t<value_type, EDim::_4, EDim::_4> matt(t);
+            rotation_matrix_t<value_type, EDim::_4, EDim::_4> matr(r);
             return matt * matr;
         }
 
-        static inline matrix_t TRS(const vector_t<value_type, EDim::_3>& t,
+        static inline matrix_t trs(const vector_t<value_type, EDim::_3>& t,
             const quaternion<value_type>& r,
             const vector_t<value_type, EDim::_3>& s)
         {
-            matrix_t matt = translate(t);
-            matrix_t matr = convert_to_matrix4x4(r);
-            matrix_t mats = scale(s);
+            translation_matrix_t<value_type, EDim::_4, EDim::_4> matt(t);
+            rotation_matrix_t<value_type, EDim::_4, EDim::_4> matr(r);
+            scale_matrix_t<value_type, EDim::_4, EDim::_4> mats(s);
             return matt * matr * mats;
         }
 
@@ -804,6 +727,238 @@ namespace math
         }
 
         static inline matrix_t ortho2d_lh(const vector2<value_type>& size, const vector2<value_type>& zpair) { ortho2d_lh(size.x, size.y, zpair.x, zpair.y); }
+
+        static constexpr matrix_t translation(value_type tx, value_type ty, value_type tz);
+        static constexpr matrix_t translation(const vector_t<value_type, EDim::_3>& t);
+        static constexpr matrix_t rotation(const quaternion<value_type>& q);
+        static constexpr matrix_t scale(value_type sx, value_type sy, value_type sz);
+        static constexpr matrix_t scale(value_type s);
+        static constexpr matrix_t scale(const vector_t<value_type, EDim::_3>& s);
+    };
+
+    template<typename value_type>
+    struct translation_matrix_t<value_type, EDim::_2, EDim::_3>
+        : public matrix_t<value_type, EDim::_2, EDim::_3>
+    {
+        constexpr translation_matrix_t(value_type tx, value_type ty)
+            : matrix_t(
+                value_type(1), value_type(0), tx,
+                value_type(0), value_type(1), ty)
+        { }
+
+        constexpr translation_matrix_t(const vector_t<value_type, EDim::_2>& translation)
+            : translation_matrix_t(translation.x, translation.y)
+        { }
+    };
+
+    template<typename value_type>
+    struct translation_matrix_t<value_type, EDim::_3, EDim::_3>
+        : public matrix_t<value_type, EDim::_3, EDim::_3>
+    {
+        constexpr translation_matrix_t(value_type tx, value_type ty)
+            : matrix_t(
+                value_type(1), value_type(0), tx,
+                value_type(0), value_type(1), ty)
+        { }
+
+        constexpr translation_matrix_t(const vector_t<value_type, EDim::_2>& translation)
+            : translation_matrix_t(translation.x, translation.y)
+        { }
+    };
+
+    template<typename value_type>
+    struct translation_matrix_t<value_type, EDim::_4, EDim::_4>
+        : public matrix_t<value_type, EDim::_4, EDim::_4>
+    {
+        constexpr translation_matrix_t(value_type tx, value_type ty, value_type tz)
+            : matrix_t(
+                value_type(1), value_type(0), value_type(0), tx,
+                value_type(0), value_type(1), value_type(0), ty,
+                value_type(0), value_type(0), value_type(1), tz,
+                value_type(0), value_type(0), value_type(0), value_type(1)
+            )
+        { }
+
+        constexpr translation_matrix_t(const vector_t<value_type, EDim::_3>& translation)
+            : translation_matrix_t(translation.x, translation.y, translation.z)
+        { }
+    };
+
+
+    template<typename value_type>
+    struct rotation_matrix_t<value_type, EDim::_2, EDim::_2>
+        : public matrix_t<value_type, EDim::_2, EDim::_2>
+    {
+        inline rotation_matrix_t(const radian<value_type>& r)
+        {
+            value_type cosr = cos(r);
+            value_type sinr = sin(r);
+
+            cells[0][0] = cosr;     cells[0][1] = -sinr;
+            cells[1][0] = sinr;     cells[1][1] = cosr;
+        }
+    };
+
+    template<typename value_type>
+    struct rotation_matrix_t<value_type, EDim::_2, EDim::_3>
+        : public matrix_t<value_type, EDim::_2, EDim::_3>
+    {
+        inline rotation_matrix_t(const radian<value_type>& r)
+        {
+            value_type cosr = cos(r);
+            value_type sinr = sin(r);
+
+            cells[0][0] = cosr;     cells[0][1] = -sinr;
+            cells[1][0] = sinr;     cells[1][1] = cosr;
+        }
+    };
+
+    template<typename value_type>
+    struct rotation_matrix_t<value_type, EDim::_3, EDim::_3>
+        : public matrix_t<value_type, EDim::_3, EDim::_3>
+    {
+        inline rotation_matrix_t(const radian<value_type>& r)
+        {
+            value_type cosr = cos(r);
+            value_type sinr = sin(r);
+
+            cells[0][0] = cosr;     cells[0][1] = -sinr;
+            cells[1][0] = sinr;     cells[1][1] = cosr;
+        }
+
+        constexpr rotation_matrix_t(const quaternion<value_type>& q)
+        {
+            vector_t<value_type, EDim::_3> vsqr2 = q.v * q.v * value_type(2);
+            value_type xy2 = q.v.x * q.v.y * value_type(2);
+            value_type yz2 = q.v.y * q.v.z * value_type(2);
+            value_type zx2 = q.v.z * q.v.x * value_type(2);
+            value_type wx2 = q.w * q.v.x * value_type(2);
+            value_type wy2 = q.w * q.v.y * value_type(2);
+            value_type wz2 = q.w * q.v.z * value_type(2);
+
+            cells[0][0] = value_type(1) - vsqr2.y - vsqr2.z;
+            cells[1][1] = value_type(1) - vsqr2.z - vsqr2.x;
+            cells[2][2] = value_type(1) - vsqr2.x - vsqr2.y;
+
+            cells[0][1] = xy2 - wz2;
+            cells[0][2] = zx2 + wy2;
+            cells[1][0] = xy2 + wz2;
+
+            cells[1][2] = yz2 - wx2;
+            cells[2][0] = zx2 - wy2;
+            cells[2][1] = yz2 + wx2;
+        }
+    };
+
+    template<typename value_type>
+    struct rotation_matrix_t<value_type, EDim::_4, EDim::_4>
+        : public matrix_t<value_type, EDim::_4, EDim::_4>
+    {
+        constexpr rotation_matrix_t(const quaternion<value_type>& q)
+        {
+            vector_t<value_type, EDim::_3> vsqr2 = q.v * q.v * value_type(2);
+            value_type xy2 = q.v.x * q.v.y * value_type(2);
+            value_type yz2 = q.v.y * q.v.z * value_type(2);
+            value_type zx2 = q.v.z * q.v.x * value_type(2);
+            value_type wx2 = q.w * q.v.x * value_type(2);
+            value_type wy2 = q.w * q.v.y * value_type(2);
+            value_type wz2 = q.w * q.v.z * value_type(2);
+
+            cells[0][0] = value_type(1) - vsqr2.y - vsqr2.z;
+            cells[1][1] = value_type(1) - vsqr2.z - vsqr2.x;
+            cells[2][2] = value_type(1) - vsqr2.x - vsqr2.y;
+
+            cells[0][1] = xy2 - wz2;
+            cells[0][2] = zx2 + wy2;
+            cells[1][0] = xy2 + wz2;
+
+            cells[1][2] = yz2 - wx2;
+            cells[2][0] = zx2 - wy2;
+            cells[2][1] = yz2 + wx2;
+        }
+    };
+
+
+    template<typename value_type>
+    struct scale_matrix_t<value_type, EDim::_2, EDim::_2>
+        : public matrix_t<value_type, EDim::_2, EDim::_2>
+    {
+        constexpr scale_matrix_t(value_type sx, value_type sy)
+            : matrix_t(
+                sx, value_type(0),
+                value_type(0), sy
+            )
+        { }
+
+        constexpr scale_matrix_t(value_type s) : scale_matrix_t(s, s) { }
+
+        constexpr scale_matrix_t(const vector_t<value_type, EDim::_2>& s) : scale_matrix_t(s.x, s.y) { }
+    };
+
+    template<typename value_type>
+    struct scale_matrix_t<value_type, EDim::_2, EDim::_3>
+        : public matrix_t<value_type, EDim::_2, EDim::_3>
+    {
+        constexpr scale_matrix_t(value_type sx, value_type sy)
+            : matrix_t(
+                sx, value_type(0),
+                value_type(0), sy
+            )
+        { }
+
+        constexpr scale_matrix_t(value_type s) : scale_matrix_t(s, s) { }
+
+        constexpr scale_matrix_t(const vector_t<value_type, EDim::_2>& s) : scale_matrix_t(s.x, s.y) { }
+    };
+
+    template<typename value_type>
+    struct scale_matrix_t<value_type, EDim::_3, EDim::_3>
+        : public matrix_t<value_type, EDim::_3, EDim::_3>
+    {
+        constexpr scale_matrix_t(value_type sx, value_type sy, value_type sz)
+            : matrix_t(
+                sx, value_type(0), value_type(0)
+                value_type(0), sy, value_type(0)
+                value_type(0), value_type(0), sz
+            )
+        { }
+
+        constexpr scale_matrix_t(value_type s) : scale_matrix_t(s, s, s) { }
+
+        constexpr scale_matrix_t(const vector_t<value_type, EDim::_3>&s) : scale_matrix_t(s.x, s.y, s.z) { }
+
+        static constexpr scale_matrix_t make2d(value_type sx, value_type sy)
+        {
+            return scale_matrix_t<value_type, EDim::_3, EDim::_3>(sx, sy, value_type(1));
+        }
+
+        static constexpr scale_matrix_t make2d(value_type s)
+        {
+            return scale_matrix_t<value_type, EDim::_3, EDim::_3>(s, s, value_type(1));
+        }
+
+        static constexpr scale_matrix_t make2d(const vector_t<value_type, EDim::_2>& s)
+        {
+            return scale_matrix_t<value_type, EDim::_3, EDim::_3>(s.x, s.y, value_type(1));
+        }
+    };
+
+    template<typename value_type>
+    struct scale_matrix_t<value_type, EDim::_4, EDim::_4>
+        : public matrix_t<value_type, EDim::_4, EDim::_4>
+    {
+        constexpr scale_matrix_t(value_type sx, value_type sy, value_type sz)
+            : matrix_t(
+                sx, value_type(0), value_type(0), value_type(0)
+                value_type(0), sy, value_type(0), value_type(0)
+                value_type(0), value_type(0), sz, value_type(0)
+                value_type(0), value_type(0), value_type(0), value_type(1)
+            )
+        { }
+
+        constexpr scale_matrix_t(value_type s) : scale_matrix_t(s, s, s) { }
+
+        constexpr scale_matrix_t(const vector_t<value_type, EDim::_3>&s) : scale_matrix_t(s.x, s.y, s.z) { }
     };
 
     namespace math_impl
@@ -856,6 +1011,188 @@ namespace math
                 + a02 * determinant3x3(a10, a11, a13, a20, a21, a23, a30, a31, a33)
                 - a03 * determinant3x3(a10, a11, a12, a20, a21, a22, a30, a31, a32);
         }
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+        matrix_t<value_type, EDim::_2, EDim::_3>::translation(value_type tx, value_type ty)
+    {
+        return translation_matrix_t<value_type, EDim::_2, EDim::_3>(tx, ty);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+        matrix_t<value_type, EDim::_2, EDim::_3>::translation(const vector_t<value_type, EDim::_2>& translation)
+    {
+        return translation_matrix_t<value_type, EDim::_2, EDim::_3>(translation);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::translation(value_type tx, value_type ty)
+    {
+        return translation_matrix_t<value_type, EDim::_3, EDim::_3>(tx, ty);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::translation(const vector_t<value_type, EDim::_2>& translation)
+    {
+        return translation_matrix_t<value_type, EDim::_3, EDim::_3>(translation);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+        matrix_t<value_type, EDim::_4, EDim::_4>::translation(value_type tx, value_type ty, value_type tz)
+    {
+        return translation_matrix_t<value_type, EDim::_4, EDim::_4>(tx, ty, tz);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+        matrix_t<value_type, EDim::_4, EDim::_4>::translation(const vector_t<value_type, EDim::_3>& translation)
+    {
+        return translation_matrix_t<value_type, EDim::_4, EDim::_4>(translation);
+    }
+
+    template<typename value_type>
+    inline matrix_t<value_type, EDim::_2, EDim::_2>
+        matrix_t<value_type, EDim::_2, EDim::_2>::rotation(const radian<value_type>& r)
+    {
+        return rotation_matrix_t<value_type, EDim::_2, EDim::_2>(r);
+    }
+
+    template<typename value_type>
+    inline matrix_t<value_type, EDim::_2, EDim::_3>
+        matrix_t<value_type, EDim::_2, EDim::_3>::rotation(const radian<value_type>& r)
+    {
+        return rotation_matrix_t<value_type, EDim::_2, EDim::_3>(r);
+    }
+
+    template<typename value_type>
+    inline matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::rotation(const radian<value_type>& r)
+    {
+        return rotation_matrix_t<value_type, EDim::_3, EDim::_3>(r);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::rotation(const quaternion<value_type>& q)
+    {
+        return rotation_matrix_t<value_type, EDim::_3, EDim::_3>(q);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+        matrix_t<value_type, EDim::_4, EDim::_4>::rotation(const quaternion<value_type>& q)
+    {
+        return rotation_matrix_t<value_type, EDim::_4, EDim::_4>(q);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_2, EDim::_2>
+        matrix_t<value_type, EDim::_2, EDim::_2>::scale(value_type sx, value_type sy)
+    {
+        return scale_matrix_t<value_type, EDim::_2, EDim::_2>(sx, sy);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_2, EDim::_2>
+        matrix_t<value_type, EDim::_2, EDim::_2>::scale(value_type s)
+    {
+        return scale_matrix_t<value_type, EDim::_2, EDim::_2>(s);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_2, EDim::_2>
+        matrix_t<value_type, EDim::_2, EDim::_2>::scale(const vector_t<value_type, EDim::_2>& s)
+    {
+        return scale_matrix_t<value_type, EDim::_2, EDim::_2>(s);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+        matrix_t<value_type, EDim::_2, EDim::_3>::scale(value_type sx, value_type sy)
+    {
+        return scale_matrix_t<value_type, EDim::_2, EDim::_3>(sx, sy);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+        matrix_t<value_type, EDim::_2, EDim::_3>::scale(value_type s)
+    {
+        return scale_matrix_t<value_type, EDim::_2, EDim::_3>(s);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+        matrix_t<value_type, EDim::_2, EDim::_3>::scale(const vector_t<value_type, EDim::_2>& s)
+    {
+        return scale_matrix_t<value_type, EDim::_2, EDim::_3>(s);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::scale(value_type sx, value_type sy, value_type sz)
+    {
+        return scale_matrix_t<value_type, EDim::_3, EDim::_3>(sx, sy, sz);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::scale(value_type s)
+    {
+        return scale_matrix_t<value_type, EDim::_3, EDim::_3>(s);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::scale(const vector_t<value_type, EDim::_3>& s)
+    {
+        return scale_matrix_t<value_type, EDim::_3, EDim::_3>(s);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::scale2d(value_type sx, value_type sy)
+    {
+        return scale_matrix_t<value_type, EDim::_3, EDim::_3>::make2d(sx, sy);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::scale2d(value_type s)
+    {
+        return scale_matrix_t<value_type, EDim::_3, EDim::_3>::make2d(s);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+        matrix_t<value_type, EDim::_3, EDim::_3>::scale2d(const vector_t<value_type, EDim::_2>& s)
+    {
+        return scale_matrix_t<value_type, EDim::_3, EDim::_3>::make2d(s);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+        matrix_t<value_type, EDim::_4, EDim::_4>::scale(value_type sx, value_type sy, value_type sz)
+    {
+        return scale_matrix_t<value_type, EDim::_4, EDim::_4>(sx, sy, sz);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+        matrix_t<value_type, EDim::_4, EDim::_4>::scale(value_type s)
+    {
+        return scale_matrix_t<value_type, EDim::_4, EDim::_4>(s);
+    }
+
+    template<typename value_type>
+    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+        matrix_t<value_type, EDim::_4, EDim::_4>::scale(const vector_t<value_type, EDim::_3>& s)
+    {
+        return scale_matrix_t<value_type, EDim::_4, EDim::_4>(s);
     }
 
     template<typename value_type, EDim Row, EDim Col>
@@ -928,7 +1265,7 @@ namespace math
     }
 
     template<typename value_type>
-    inline vector_t<value_type, EDim::_3> operator* (const matrix_t<value_type, EDim::_2, EDim::_3>& l, const vector_t<value_type, EDim::_3> & r)
+    inline vector_t<value_type, EDim::_3> operator* (const matrix_t<value_type, EDim::_2, EDim::_3>& l, const vector_t<value_type, EDim::_3>& r)
     {
         return vector_t<value_type, EDim::_3>(dot(l.rows[0], r), dot(l.rows[1], r), r.z);
     }
@@ -940,7 +1277,7 @@ namespace math
     }
 
     template<typename value_type, EDim Row, EDim Col>
-    constexpr vector_t<value_type, Row> operator* (const matrix_t<value_type, Row, Col>& l, const vector_t<value_type, Col> & r)
+    constexpr vector_t<value_type, Row> operator* (const matrix_t<value_type, Row, Col>& l, const vector_t<value_type, Col>& r)
     {
         vector_t<value_type, Row> rst;
         for (size_t ri = 0; ri < Row; ri++)
@@ -1498,7 +1835,6 @@ namespace math
             value_type(0), value_type(0), value_type(1));
     }
 
-
     template<typename value_type>
     constexpr matrix_t<value_type, EDim::_2, EDim::_2> convert_to_matrix2x2(const matrix_t<value_type, EDim::_2, EDim::_3>& matrix)
     {
@@ -1552,57 +1888,15 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3> convert_to_matrix3x3(const quaternion<value_type>& q)
+    constexpr rotation_matrix_t<value_type, EDim::_3, EDim::_3> convert_to_matrix3x3(const quaternion<value_type>& q)
     {
-        matrix_t<value_type, EDim::_3, EDim::_3> rst;
-        vector_t<value_type, EDim::_3> vsqr2 = q.v * q.v * value_type(2);
-        value_type xy2 = q.v.x * q.v.y * value_type(2);
-        value_type yz2 = q.v.y * q.v.z * value_type(2);
-        value_type zx2 = q.v.z * q.v.x * value_type(2);
-        value_type wx2 = q.w * q.v.x * value_type(2);
-        value_type wy2 = q.w * q.v.y * value_type(2);
-        value_type wz2 = q.w * q.v.z * value_type(2);
-
-        rst.cells[0][0] = value_type(1) - vsqr2.y - vsqr2.z;
-        rst.cells[1][1] = value_type(1) - vsqr2.z - vsqr2.x;
-        rst.cells[2][2] = value_type(1) - vsqr2.x - vsqr2.y;
-
-        rst.cells[0][1] = xy2 - wz2;
-        rst.cells[0][2] = zx2 + wy2;
-        rst.cells[1][0] = xy2 + wz2;
-
-        rst.cells[1][2] = yz2 - wx2;
-        rst.cells[2][0] = zx2 - wy2;
-        rst.cells[2][1] = yz2 + wx2;
-
-        return rst;
+        return rotation_matrix_t<value_type, EDim::_3, EDim::_3>(q);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_4, EDim::_4> convert_to_matrix4x4(const quaternion<value_type>& q)
+    constexpr rotation_matrix_t<value_type, EDim::_4, EDim::_4> convert_to_matrix4x4(const quaternion<value_type>& q)
     {
-        matrix_t<value_type, EDim::_4, EDim::_4> rst;
-        vector_t<value_type, EDim::_3> vsqr2 = q.v * q.v * value_type(2);
-        value_type xy2 = q.v.x * q.v.y * value_type(2);
-        value_type yz2 = q.v.y * q.v.z * value_type(2);
-        value_type zx2 = q.v.z * q.v.x * value_type(2);
-        value_type wx2 = q.w * q.v.x * value_type(2);
-        value_type wy2 = q.w * q.v.y * value_type(2);
-        value_type wz2 = q.w * q.v.z * value_type(2);
-
-        rst.cells[0][0] = value_type(1) - vsqr2.y - vsqr2.z;
-        rst.cells[1][1] = value_type(1) - vsqr2.z - vsqr2.x;
-        rst.cells[2][2] = value_type(1) - vsqr2.x - vsqr2.y;
-
-        rst.cells[0][1] = xy2 - wz2;
-        rst.cells[0][2] = zx2 + wy2;
-        rst.cells[1][0] = xy2 + wz2;
-
-        rst.cells[1][2] = yz2 - wx2;
-        rst.cells[2][0] = zx2 - wy2;
-        rst.cells[2][1] = yz2 + wx2;
-
-        return rst;
+        return rotation_matrix_t<value_type, EDim::_4, EDim::_4>(q);
     }
 
     namespace math_impl
@@ -1733,6 +2027,16 @@ namespace math
     template<typename value_type> using matrix2x3 = matrix_t<value_type, EDim::_2, EDim::_3>;
     template<typename value_type> using matrix3x3 = matrix_t<value_type, EDim::_3, EDim::_3>;
     template<typename value_type> using matrix4x4 = matrix_t<value_type, EDim::_4, EDim::_4>;
+
+
+    template<typename value_type> using tmatrix2x3 = translation_matrix_t<value_type, EDim::_2, EDim::_3>;
+    template<typename value_type> using tmatrix3x3 = translation_matrix_t<value_type, EDim::_3, EDim::_3>;
+    template<typename value_type> using tmatrix4x4 = translation_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using rmatrix3x3 = rotation_matrix_t<value_type, EDim::_3, EDim::_3>;
+    template<typename value_type> using rmatrix4x4 = rotation_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using smatrix2x3 = scale_matrix_t<value_type, EDim::_2, EDim::_3>;
+    template<typename value_type> using smatrix3x3 = scale_matrix_t<value_type, EDim::_3, EDim::_3>;
+    template<typename value_type> using smatrix4x4 = scale_matrix_t<value_type, EDim::_4, EDim::_4>;
 
     using float2x2 = matrix2x2<float>;
     using float2x3 = matrix2x3<float>;

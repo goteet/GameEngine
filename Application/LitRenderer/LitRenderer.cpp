@@ -3,8 +3,6 @@
 #include <Foundation/Math/PredefinedConstantValues.h>
 #include "LitRenderer.h"
 
-const int MaxRecursiveDepth = 10;
-const F RayBias = math::EPSILON<F> *100.0f;
 
 #include <random>
 template<typename T>
@@ -14,6 +12,8 @@ struct random
 
     static T value() { return instance()._value(); }
 
+    static T range(T range_value) { return value() * T(2) * range_value - range_value; }
+
 private:
     std::random_device randomDevice;
     std::mt19937 generator;
@@ -22,13 +22,13 @@ private:
     F _value() { return distribution(generator); }
 };
 
-
 math::vector3<F> GenerateUnitSphereVector()
 {
-    while (true) {
-        F x = F(2) * random<F>::value() - F(1);
-        F y = F(2) * random<F>::value() - F(1);
-        F z = F(2) * random<F>::value() - F(1);
+    while (true)
+    {
+        F x = random<F>::range(F(1));
+        F y = random<F>::range(F(1));
+        F z = random<F>::range(F(1));
         math::vector3<F> v = math::vector3<F>(x, y, z);
         if (math::magnitude_sqr(v) < F(1))
         {
@@ -62,7 +62,7 @@ math::vector3<F> GenerateHemisphereDirection(const math::vector3<F>& normal)
 {
     F cosTheta = F(1) - F(2) * random<F>::value();
     F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
-    math::radian<F> phi(F(2) * math::PI<F> *random<F>::value());
+    math::radian<F> phi(math::TWO_PI<F> *random<F>::value());
     F cosPhi = math::cos(phi);
     F sinPhi = math::sin(phi);
 
@@ -73,6 +73,26 @@ math::vector3<F> GenerateHemisphereDirection(const math::vector3<F>& normal)
     UVW uvw(normal);
     return uvw.local(x, y, z);
 }
+
+math::vector3<F> GenUniformHemisphereDirection(const math::vector3<F>& normal)
+{
+    // pdf = 1/2PI
+    // => cdf = 1/2PI*phi*(1-cos_theta)
+    // => f_phi = 1/2PI*phi       --> phi(x) = 2*PI*x
+    // => f_theta = 1-cos_theta   --> cos_theta(x) = 1-x = x'
+    F cosTheta = random<F>::value(); //replace 1-e to e'
+    F sinTheta = sqrt(F(1) - cosTheta* cosTheta);
+    math::radian<F> phi(math::constant_value<F>::two_pi * random<F>::value());
+    F cosPhi = math::cos(phi);
+    F sinPhi = math::sin(phi);
+
+    F x = sinTheta * cosPhi;
+    F y = sinTheta * sinPhi;
+    F z = cosTheta;
+
+    return UVW(normal).local(x,y,z);
+}
+
 
 math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F>& normal)
 {
@@ -95,7 +115,7 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F
 bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering) const
 {
-    math::vector3<F> Direction = GenerateCosineWeightedHemisphereDirection(N);
+    math::vector3<F> Direction = GenUniformHemisphereDirection(N);
     outScattering.set_origin(P);
     outScattering.set_direction(Direction, math::norm);
     return true;
@@ -104,7 +124,7 @@ bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N
 F Lambertian::ScatteringPDF(const math::vector3<F>& N, const math::vector3<F>& Scattering) const
 {
     F cosTheta = math::dot(N, Scattering);
-    return cosTheta < F(0) ? F(0) : cosTheta / math::PI<F>;
+    return cosTheta < F(0) ? F(0) : F(1) / math::constant_value<F>::two_pi;
 }
 
 math::vector3<F> Reflect(const math::vector3<F>& In, const math::vector3<F>& N)
@@ -183,16 +203,33 @@ math::vector3<F> PureLight_ForTest::Emitting() const
     return Emission;
 }
 
-math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, int recursiveDepth)
+
+struct TerminalRecord
 {
-    if (recursiveDepth == MaxRecursiveDepth)
+    static const int MaxRecursiveDepth = 100;
+
+    math::vector3<F> OuterReflectance = math::vector3<F>::one();
+    int CurrentRecursiveDepth = MaxRecursiveDepth;
+
+    TerminalRecord Next(const math::vector3<F>& reflectance) const
+    {
+        return TerminalRecord{ OuterReflectance * reflectance,  CurrentRecursiveDepth - 1 };
+    }
+
+    bool IsTerminal() const
+    {
+        return CurrentRecursiveDepth == 0 || math::near_zero(OuterReflectance);
+    };
+};
+
+math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRecord& TerminalRecord)
+{
+    if (TerminalRecord.IsTerminal())
     {
         return math::vector3<F>::zero();
     }
 
-    //return Sky Color if there is no collision occured In the direction.
-    const F Epsilon = RayBias;
-    HitRecord contactRecord = scene.DetectIntersecting(ray, nullptr, Epsilon);
+    HitRecord contactRecord = scene.DetectIntersecting(ray, nullptr, math::SMALL_NUM<F>);
     if (contactRecord.Object == nullptr)
     {
         return math::vector3<F>::zero();
@@ -224,13 +261,13 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, int recursiveDep
             math::vector3<F> lightDirectoin = LightSamplePos - shadingPoint;
             scattering.set_direction(lightDirectoin);
             F cosThetaPrime = math::dot(-LightNormal, scattering.direction());
-            if (cosThetaPrime < -Epsilon && LightObject->IsDualface())
+            if (cosThetaPrime < -math::SMALL_NUM<F> && LightObject->IsDualface())
             {
                 cosThetaPrime = -cosThetaPrime;
             }
-            if (cosThetaPrime > Epsilon)
+            if (cosThetaPrime > math::SMALL_NUM<F>)
             {
-                HitRecord lightHitRecord = scene.DetectIntersecting(scattering, nullptr, Epsilon);
+                HitRecord lightHitRecord = scene.DetectIntersecting(scattering, nullptr, math::SMALL_NUM<F>);
                 if (lightHitRecord.Object == LightObject)
                 {
                     //direct light sampling.
@@ -246,15 +283,16 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, int recursiveDep
         if (material.Scattering(shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering))
         {
             pdf = material.ScatteringPDF(normal, scattering.direction());
-            Li = Trace(scene, scattering, recursiveDepth + 1);
+            F cosTheta = math::dot(normal, scattering.direction());
+            math::vector3<F> reflectance = material.BRDF() * cosTheta / pdf;
+            Li = Trace(scene, scattering, TerminalRecord.Next(reflectance));
         }
     }
 
     F cosTheta = math::dot(normal, scattering.direction());
-    math::vector3<F> emit = material.Emitting();
-    math::vector3<F> radiance = emit + 
-        + material.BRDF() * Li * cosTheta / (pdf);
-    return radiance;
+    math::vector3<F> reflection = material.BRDF() * Li * cosTheta / pdf;
+    math::vector3<F> emission = material.Emitting();
+    return emission + reflection;
 }
 
 math::point3d<F> SceneRect::SampleRandomPoint(math::vector3<F>& outN, F& outPDF)
@@ -443,7 +481,8 @@ void LitRenderer::GenerateSamples()
 
 void LitRenderer::ResolveSamples()
 {
-    const int StartRecursiveDepth = 0;
+    const math::vector3<F> StartReflectance = math::vector3<F>::one();
+    TerminalRecord Record;
     math::vector3<F>* canvasDataPtr = mCanvas.GetBackbufferPtr();
     for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
     {
@@ -452,7 +491,7 @@ void LitRenderer::ResolveSamples()
         {
             Sample& sample = mImageSamples[colIndex + rowOffset];
             math::vector3<F>& canvasPixel = canvasDataPtr[colIndex + rowOffset];
-            canvasPixel += Trace(*mScene, sample.ray, StartRecursiveDepth);
+            canvasPixel += Trace(*mScene, sample.ray, Record);
         }
     }
     mCanvas.IncreaseSampleCount();
@@ -522,7 +561,7 @@ void Scene::FindAllLights()
 
 void Transform::UpdateWorldTransform()
 {
-    TransformMatrix = math::matrix4x4<F>::TR(Translate, Rotation);
+    TransformMatrix = math::matrix4x4<F>::tr(Translate, Rotation);
 }
 
 void SceneObject::UpdateWorldTransform()

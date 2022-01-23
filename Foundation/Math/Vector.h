@@ -773,4 +773,29 @@ namespace math
             max3(f0.z, f1.z, f2.z),
             max3(f0.w, f1.w, f2.w));
     }
+
+    template<typename value_type>
+    bool near_zero(const vector_t<value_type, EDim::_2>& v)
+    {
+        return near_zero<value_type>(v.x)
+            && near_zero<value_type>(v.y);
+    }
+
+    template<typename value_type>
+    bool near_zero(const vector_t<value_type, EDim::_3>& v)
+    {
+        return near_zero<value_type>(v.x)
+            && near_zero<value_type>(v.y)
+            && near_zero<value_type>(v.z);
+    }
+
+    template<typename value_type>
+    bool near_zero(const vector_t<value_type, EDim::_4>& v)
+    {
+        return near_zero<value_type>(v.x)
+            && near_zero<value_type>(v.y)
+            && near_zero<value_type>(v.z)
+            && near_zero<value_type>(v.w);
+    }
+
 }

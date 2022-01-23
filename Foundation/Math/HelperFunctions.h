@@ -18,6 +18,13 @@ namespace math
         return f - static_cast<int>(f);
     }
 
+    template<typename value_type, typename = std::enable_if_t<std::is_floating_point_v<value_type>>>
+    constexpr bool near_zero(value_type v, value_type small_number = SMALL_NUM<value_type>)
+    {
+        return v < small_number && -v > -small_number;
+    }
+
+
     template<typename n_value_type, typename value_type, typename = std::enable_if_t<std::is_integral_v<n_value_type>>>
     constexpr int floor2(value_type f)
     {
@@ -36,18 +43,10 @@ namespace math
         return lhs == rhs;
     }
 
-    template<>
-    constexpr bool is_equal<float>(float lhs, float rhs)
+    template<typename value_type, std::enable_if_t<std::is_floating_point_v<value_type>> = true>
+    constexpr bool is_equal(value_type lhs, value_type rhs)
     {
-        float diff = lhs - rhs;
-        return lhs == rhs || (diff <  EPSILON<float> && diff > -EPSILON<float>);
-    }
-
-    template<>
-    constexpr bool is_equal<double>(double lhs, double rhs)
-    {
-        double diff = lhs - rhs;
-        return lhs == rhs || (diff < EPSILON<double> && diff > -EPSILON<double>);
+        return lhs == rhs || near_zero<value_type>(lhs - rhs);
     }
 
     template<typename value_type>
