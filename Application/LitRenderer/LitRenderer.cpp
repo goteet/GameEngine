@@ -3,68 +3,163 @@
 #include <Foundation/Math/PredefinedConstantValues.h>
 #include "LitRenderer.h"
 
-const int MaxRecursiveDepth = 5;
+const int MaxRecursiveDepth = 10;
 const F RayBias = math::EPSILON<F> * 2.0f;
 
-bool Trace(Scene& scene, const math::ray3d<F>& ray, math::vector3<F>& outSpectral, const SceneObject* excludeObject, int recursiveDepth)
+#include <random>
+template<typename T>
+struct random
+{
+    static random<T>& instance() { static random<T> instance; return instance; }
+
+    static T value() { return instance()._value(); }
+
+private:
+    std::random_device randomDevice;
+    std::mt19937 generator;
+    std::uniform_real_distribution<F> distribution;
+    random() : generator(randomDevice()), distribution(F(0), F(1)) { }
+    F _value() { return distribution(generator); }
+};
+
+
+math::vector3<F> GenerateHemisphereDirection(const math::vector3<F>& normal)
+{
+    F cosTheta = F(1) - F(2) * random<F>::value();
+    F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
+    math::radian<F> phi(F(2) * math::PI<F> *random<F>::value());
+    F cosPhi = math::cos(phi);
+    F sinPhi = math::sin(phi);
+
+    F x = sinTheta * cosPhi;
+    F y = sinTheta * sinPhi;
+    F z = cosTheta;
+    math::vector3<F> unit(x, y, z);
+
+    return math::dot(unit, normal) >= 0 ? unit : -unit;
+}
+
+
+
+bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray,
+    math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation)
+{
+    math::vector3<F> Direction = GenerateHemisphereDirection(N);
+    outScattering.set_origin(P + Direction * F(0.001));
+    outScattering.set_direction(Direction, math::norm);
+    outAttenuation = Albedo;
+    return true;
+}
+
+
+math::vector3<F> Reflect(const math::vector3<F>& in, const math::vector3<F>& n)
+{
+    return in - F(2) * math::dot(in, n) * n;
+}
+
+bool Metal_FullReflect_ForTest::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray,
+    math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation)
+{
+    math::vector3<F> Direction = Reflect(Ray.direction(), N);
+    outScattering.set_origin(P + Direction * F(0.001));
+    outScattering.set_direction(Direction);
+    outAttenuation = Albedo;
+    return math::dot(Direction, N) > F(0);
+}
+
+
+
+math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const SceneObject* excludeObject, int recursiveDepth)
 {
     if (recursiveDepth == MaxRecursiveDepth)
-        return false;
-
-    HitRecord contactSurfaceInfo = scene.DetectIntersecting(ray, nullptr);
-    if (contactSurfaceInfo.Object == nullptr)
     {
-        return false;
+        return math::vector3<F>::zero();
     }
 
-    math::point3d<F> intersetionWorldPos = ray.calc_offset(contactSurfaceInfo.Distance);
-
-    math::ray3d<F> shadowRay;
-    shadowRay.set_origin(intersetionWorldPos + contactSurfaceInfo.SurfaceNormal * RayBias);
-
-    //Pucture Reflectance Equation.
-    for (int lightIndex = 0, lightCount = scene.GetLightCount(); lightIndex < lightCount; ++lightIndex)
+    //确认是否有碰撞的对象
+    //没有碰到直接返回天空颜色，现在还没有光源。
+    HitRecord contactRecord = scene.DetectIntersecting(ray, nullptr);
+    if (contactRecord.Object == nullptr)
     {
-        const Light& light = scene.GetLightByIndex(lightIndex);
-        bool isDirectional = light.LightType == ELightType::Directional;
-
-        math::vector3<F> towardLight; F lightDistanceSqr = std::numeric_limits<F>::max();
-        if (isDirectional)
-        {
-            towardLight = -light.Position;
-        }
-        else
-        {
-            towardLight = light.Position - intersetionWorldPos;
-            lightDistanceSqr = math::magnitude_sqr(towardLight);
-            normalize(towardLight);
-        }
-
-        shadowRay.set_direction(towardLight, math::norm);
-        HitRecord shadowInfo = scene.DetectIntersecting(shadowRay, contactSurfaceInfo.Object);
-        if (shadowInfo.Object == nullptr || (shadowInfo.Distance * shadowInfo.Distance) > lightDistanceSqr)
-        {
-            const math::vector3<F>& N = contactSurfaceInfo.SurfaceNormal;
-            const math::vector3<F>& L = towardLight;
-
-            //Lambertion BRDF diffuse
-            const Material& material = contactSurfaceInfo.Object->Material;
-            math::vector3<F> BRDF = material.Albedo; //we ignore 1/PI.
-
-            F NdotL = math::max2(math::dot(N, L), 0);
-
-            F attenuation = isDirectional ? F(1) : (F(1) / lightDistanceSqr);
-            math::vector3<F> Li = light.Intensity * attenuation * light.Color;//we ignore PI here too...
-
-            math::vector3<F> Lo = BRDF * Li * NdotL;
-            outSpectral += Lo;
-        }
-        else
-        {
-            //in shadow.
-        }
+        F t = math::clamp(ray.direction().y * F(0.5) + F(0.25), F(0), F(1));
+        return math::lerp(math::vector3<F>::one(), math::vector3<F>(F(0.5), F(0.7), F(1)), t);
     }
-    return true;
+
+    //碰到了，直接半球均匀采样个lambertian
+    F biasedDistance = math::max2<F>(contactRecord.Distance - F(0.001), F(0));
+    math::point3d<F> surfacePoint = ray.calc_offset(biasedDistance);
+    math::vector3<F> attenuation;
+    math::ray3d<F> scattering;
+    if (contactRecord.Object->Material->Scattering(surfacePoint, contactRecord.SurfaceNormal, ray, scattering, attenuation))
+    {
+        return attenuation * Trace(scene, scattering, contactRecord.Object, recursiveDepth + 1);
+    }
+    
+    return math::vector3<F>::zero();
+}
+
+namespace Legacy
+{
+//    bool Trace(Scene& scene, const math::ray3d<F>& ray, math::vector3<F>& outSpectral, const SceneObject* excludeObject, int recursiveDepth)
+//    {
+//        if (recursiveDepth == MaxRecursiveDepth)
+//            return false;
+//
+//        HitRecord contactSurfaceInfo = scene.DetectIntersecting(ray, nullptr);
+//        if (contactSurfaceInfo.Object == nullptr)
+//        {
+//            return false;
+//        }
+//
+//        math::point3d<F> intersetionWorldPos = ray.calc_offset(contactSurfaceInfo.Distance);
+//
+//        math::ray3d<F> shadowRay;
+//        shadowRay.set_origin(intersetionWorldPos + contactSurfaceInfo.SurfaceNormal * RayBias);
+//
+//        //Pucture Reflectance Equation.
+//        for (int lightIndex = 0, lightCount = scene.GetLightCount(); lightIndex < lightCount; ++lightIndex)
+//        {
+//            const Light& light = scene.GetLightByIndex(lightIndex);
+//            bool isDirectional = light.LightType == ELightType::Directional;
+//
+//            math::vector3<F> towardLight; F lightDistanceSqr = std::numeric_limits<F>::max();
+//            if (isDirectional)
+//            {
+//                towardLight = -light.Position;
+//            }
+//            else
+//            {
+//                towardLight = light.Position - intersetionWorldPos;
+//                lightDistanceSqr = math::magnitude_sqr(towardLight);
+//                normalize(towardLight);
+//            }
+//
+//            shadowRay.set_direction(towardLight, math::norm);
+//            HitRecord shadowInfo = scene.DetectIntersecting(shadowRay, contactSurfaceInfo.Object);
+//            if (shadowInfo.Object == nullptr || (shadowInfo.Distance * shadowInfo.Distance) > lightDistanceSqr)
+//            {
+//                const math::vector3<F>& N = contactSurfaceInfo.SurfaceNormal;
+//                const math::vector3<F>& L = towardLight;
+//
+//                //Lambertion BRDF diffuse
+//                const IMaterial& material = *contactSurfaceInfo.Object->Material;
+//                math::vector3<F> BRDF = material.Albedo; //we ignore 1/PI.
+//
+//                F NdotL = math::max2(math::dot(N, L), 0);
+//
+//                F attenuation = isDirectional ? F(1) : (F(1) / lightDistanceSqr);
+//                math::vector3<F> Li = light.Intensity * attenuation * light.Color;//we ignore PI here too...
+//
+//                math::vector3<F> Lo = BRDF * Li * NdotL;
+//                outSpectral += Lo;
+//            }
+//            else
+//            {
+//                //in shadow.
+//            }
+//        }
+//        return true;
+//    }
 }
 
 
@@ -107,7 +202,7 @@ RenderCanvas::RenderCanvas(unsigned char *canvasDataPtr, int width, int height, 
         for (int colIndex = 0; colIndex < CanvasWidth; colIndex++)
         {
             int pixelIndex = colIndex + rowIndex * CanvasWidth;
-            mBackbuffer[pixelIndex].set(F(0.5), F(0.5), F(0.5));
+            mBackbuffer[pixelIndex].set(F(0.0), F(0.0), F(0.0));
         }
     }
 }
@@ -117,11 +212,11 @@ RenderCanvas::~RenderCanvas()
     SafeDeleteArray(mBackbuffer);
 }
 
-bool RenderCanvas::NeedUpdate()
+bool RenderCanvas::NeedUpdate(int SampleBatchCount)
 {
     if (NeedFlushBackbuffer)
     {
-        FlushLinearColorToGammaCorrectedCanvasData();
+        FlushLinearColorToGammaCorrectedCanvasData(SampleBatchCount);
         if (!NeedFlushBackbuffer)
         {
             mNeedUpdateWindowRect = true;
@@ -130,8 +225,9 @@ bool RenderCanvas::NeedUpdate()
     return mNeedUpdateWindowRect;
 }
 
-void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData()
+void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData(int SampleBatchCount)
 {
+    F invSampleBatchCount = F(1) / F(SampleBatchCount);
     for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
     {
         int bufferRowOffset = rowIndex * CanvasWidth;
@@ -144,7 +240,7 @@ void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData()
             const math::vector3<F>& color = mBackbuffer[bufferIndex];
             for (int compIndex = 2; compIndex >= 0; compIndex--)
             {
-                F c = LinearToGammaCorrected22(color.v[compIndex]);
+                F c = LinearToGammaCorrected22(color.v[compIndex] * invSampleBatchCount);
                 c = math::clamp(c, F(0.0), F(1.0) - math::EPSILON<F>);
                 mOutCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(c * F(256.0));
             }
@@ -173,17 +269,25 @@ LitRenderer::~LitRenderer()
     SafeDeleteArray(mImageSamples);
 }
 
-void LitRenderer::GenerateImage()
+void LitRenderer::InitialSceneTransforms()
 {
     mScene.UpdateWorldTransform();
-    GenerateSamples();
-    ResolveSamples();
-    mCanvas.NeedFlushBackbuffer = true;
+}
+
+void LitRenderer::GenerateImageProgressive()
+{
+    if (mSampleBatchCount < 5000)
+    {
+        GenerateSamples();
+        ResolveSamples();
+        mCanvas.NeedFlushBackbuffer = true;
+        mSampleBatchCount += 1;
+    }
 }
 
 bool LitRenderer::NeedUpdate()
 {
-    return mCanvas.NeedUpdate();
+    return mCanvas.NeedUpdate(mSampleBatchCount);
 }
 
 void LitRenderer::GenerateSamples()
@@ -220,6 +324,7 @@ void LitRenderer::GenerateSamples()
         for (int colIndex = 0; colIndex < mCanvas.CanvasWidth; colIndex++)
         {
             std::vector<Sample>& samples = mImageSamples[colIndex + rowOffset];
+            samples.clear();
 
             sample.pixelCol = colIndex;
             sample.pixelRow = rowIndex;
@@ -227,16 +332,10 @@ void LitRenderer::GenerateSamples()
             const F pixelCenterX = colIndex * PixelSize + HalfPixelSize - halfWidth;
             const F pixelCenterY = rowIndex * PixelSize + HalfPixelSize - halfHeight;
 
-            sample.ray.set_direction(canvasPositionToRay(pixelCenterX - QuaterPixelSize, pixelCenterY));
-            samples.push_back(sample);
+            F x = F(2) * random<F>::value() - F(1);
+            F y = F(2) * random<F>::value() - F(1);
 
-            sample.ray.set_direction(canvasPositionToRay(pixelCenterX + QuaterPixelSize, pixelCenterY));
-            samples.push_back(sample);
-
-            sample.ray.set_direction(canvasPositionToRay(pixelCenterX, pixelCenterY - QuaterPixelSize));
-            samples.push_back(sample);
-
-            sample.ray.set_direction(canvasPositionToRay(pixelCenterX, pixelCenterY + QuaterPixelSize));
+            sample.ray.set_direction(canvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
             samples.push_back(sample);
         }
     }
@@ -260,12 +359,8 @@ void LitRenderer::ResolveSamples()
             int hittedSampleCount = 0;
             for (const Sample& sample : samples)
             {
-                traceSpectral.set(0, 0, 0);
-                if (Trace(mScene, sample.ray, traceSpectral, nullptr, StartRecursiveDepth))
-                {
-                    accSpectral += traceSpectral;
-                    hittedSampleCount++;
-                }
+                accSpectral += Trace(mScene, sample.ray, nullptr, StartRecursiveDepth);
+                hittedSampleCount++;
 
             }
             if (hittedSampleCount > 0)
@@ -276,7 +371,7 @@ void LitRenderer::ResolveSamples()
             {
                 accSpectral = mClearColor;
             }
-            canvasPixel = accSpectral;
+            canvasPixel += accSpectral;
         }
     }
 }
@@ -329,6 +424,7 @@ Scene::Scene(F aspect)
         SceneCenterX - 20,
         SceneBottom + BigObjectSize,
         SceneCenterZ - 5);
+    lSphere->Material = std::make_unique<Lambertian>();
 
     SceneSphere* rSphere = new SceneSphere(); mSceneObjects.push_back(rSphere);
     rSphere->SetRadius(SmallObjectSize);
@@ -336,6 +432,15 @@ Scene::Scene(F aspect)
         SceneCenterX - 20,
         SceneBottom + SmallObjectSize,
         SceneCenterZ - 30);
+    rSphere->Material = std::make_unique<Lambertian>();
+
+    SceneSphere* bigSphere = new SceneSphere(); mSceneObjects.push_back(bigSphere);
+    bigSphere->SetRadius(16);
+    bigSphere->SetTranslate(
+        SceneCenterX - 8,
+        SceneCenterY,
+        SceneCenterZ + 10);
+    bigSphere->Material = std::make_unique<Metal_FullReflect_ForTest>();
 
     SceneCube* lCube = new SceneCube(); mSceneObjects.push_back(lCube);
     lCube->SetExtends(SmallObjectSize, BigObjectSize, SmallObjectSize);
@@ -344,6 +449,7 @@ Scene::Scene(F aspect)
         SceneBottom + BigObjectSize,
         SceneCenterZ + 30);
     lCube->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(-30)));
+    lCube->Material = std::make_unique<Lambertian>();
 
     SceneCube* rCube = new SceneCube(); mSceneObjects.push_back(rCube);
     rCube->SetExtends(SmallObjectSize, SmallObjectSize, SmallObjectSize);
@@ -352,32 +458,35 @@ Scene::Scene(F aspect)
         SceneBottom + SmallObjectSize,
         SceneCenterZ + 5);
     rCube->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(60)));
+    rCube->Material = std::make_unique<Lambertian>();
     
     SceneRect* wallLeft = new SceneRect(); mSceneObjects.push_back(wallLeft);
     wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
     wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
-    wallLeft->SetAlbedo(1, 0, 0);
+    wallLeft->Material = std::make_unique<Lambertian>(F(0.9), F(0.025), F(0.025));
 
     SceneRect* wallRight = new SceneRect(); mSceneObjects.push_back(wallRight);
     wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
     wallRight->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
     wallRight->SetExtends(SceneExtendZ, SceneExtendY);
-    wallRight->SetAlbedo(0, 1, 0);
+    wallRight->Material = std::make_unique<Lambertian>(F(0.025), F(0.8), F(0.025));
 
-    SceneRect* wallTop = new SceneRect(); mSceneObjects.push_back(wallTop);
-    wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
-    wallTop->SetExtends(SceneExtendZ, SceneExtendX);
-    wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
+    //SceneRect* wallTop = new SceneRect(); mSceneObjects.push_back(wallTop);
+    //wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
+    //wallTop->SetExtends(SceneExtendZ, SceneExtendX);
+    //wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
 
     SceneRect* wallBottom = new SceneRect(); mSceneObjects.push_back(wallBottom);
     wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
     wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
     wallBottom->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
+    wallBottom->Material = std::make_unique<Lambertian>(F(0.025), F(0.025), F(0.9));
 
     SceneRect* wallFar = new SceneRect(); mSceneObjects.push_back(wallFar);
     wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
     wallFar->SetExtends(SceneExtendX, SceneExtendY);
     wallFar->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
+    wallFar->Material = std::make_unique<Lambertian>(F(0.25), F(0.25), F(0.25));
 }
 
 Scene::~Scene()

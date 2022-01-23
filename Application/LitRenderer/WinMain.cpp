@@ -13,8 +13,8 @@
 #include "LitRenderer.h"
 
 
-const int BitmapCanvasWidth = 1600;
-const int BitmapCanvasHeight = 900;
+const int BitmapCanvasWidth = 800;
+const int BitmapCanvasHeight = 600;
 const int ColorDepth = 24;
 const int BitmapCanvasLinePitch = (BitmapCanvasWidth * ColorDepth + 31) / 32 * 4;
 const wchar_t* AppClassName = L"SoftRendererWindowClass";
@@ -68,6 +68,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
     bool running = true;
+    bool generate = false;
     while (running)
     {
         while (::PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
@@ -82,10 +83,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             }
         }
 
+        if (generate)
+        {
+            Renderer->GenerateImageProgressive();
+            generate = false;
+        }
+
         if (NeedUpdate())
         {
             ::RedrawWindow(hWindow, NULL, NULL, RDW_INVALIDATE);
+            generate = true;
         }
+
+        
     }
 
     Uninitialize(hWindow);
@@ -223,6 +233,7 @@ bool Initialize(HWND hWindow)
     ::ReleaseDC(hWindow, hdcWindowDC);
 
     Renderer = new LitRenderer(canvasDIBDataPtr, BitmapCanvasWidth, BitmapCanvasHeight, BitmapCanvasLinePitch);
-    Renderer->GenerateImage();
+    Renderer->InitialSceneTransforms();
+    Renderer->GenerateImageProgressive();
     return true;
 }

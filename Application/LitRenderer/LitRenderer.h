@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <vector>
 #include <Foundation/Math/Vector.h>
 #include <Foundation/Math/Matrix.h>
@@ -12,7 +13,7 @@ public:
     RenderCanvas(unsigned char *canvasDataPtr, int width, int height, int linePitch);
     ~RenderCanvas();
 
-    bool NeedUpdate();
+    bool NeedUpdate(int SampleBatchCount);
 
     math::vector3<F>* GetBackbufferPtr() { return mBackbuffer; }
     bool NeedFlushBackbuffer = true;
@@ -21,7 +22,7 @@ public:
     const int CanvasLinePitch;
 
 private:
-    void FlushLinearColorToGammaCorrectedCanvasData();
+    void FlushLinearColorToGammaCorrectedCanvasData(int SampleBatchCount);
 
     bool mNeedUpdateWindowRect = false;
     unsigned char *mOutCanvasDataPtr;
@@ -55,9 +56,31 @@ struct Light
     F Intensity = 1.0;
 };
 
-struct Material
+struct IMaterial
+{
+    virtual ~IMaterial() { }
+    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray,
+        math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) = 0;
+};
+
+struct Lambertian : public IMaterial
 {
     math::vector3<F> Albedo = math::vector3<F>::one();
+
+    Lambertian() = default;
+    Lambertian(F r, F g, F b) : Albedo(r, g, b) { }
+    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray,
+        math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) override;
+};
+
+struct Metal_FullReflect_ForTest : public IMaterial
+{
+    math::vector3<F> Albedo = math::vector3<F>::one();
+
+    Metal_FullReflect_ForTest() = default;
+    Metal_FullReflect_ForTest(F r, F g, F b) : Albedo(r, g, b) { }
+    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray,
+        math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) override;
 };
 
 struct Transform
@@ -75,10 +98,9 @@ struct SceneObject
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray) const = 0;
     void SetTranslate(F x, F y, F z) { Transform.Translate.set(x, y, z); }
     void SetRotation(const math::quaternion<F>& q) { Transform.Rotation = q; }
-    void SetAlbedo(F r, F g, F b) { Material.Albedo.set(r, g, b); }
 
     Transform Transform;
-    Material Material;
+    std::unique_ptr<IMaterial> Material;
 };
 
 
@@ -158,7 +180,8 @@ public:
     LitRenderer(unsigned char * canvasDataPtr, int canvasWidth, int canvasHeight, int canvasLinePitch);
     ~LitRenderer();
 
-    void GenerateImage();
+    void InitialSceneTransforms();
+    void GenerateImageProgressive();
     bool NeedUpdate();
 
 private:
@@ -176,6 +199,7 @@ private:
     RenderCanvas mCanvas;
     SimpleBackCamera mCamera;
     Scene mScene;
+    int mSampleBatchCount = 0;
 
     std::vector<Sample>* mImageSamples = nullptr;
 };
