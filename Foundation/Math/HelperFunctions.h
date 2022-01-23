@@ -1,6 +1,8 @@
 #pragma once
 #include "PredefinedConstantValues.h"
 
+#include <algorithm>
+
 namespace math
 {
     template<typename value_type>
