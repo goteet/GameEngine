@@ -10,7 +10,7 @@ using F = double;
 class RenderCanvas
 {
 public:
-    RenderCanvas(unsigned char *canvasDataPtr, int width, int height, int linePitch);
+    RenderCanvas(unsigned char* canvasDataPtr, int width, int height, int linePitch);
     ~RenderCanvas();
 
     bool NeedUpdate(int SampleBatchCount);
@@ -25,7 +25,7 @@ private:
     void FlushLinearColorToGammaCorrectedCanvasData(int SampleBatchCount);
 
     bool mNeedUpdateWindowRect = false;
-    unsigned char *mOutCanvasDataPtr;
+    unsigned char* mOutCanvasDataPtr;
     math::vector3<F>* mBackbuffer = nullptr;
 };
 
@@ -34,10 +34,14 @@ struct SceneObject;
 struct HitRecord
 {
     HitRecord() = default;
-    HitRecord(SceneObject* o, math::vector3<F> n, F d)
-        : Object(o), SurfaceNormal(n), Distance(d) { }
+    HitRecord(SceneObject* o, bool f, math::vector3<F> n, F d)
+        : Object(o), SurfaceNormal(n), Distance(d), IsFrontFace(f)
+    {
+
+    }
 
     SceneObject* Object = nullptr;
+    bool IsFrontFace = true;
     math::vector3<F> SurfaceNormal;
     F Distance = F(0);
 };
@@ -59,7 +63,7 @@ struct Light
 struct IMaterial
 {
     virtual ~IMaterial() { }
-    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray,
+    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
         math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) = 0;
 };
 
@@ -69,17 +73,28 @@ struct Lambertian : public IMaterial
 
     Lambertian() = default;
     Lambertian(F r, F g, F b) : Albedo(r, g, b) { }
-    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray,
+    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
         math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) override;
 };
 
-struct Metal_FullReflect_ForTest : public IMaterial
+struct Metal : public IMaterial
 {
     math::vector3<F> Albedo = math::vector3<F>::one();
+    F Fuzzy = F(0);
 
-    Metal_FullReflect_ForTest() = default;
-    Metal_FullReflect_ForTest(F r, F g, F b) : Albedo(r, g, b) { }
-    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray,
+    Metal() = default;
+    Metal(F r, F g, F b, F f) : Albedo(r, g, b), Fuzzy(f) { }
+    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+        math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) override;
+};
+
+struct Dielectric : public IMaterial
+{
+    F RefractiveIndex = F(1.0003);
+
+    Dielectric() = default;
+    Dielectric(F ior) : RefractiveIndex(ior) { }
+    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
         math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) override;
 };
 
@@ -124,7 +139,9 @@ struct SceneRect : SceneObject
     virtual void UpdateWorldTransform() override;
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray) const override;
     void SetExtends(F x, F y) { Rect.set_extends(x, y); }
+    void SetDualFace(bool dual) { mDualFace = dual; }
 private:
+    bool mDualFace = false;
     math::rect<F> Rect;
     math::point3d<F> mWorldPosition;
     math::vector3<F> mWorldNormal;
@@ -153,7 +170,7 @@ public:
     void UpdateWorldTransform();
     HitRecord DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject);
     unsigned int GetLightCount() const { return (unsigned int)mLights.size(); }
-    const Light&  GetLightByIndex(unsigned int index) const;
+    const Light& GetLightByIndex(unsigned int index) const;
 private:
     std::vector<Light> mLights;
     std::vector<SceneObject*> mSceneObjects;
@@ -177,7 +194,7 @@ public:
 class LitRenderer
 {
 public:
-    LitRenderer(unsigned char * canvasDataPtr, int canvasWidth, int canvasHeight, int canvasLinePitch);
+    LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canvasHeight, int canvasLinePitch);
     ~LitRenderer();
 
     void InitialSceneTransforms();

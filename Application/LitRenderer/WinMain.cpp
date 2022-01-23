@@ -14,7 +14,7 @@
 
 
 const int BitmapCanvasWidth = 800;
-const int BitmapCanvasHeight = 600;
+const int BitmapCanvasHeight = 800;
 const int ColorDepth = 24;
 const int BitmapCanvasLinePitch = (BitmapCanvasWidth * ColorDepth + 31) / 32 * 4;
 const wchar_t* AppClassName = L"SoftRendererWindowClass";

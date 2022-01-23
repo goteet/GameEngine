@@ -222,13 +222,9 @@ namespace math
             {
                 return intersection::intersect;
             }
-            else if (t > value_type(0))
-            {
-                return intersection::none;
-            }
             else
             {
-                return intersection::inside;
+                return intersection::none;
             }
         }
         return intersection::none;
