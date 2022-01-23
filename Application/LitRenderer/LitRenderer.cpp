@@ -159,6 +159,7 @@ LitRenderer::~LitRenderer()
 
 void LitRenderer::GenerateImage()
 {
+    mScene.UpdateWorldTransform();
     GenerateSamples();
     ResolveSamples();
     mCanvas.NeedFlushBackbuffer = true;
@@ -176,7 +177,7 @@ void LitRenderer::GenerateSamples()
     F halfWidth = mCanvas.CanvasWidth * F(0.5) * PixelSize;
     F halfHeight = mCanvas.CanvasHeight * F(0.5) * PixelSize;
     //     <---> (half height)
-    //  +  o----.¡¡(o=origin)
+    //  +  o----. (o=origin)
     //  |  |  /   Asumed canvas is at origin(0,0,0),
     //  |  | /    and camera is placed at neg-z-axis,
     //  +  |/
@@ -270,73 +271,62 @@ SimpleBackCamera::SimpleBackCamera(math::degree<F> verticalFov)
     , Position(0, 0, 0)
 { }
 
-
 Scene::Scene()
     : AmbientColor(F(0.01), F(0.01), F(0.01))
 {
     const F SceneDistance = 5;
-    const F lSphereRadius = 10;
-    const F rSphereRadius = lSphereRadius * F(0.5);
-    const F LightHeight = lSphereRadius * 4;
+    const F BigObjectSize = 10;
+    const F SmallObjectSize = BigObjectSize * F(0.5);
+    const F LightHeight = BigObjectSize * 4;
     const F SceneSize = 40;
     const F GroundHeight = -SceneSize;
 
     Light mainLight;
-    mainLight.Position.set(0, GroundHeight + F(1.99) * SceneSize, SceneDistance);
+    mainLight.Position.set(0, GroundHeight + F(1.99) * SceneSize, -20);
     mainLight.Color.set(1, 1, 1);
     mainLight.Intensity = 400;
 
     mLights.push_back(mainLight);
 
-    SceneSphere* lSphere = new SceneSphere();
-    SceneSphere* rSphere = new SceneSphere();
+    SceneSphere* lSphere = new SceneSphere(); mSceneObjects.push_back(lSphere);
+    SceneSphere* rSphere = new SceneSphere(); mSceneObjects.push_back(rSphere);
 
-    lSphere->Sphere.center().set(-10 - lSphereRadius, GroundHeight + lSphereRadius, SceneDistance - lSphereRadius);
-    lSphere->Sphere.set_radius(lSphereRadius);
+    lSphere->SetRadius(BigObjectSize);
+    lSphere->SetTranslate(-10 - BigObjectSize, GroundHeight + BigObjectSize, SceneDistance - BigObjectSize);
 
-    rSphere->Sphere.center().set(-10 + rSphereRadius, GroundHeight + rSphereRadius, SceneDistance - 10 - rSphereRadius);
-    rSphere->Sphere.set_radius(rSphereRadius);
-    mSceneObjects.push_back(rSphere);
-    mSceneObjects.push_back(lSphere);
+    rSphere->SetRadius(SmallObjectSize);
+    rSphere->SetTranslate(-10 + SmallObjectSize, GroundHeight + SmallObjectSize, SceneDistance - 10 - SmallObjectSize);
 
+    SceneCube* lCube = new SceneCube(); mSceneObjects.push_back(lCube);
+    SceneCube* rCube = new SceneCube(); mSceneObjects.push_back(rCube);
 
-    SceneCube* lCube = new SceneCube();
-    SceneCube* rCube = new SceneCube();
+    lCube->SetExtends(SmallObjectSize, BigObjectSize, SmallObjectSize);
+    lCube->SetTranslate(10 + BigObjectSize, GroundHeight + BigObjectSize, SceneDistance + 10 + BigObjectSize);
+    lCube->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(30)));
 
-    lCube->Cube.center().set(10 + lSphereRadius, GroundHeight + lSphereRadius, SceneDistance + 10 + lSphereRadius);
-    rCube->Cube.center().set(6 + rSphereRadius, GroundHeight + rSphereRadius, SceneDistance);
+    rCube->SetExtends(SmallObjectSize, SmallObjectSize, SmallObjectSize);
+    rCube->SetTranslate(6 + SmallObjectSize, GroundHeight + SmallObjectSize, SceneDistance);
+    rCube->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(60)));
 
-    lCube->Cube.set_extends(rSphereRadius, lSphereRadius, rSphereRadius);
-    rCube->Cube.set_extends(rSphereRadius, rSphereRadius, rSphereRadius);
-    mSceneObjects.push_back(lCube);
-    mSceneObjects.push_back(rCube);
+    ScenePlane* lWall = new ScenePlane(); mSceneObjects.push_back(lWall);
+    ScenePlane* rWall = new ScenePlane(); mSceneObjects.push_back(rWall);
+    ScenePlane* tWall = new ScenePlane(); mSceneObjects.push_back(tWall);
+    ScenePlane* bWall = new ScenePlane(); mSceneObjects.push_back(bWall);
+    ScenePlane* fWall = new ScenePlane(); mSceneObjects.push_back(fWall);
 
-    ScenePlane* lWall = new ScenePlane();
-    ScenePlane* rWall = new ScenePlane();
-    ScenePlane* tWall = new ScenePlane();
-    ScenePlane* bWall = new ScenePlane();
-    ScenePlane* fWall = new ScenePlane();
+    lWall->SetTranslate(-SceneSize, 0, 0);
 
-    lWall->Plane.position().set(-SceneSize, 0, 0);
-    lWall->Plane.set_normal(math::vector3<F>::unit_x(), math::norm);
+    rWall->SetTranslate(SceneSize, 0, 0);
+    rWall->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
 
-    rWall->Plane.position().set(SceneSize, 0, 0);
-    rWall->Plane.set_normal(math::vector3<F>::unit_x_neg(), math::norm);
+    tWall->SetTranslate(0, GroundHeight + 2 * SceneSize, 0);
+    tWall->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
 
-    tWall->Plane.position().set(0, GroundHeight + 2 * SceneSize, 0);
-    tWall->Plane.set_normal(math::vector3<F>::unit_y_neg(), math::norm);
+    bWall->SetTranslate(0, GroundHeight, 0);
+    bWall->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
 
-    bWall->Plane.position().set(0, GroundHeight, 0);
-    bWall->Plane.set_normal(math::vector3<F>::unit_y(), math::norm);
-
-    fWall->Plane.position().set(0, 0, F(1.5) * SceneSize);
-    fWall->Plane.set_normal(math::vector3<F>::unit_z_neg(), math::norm);
-
-    mSceneObjects.push_back(lWall);
-    mSceneObjects.push_back(rWall);
-    mSceneObjects.push_back(tWall);
-    mSceneObjects.push_back(bWall);
-    mSceneObjects.push_back(fWall);
+    fWall->SetTranslate(0, 0, F(1.5) * SceneSize);
+    fWall->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
 }
 
 Scene::~Scene()
@@ -346,6 +336,14 @@ Scene::~Scene()
         SafeDelete(obj);
     }
     mSceneObjects.clear();
+}
+
+void Scene::UpdateWorldTransform()
+{
+    for (auto* object : mSceneObjects)
+    {
+        object->UpdateWorldTransform();
+    }
 }
 
 IntersectingInfo Scene::DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject)
@@ -381,57 +379,90 @@ const Light & Scene::GetLightByIndex(unsigned int index) const
     }
 }
 
+void Transform::UpdateWorldTransform()
+{
+    TransformMatrix = math::matrix4x4<F>::TR(Translate, Rotation);
+}
+
+void SceneObject::UpdateWorldTransform()
+{
+    Transform.UpdateWorldTransform();
+}
+
+void SceneSphere::UpdateWorldTransform()
+{
+    SceneObject::UpdateWorldTransform();
+    mWorldCenter = transform(Transform.TransformMatrix, mSphere.center());
+}
+
 IntersectingInfo SceneSphere::IntersectWithRay(const math::ray3d<F>& ray) const
 {
     F t0, t1;
-    math::intersection result = math::intersect(ray, Sphere, t0, t1);
+    math::intersection result = math::intersect_sphere(ray, mWorldCenter, mSphere.radius_sqr(), t0, t1);
     if (result == math::intersection::none)
     {
         return IntersectingInfo();
     }
-
-    if (result == math::intersection::inside)
+    else if (result == math::intersection::inside)
     {
         t0 = t1;
     }
 
     math::point3d<F> intersectPosition = ray.calc_offset(t0);
-    math::vector3<F> surfaceNormal = normalized(intersectPosition - Sphere.center());
+    math::vector3<F> surfaceNormal = normalized(intersectPosition - mWorldCenter);
 
     return IntersectingInfo(const_cast<SceneSphere*>(this), surfaceNormal, t0);
+}
+
+void ScenePlane::UpdateWorldTransform()
+{
+    SceneObject::UpdateWorldTransform();
+
+    mWorldPosition = transform(Transform.TransformMatrix, Plane.position());
+    mWorldNormal = transform(Transform.TransformMatrix, Plane.normal()); // no scale so there...
 }
 
 IntersectingInfo ScenePlane::IntersectWithRay(const math::ray3d<F>& ray) const
 {
     F t;
-    math::intersection result = math::intersect(ray, Plane, t);
+    math::intersection result = math::intersect_plane(ray, mWorldPosition, mWorldNormal, false, t);
     if (result == math::intersection::none)
     {
         return IntersectingInfo();
     }
     else
     {
-        return IntersectingInfo(const_cast<ScenePlane*>(this), Plane.normal(), t);
+        return IntersectingInfo(const_cast<ScenePlane*>(this), mWorldNormal, t);
     }
+}
+
+void SceneCube::UpdateWorldTransform()
+{
+    SceneObject::UpdateWorldTransform();
+    mWorldPosition = transform(Transform.TransformMatrix, Cube.center());
+    mWorldAxisX = transform(Transform.TransformMatrix, Cube.axis_x());
+    mWorldAxisY = transform(Transform.TransformMatrix, Cube.axis_y());
+    mWorldAxisZ = transform(Transform.TransformMatrix, Cube.axis_z());
 }
 
 IntersectingInfo SceneCube::IntersectWithRay(const math::ray3d<F>& ray) const
 {
     F t0, t1;
+
     math::vector3<F> n0, n1;
-    math::intersection result = math::intersect(ray, Cube, t0, t1, n0, n1);
+    math::intersection result = math::intersect_cube(ray, mWorldPosition,
+        mWorldAxisX, mWorldAxisY, mWorldAxisZ,
+        Cube.width(), Cube.height(), Cube.depth(),
+        t0, t1, n0, n1);
     if (result == math::intersection::none)
     {
         return IntersectingInfo();
     }
-
-    if (result == math::intersection::inside)
+    else if (result == math::intersection::inside)
     {
+        n0 = n1;
+        t0 = t1;
+    }
 
-        return IntersectingInfo(const_cast<SceneCube*>(this), n1, t1);
-    }
-    else
-    {
-        return IntersectingInfo(const_cast<SceneCube*>(this), n0, t0);
-    }
+    return IntersectingInfo(const_cast<SceneCube*>(this), n0, t0);
 }

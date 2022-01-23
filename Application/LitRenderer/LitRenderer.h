@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <Foundation/Math/Vector.h>
+#include <Foundation/Math/Matrix.h>
 #include <Foundation/Math/Rotation.h>
 #include <Foundation/Math/Geometry.h>
 
@@ -40,40 +41,80 @@ struct IntersectingInfo
     F Distance = F(0);
 };
 
+enum class ELightType
+{
+    Directional, Puncture
+};
+
 struct Light
 {
     Light() = default;
+    ELightType LightType = ELightType::Puncture;
     math::vector3<F> Position = math::vector3<F>::zero();
     math::vector3<F> Color = math::vector3<F>::zero();
     F Intensity = 1.0;
 };
 
+struct Material
+{
+    math::vector3<F> Albedo = math::vector3<F>::one();
+};
+
+struct Transform
+{
+    void UpdateWorldTransform();
+    math::vector3<F> Translate = math::vector3<F>::zero();
+    math::quaternion<F> Rotation = math::quaternion<F>::identity();
+    math::matrix4x4<F> TransformMatrix = math::matrix4x4<F>::identity();
+};
+
 struct SceneObject
 {
     virtual ~SceneObject() { }
+    virtual void UpdateWorldTransform();
     virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const = 0;
+    void SetTranslate(F x, F y, F z) { Transform.Translate.set(x, y, z); }
+    void SetRotation(const math::quaternion<F>& q) { Transform.Rotation = q; }
+
+    Transform Transform;
+    Material Material;
 };
 
 
 struct SceneSphere : SceneObject
 {
-    SceneSphere() : Sphere(math::point3d<F>(), 1) { }
+    SceneSphere() : mSphere(math::point3d<F>(), 1) { }
+    virtual void UpdateWorldTransform() override;
     virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
-    math::sphere<F> Sphere;
+    void SetRadius(F radius) { mSphere.set_radius(radius); }
+private:
+    math::sphere<F> mSphere;
+    math::point3d<F> mWorldCenter;
 };
 
 struct ScenePlane : SceneObject
 {
     ScenePlane() : Plane(math::point3d<F>(), math::vector3<F>::unit_x()) { }
+    virtual void UpdateWorldTransform() override;
     virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
+private:
     math::plane<F> Plane;
+    math::point3d<F> mWorldPosition;
+    math::vector3<F> mWorldNormal;
 };
 
 struct SceneCube : SceneObject
 {
     SceneCube() : Cube(math::point3d<F>(), math::vector3<F>::one()) { }
+    virtual void UpdateWorldTransform() override;
     virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
+    void SetExtends(F x, F y, F z) { Cube.set_extends(x, y, z); }
+private:
     math::cube<F> Cube;
+    math::point3d<F> mWorldPosition;
+    math::vector3<F> mWorldAxisX;
+    math::vector3<F> mWorldAxisY;
+    math::vector3<F> mWorldAxisZ;
 };
 
 class Scene
@@ -81,11 +122,9 @@ class Scene
 public:
     Scene();
     ~Scene();
-
+    void UpdateWorldTransform();
     IntersectingInfo DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject);
-
     unsigned int GetLightCount() const { return (unsigned int)mLights.size(); }
-
     const Light&  GetLightByIndex(unsigned int index) const;
 
     math::vector3<F> AmbientColor;
