@@ -39,21 +39,22 @@ namespace math
     struct ray
     {
         ray() = default;
-        ray(const point<value_type, dimension>& o, const vector_t<value_type, dimension>& d) : _origin(o), _direction(normalized(d)) { }
-        ray(const vector_t<value_type, (EDim)(dimension + 1)>& o, const vector_t<value_type, dimension>& d) : _origin(o), _direction(normalized(d)) { }
-        ray(const point<value_type, dimension>& o, const vector_t<value_type, dimension>& d, normalize_hint) : _origin(o), _direction(d) { }
-        ray(const vector_t<value_type, (EDim)(dimension + 1)>& o, const vector_t<value_type, dimension>& d, normalize_hint) : _origin(o), _direction(d) { }
+        ray(const point<value_type, dimension>& o, const vector_t<value_type, dimension>& d) : _origin(o), _direction(normalized(d)) { _inv_direction = inversed(_direction); }
+        ray(const vector_t<value_type, (EDim)(dimension + 1)>& o, const vector_t<value_type, dimension>& d) : _origin(o), _direction(normalized(d)) { _inv_direction = inversed(_direction); }
+        ray(const point<value_type, dimension>& o, const vector_t<value_type, dimension>& d, normalize_hint) : _origin(o), _direction(d) { _inv_direction = inversed(_direction); }
+        ray(const vector_t<value_type, (EDim)(dimension + 1)>& o, const vector_t<value_type, dimension>& d, normalize_hint) : _origin(o), _direction(d) { _inv_direction = inverse(_direction); }
         constexpr const point<value_type, dimension>& origin() const { return _origin; }
         constexpr point<value_type, dimension>& origin() { return _origin; }
         constexpr const vector_t<value_type, dimension>& direction() const { return _direction; }
+        constexpr const vector_t<value_type, dimension>& inv_direction() const { return _inv_direction; }
         constexpr void set_origin(const point<value_type, dimension>& o) { _origin = o; }
-        constexpr void set_direction(const vector_t<value_type, dimension>& dir) { _direction = normalized(dir); }
-        constexpr void set_direction(const vector_t<value_type, dimension>& dir, normalize_hint) { _direction = dir; }
+        constexpr void set_direction(const vector_t<value_type, dimension>& dir) { _direction = normalized(dir); _inv_direction = inversed(_direction); }
+        constexpr void set_direction(const vector_t<value_type, dimension>& dir, normalize_hint) { _direction = dir; _inv_direction = inversed(_direction); }
         constexpr vector_t<value_type, dimension> calc_offset(scaler_t<value_type> length) const { return _origin + _direction * length; }
 
     private:
         point<value_type, dimension> _origin;
-        vector_t<value_type, dimension> _direction;
+        vector_t<value_type, dimension> _direction, _inv_direction;
     };
 
     template<typename value_type>
@@ -113,6 +114,18 @@ namespace math
         vector_t<value_type, EDim::_3> _extends;
     };
 
+    template<typename value_type>
+    constexpr point<value_type, EDim::_3> transform(
+        const matrix_t<value_type, EDim::_4, EDim::_4>& l,
+        const point<value_type, EDim::_3>& r)
+    {
+        vector_t<value_type, EDim::_4> rhs4(r, value_type(1));
+        return point<value_type, EDim::_3>(
+            dot(l.rows[0], rhs4),
+            dot(l.rows[1], rhs4),
+            dot(l.rows[2], rhs4));
+    }
+
 
     enum class intersection : unsigned char
     {
@@ -154,8 +167,10 @@ namespace math
         return intersect_plane(ray, plane.position(), plane.normal(), false, t);
     }
 
+
     template<typename value_type>
-    intersection intersect(const ray<value_type, EDim::_3>& ray, const sphere<value_type>& sphere,
+    intersection intersect_sphere(const ray<value_type, EDim::_3>& ray,
+        const point<value_type, EDim::_3>& center, value_type radius_sqr,
         value_type& t0, value_type& t1)
     {
         //dot(dir, dir)*t^2 + 2*dot(dir, Or-Os)*t + dot(Or-Os, Or-Os) - r^2 = 0
@@ -163,11 +178,11 @@ namespace math
         //b = 2*dot(Dr, Or-Os)
         //c = dot(Or-Os,Or-Os) - r^2
         //t = (-b +- sqrt(b^2 - 4ac)) / 2a
-        vector_t<value_type, EDim::_3> Or_Os = ray.origin() - sphere.center();
+        vector_t<value_type, EDim::_3> Or_Os = ray.origin() - center;
         const vector_t<value_type, EDim::_3> Dr = ray.direction();
         value_type a = dot(Dr, Dr);
         value_type b = 2 * dot(Dr, Or_Os);
-        value_type c = dot(Or_Os, Or_Os) - sphere.radius_sqr();
+        value_type c = dot(Or_Os, Or_Os) - radius_sqr;
         value_type det = b * b - 4 * a*c;
         if (det > value_type(0))
         {
@@ -191,8 +206,15 @@ namespace math
     }
 
     template<typename value_type>
+    intersection intersect(const ray<value_type, EDim::_3>& ray, const sphere<value_type>& sphere,
+        value_type& t0, value_type& t1)
+    {
+        return intersect_sphere(ray, sphere.center(), sphere.radius_sqr(), t0, t1);
+    }
+
+    template<typename value_type>
     intersection intersect_cube(const ray<value_type, EDim::_3>& ray,
-        const vector_t<value_type, EDim::_3>& position,
+        const point<value_type, EDim::_3>& position,
         const vector_t<value_type, EDim::_3>& axis_x,
         const vector_t<value_type, EDim::_3>& axis_y,
         const vector_t<value_type, EDim::_3>& axis_z,

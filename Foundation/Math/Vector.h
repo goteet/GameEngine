@@ -657,8 +657,17 @@ namespace math
             v.w >= value_type(0) ? v.w : -v.w);
     }
 
+
+
+    template<typename value_type> constexpr value_type min_component(const vector_t<value_type, EDim::_2>& v) { return min2(v.x, v.y); }
+    template<typename value_type> constexpr value_type max_component(const vector_t<value_type, EDim::_2>& v) { return max2(v.x, v.y); }
+    template<typename value_type> constexpr value_type min_component(const vector_t<value_type, EDim::_3>& v) { return min3(v.x, v.y, v.z); }
+    template<typename value_type> constexpr value_type max_component(const vector_t<value_type, EDim::_3>& v) { return max3(v.x, v.y, v.z); }
+    template<typename value_type> constexpr value_type min_component(const vector_t<value_type, EDim::_4>& v) { return min2(min2(v.x, v.y), min2(v.z, v.w)); }
+    template<typename value_type> constexpr value_type max_component(const vector_t<value_type, EDim::_4>& v) { return max2(max2(v.x, v.y), max2(v.z, v.w)); }
+
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_2> min_elementwise(const vector_t<value_type, EDim::_2>& l, const vector_t<value_type, EDim::_2>& r)
+    constexpr vector_t<value_type, EDim::_2> min_comp_wise(const vector_t<value_type, EDim::_2>& l, const vector_t<value_type, EDim::_2>& r)
     {
         return vector_t<value_type, EDim::_2>(
             min2(l.x, r.x),
@@ -666,7 +675,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_2> min_elementwise(const vector_t<value_type, EDim::_2>& f0, const vector_t<value_type, EDim::_2>& f1, const vector_t<value_type, EDim::_2>& f2)
+    constexpr vector_t<value_type, EDim::_2> min_comp_wise(const vector_t<value_type, EDim::_2>& f0, const vector_t<value_type, EDim::_2>& f1, const vector_t<value_type, EDim::_2>& f2)
     {
         return vector_t<value_type, EDim::_2>(
             min3(f0.x, f1.x, f2.x),
@@ -674,7 +683,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_3> min_elementwise(const vector_t<value_type, EDim::_3>& l, const vector_t<value_type, EDim::_3>& r)
+    constexpr vector_t<value_type, EDim::_3> min_comp_wise(const vector_t<value_type, EDim::_3>& l, const vector_t<value_type, EDim::_3>& r)
     {
         return vector_t<value_type, EDim::_3>(
             min2(l.x, r.x),
@@ -683,7 +692,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_3> min_elementwise(const vector_t<value_type, EDim::_3>& f0, const vector_t<value_type, EDim::_3>& f1, const vector_t<value_type, EDim::_3>& f2)
+    constexpr vector_t<value_type, EDim::_3> min_comp_wise(const vector_t<value_type, EDim::_3>& f0, const vector_t<value_type, EDim::_3>& f1, const vector_t<value_type, EDim::_3>& f2)
     {
         return vector_t<value_type, EDim::_3>(
             min3(f0.x, f1.x, f2.x),
@@ -692,7 +701,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_4> min_elementwise(const vector_t<value_type, EDim::_4>& l, const vector_t<value_type, EDim::_4>& r)
+    constexpr vector_t<value_type, EDim::_4> min_comp_wise(const vector_t<value_type, EDim::_4>& l, const vector_t<value_type, EDim::_4>& r)
     {
         return vector_t<value_type, EDim::_4>(
             min2(l.x, r.x),
@@ -702,7 +711,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_4> min_elementwise(const vector_t<value_type, EDim::_4>& f0, const vector_t<value_type, EDim::_4>& f1, const vector_t<value_type, EDim::_4>& f2)
+    constexpr vector_t<value_type, EDim::_4> min_comp_wise(const vector_t<value_type, EDim::_4>& f0, const vector_t<value_type, EDim::_4>& f1, const vector_t<value_type, EDim::_4>& f2)
     {
         return vector_t<value_type, EDim::_4>(
             min3(f0.x, f1.x, f2.x),
@@ -712,7 +721,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_2> max_elementwise(const vector_t<value_type, EDim::_2>& l, const vector_t<value_type, EDim::_2>& r)
+    constexpr vector_t<value_type, EDim::_2> max_comp_wise(const vector_t<value_type, EDim::_2>& l, const vector_t<value_type, EDim::_2>& r)
     {
         return vector_t<value_type, EDim::_2>(
             max2(l.x, r.x),
@@ -720,7 +729,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_2> max_elementwise(const vector_t<value_type, EDim::_2>& f0, const vector_t<value_type, EDim::_2>& f1, const vector_t<value_type, EDim::_2>& f2)
+    constexpr vector_t<value_type, EDim::_2> max_comp_wise(const vector_t<value_type, EDim::_2>& f0, const vector_t<value_type, EDim::_2>& f1, const vector_t<value_type, EDim::_2>& f2)
     {
         return vector_t<value_type, EDim::_2>(
             max3(f0.x, f1.x, f2.x),
@@ -728,7 +737,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_3> max_elementwise(const vector_t<value_type, EDim::_3>& l, const vector_t<value_type, EDim::_3>& r)
+    constexpr vector_t<value_type, EDim::_3> max_comp_wise(const vector_t<value_type, EDim::_3>& l, const vector_t<value_type, EDim::_3>& r)
     {
         return vector_t<value_type, EDim::_3>(
             max2(l.x, r.x),
@@ -737,7 +746,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_3> max_elementwise(const vector_t<value_type, EDim::_3>& f0, const vector_t<value_type, EDim::_3>& f1, const vector_t<value_type, EDim::_3>& f2)
+    constexpr vector_t<value_type, EDim::_3> max_comp_wise(const vector_t<value_type, EDim::_3>& f0, const vector_t<value_type, EDim::_3>& f1, const vector_t<value_type, EDim::_3>& f2)
     {
         return vector_t<value_type, EDim::_3>(
             max3(f0.x, f1.x, f2.x),
@@ -746,7 +755,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_4> max_elementwise(const vector_t<value_type, EDim::_4>& l, const vector_t<value_type, EDim::_4>& r)
+    constexpr vector_t<value_type, EDim::_4> max_comp_wise(const vector_t<value_type, EDim::_4>& l, const vector_t<value_type, EDim::_4>& r)
     {
         return vector_t<value_type, EDim::_4>(
             max2(l.x, r.x),
@@ -756,7 +765,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr vector_t<value_type, EDim::_4> max_elementwise(const vector_t<value_type, EDim::_4>& f0, const vector_t<value_type, EDim::_4>& f1, const vector_t<value_type, EDim::_4>& f2)
+    constexpr vector_t<value_type, EDim::_4> max_comp_wise(const vector_t<value_type, EDim::_4>& f0, const vector_t<value_type, EDim::_4>& f1, const vector_t<value_type, EDim::_4>& f2)
     {
         return vector_t<value_type, EDim::_4>(
             max3(f0.x, f1.x, f2.x),

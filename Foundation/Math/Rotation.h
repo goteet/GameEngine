@@ -53,17 +53,8 @@ namespace math
         }
 
         // static utilities
-        static constexpr quaternion identity()
-        {
-            return quaternion(value_type(1),
-                value_type(0), value_type(0), value_type(0));
-        }
-
-        static constexpr quaternion identity_neg()
-        {
-            return quaternion(-value_type(1),
-                value_type(0), value_type(0), value_type(0));
-        }
+        static constexpr quaternion identity() { return quaternion(value_type(1), value_type(0), value_type(0), value_type(0)); }
+        static constexpr quaternion identity_neg() { return quaternion(-value_type(1), value_type(0), value_type(0), value_type(0)); }
     };
 
     // operations	
@@ -564,9 +555,9 @@ namespace math
         value_type length2 = magnitude_sqr(q);
         if (!is_equal(length2, value_type(0)) & !is_equal(length2, value_type(1)))
         {
-            value_type invLength = value_type(1) / sqrtf(length2);
-                q.v *= invLength;
-                q.w *= invLength;
+            value_type invLength = value_type(1) / sqrt(length2);
+            q.v *= invLength;
+            q.w *= invLength;
         }
     }
 
@@ -653,19 +644,38 @@ namespace math
         if (is_equal(cosw, value_type(1)))
         {
             f_s = value_type(1) - f;
-                f_e = f;
+            f_e = f;
         }
         else
         {
             value_type sinw = sqrtf(value_type(1) - cosw * cosw);
-                value_type inv_sinw = value_type(1) / sinw;
-                value_type w = atan2(sinw, cosw);
+            value_type inv_sinw = value_type(1) / sinw;
+            value_type w = atan2(sinw, cosw);
 
-                f_s = sinf((value_type(1) - f) * w)*  inv_sinw;
+            f_s = sinf((value_type(1) - f) * w)*  inv_sinw;
             f_e = sinf(f * w) * inv_sinw;
         }
 
         return f_s * s + f_e * d;
+    }
+
+
+    template<typename value_type>
+    inline quaternion<value_type> make_rotation_x_axis(radian<value_type> r)
+    {
+        return quaternion<value_type>(vector3<value_type>::unit_x(), r);
+    }
+
+    template<typename value_type>
+    inline quaternion<value_type> make_rotation_y_axis(radian<value_type> r)
+    {
+        return quaternion<value_type>(vector3<value_type>::unit_y(), r);
+    }
+
+    template<typename value_type>
+    inline quaternion<value_type> make_rotation_z_axis(radian<value_type> r)
+    {
+        return quaternion<value_type>(vector3<value_type>::unit_z(), r);
     }
 
     template<typename value_type>

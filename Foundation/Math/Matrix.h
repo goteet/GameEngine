@@ -63,7 +63,7 @@ namespace math
 
         inline value_type& operator[] (index_type idx) { return m[idx]; }
         inline const value_type& operator[] (index_type idx) const { return m[idx]; }
-        constexpr vector_t<value_type, EDim::_2> column(size_t idx) { return vector_t<value_type, EDim::_2>(cells[0][idx], cells[1][idx]); }
+        constexpr vector_t<value_type, EDim::_2> column(size_t idx) const { return vector_t<value_type, EDim::_2>(cells[0][idx], cells[1][idx]); }
         constexpr void set_column(size_t idx, vector_t<value_type, EDim::_2> _v)
         {
             cells[0][idx] = _v.x;
@@ -173,9 +173,9 @@ namespace math
 
         inline value_type& operator[] (index_type idx) { return v[idx]; }
         inline const value_type& operator[] (index_type idx) const { return v[idx]; }
-        constexpr vector_t<value_type, EDim::_2> row2d(size_t idx) { return vector_t<value_type, EDim::_2>(cells[idx][0], cells[idx][1]); }
-        constexpr vector_t<value_type, EDim::_2> column(size_t idx) { return vector_t<value_type, EDim::_2>(cells[0][idx], cells[1][idx]); }
-        constexpr vector_t<value_type, EDim::_3> column3(size_t idx) { return vector_t<value_type, EDim::_3>(cells[0][idx], cells[1][idx], idx == 2 ? value_type(1) : value_type(0)); }
+        constexpr vector_t<value_type, EDim::_2> row2d(size_t idx) const { return vector_t<value_type, EDim::_2>(cells[idx][0], cells[idx][1]); }
+        constexpr vector_t<value_type, EDim::_2> column(size_t idx) const { return vector_t<value_type, EDim::_2>(cells[0][idx], cells[1][idx]); }
+        constexpr vector_t<value_type, EDim::_3> column3(size_t idx) const { return vector_t<value_type, EDim::_3>(cells[0][idx], cells[1][idx], idx == 2 ? value_type(1) : value_type(0)); }
         constexpr void set_column(size_t idx, vector_t<value_type, EDim::_2> _v)
         {
             cells[0][idx] = _v.x;
@@ -385,8 +385,8 @@ namespace math
 
         inline value_type& operator[] (index_type idx) { return v[idx]; }
         inline const value_type& operator[] (index_type idx) const { return v[idx]; }
-        constexpr vector_t<value_type, EDim::_2> column2(size_t idx) { return vector_t<value_type, EDim::_2>(cells[0][idx], cells[1][idx]); }
-        constexpr vector_t<value_type, EDim::_3> column(size_t idx) { return vector_t<value_type, EDim::_3>(cells[0][idx], cells[1][idx], cells[2][idx]); }
+        constexpr vector_t<value_type, EDim::_2> column2(size_t idx) const { return vector_t<value_type, EDim::_2>(cells[0][idx], cells[1][idx]); }
+        constexpr vector_t<value_type, EDim::_3> column(size_t idx) const { return vector_t<value_type, EDim::_3>(cells[0][idx], cells[1][idx], cells[2][idx]); }
         constexpr void set_column(size_t index, vector_t<value_type, EDim::_3> v)
         {
             cells[0][index] = v.x;
@@ -599,7 +599,7 @@ namespace math
             {
                 for (size_t ci = 0; ci < col_dim; ci++)
                 {
-                    c[ri][ci] = r.cells[ri][ci];
+                    cells[ri][ci] = r.cells[ri][ci];
                 }
             }
             return *this;
@@ -608,7 +608,7 @@ namespace math
         inline value_type& operator[] (index_type index) { return v[index]; }
         inline const value_type& operator[] (index_type index) const { return v[index]; }
 
-        constexpr vector_t<value_type, EDim::_3> column3(size_t index)
+        constexpr vector_t<value_type, EDim::_3> column3(size_t index) const
         {
             return vector_t<value_type, EDim::_3>(
                 cells[0][index],
@@ -616,9 +616,9 @@ namespace math
                 cells[2][index]);
         }
 
-        constexpr vector_t<value_type, EDim::_4> column(size_t index)
+        constexpr vector_t<value_type, EDim::_4> column(size_t index) const
         {
-            return vector_c(
+            return vector_t<value_type, EDim::_4>(
                 cells[0][index],
                 cells[1][index],
                 cells[2][index],
@@ -730,6 +730,23 @@ namespace math
                 value_type(0), value_type(0), value_type(1), value_type(0),
                 value_type(0), value_type(0), value_type(0), value_type(1)
             );
+        }
+
+        static inline matrix_t TR(const vector_t<value_type, EDim::_3>& t, const quaternion<value_type>& r)
+        {
+            matrix_t matt = translate(t);
+            matrix_t matr = convert_to_matrix4x4(r);
+            return matt * matr;
+        }
+
+        static inline matrix_t TRS(const vector_t<value_type, EDim::_3>& t,
+            const quaternion<value_type>& r,
+            const vector_t<value_type, EDim::_3>& s)
+        {
+            matrix_t matt = translate(t);
+            matrix_t matr = convert_to_matrix4x4(r);
+            matrix_t mats = scale(s);
+            return matt * matr * mats;
         }
 
         static inline matrix_t look_at(
@@ -1280,6 +1297,40 @@ namespace math
         matrix_t<value_type, dimension, dimension> rst(matrix);
         inverse(rst);
         return rst;
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_2> get_scale(const matrix_t<value_type, EDim::_2, EDim::_3>& matrix)
+    {
+        value_type xscale = magnitude(matrix.column3(0));
+        value_type yscale = magnitude(matrix.column3(1));
+        return vector_t<value_type, EDim::_3>(xscale, yscale);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_2> get_scale(const matrix_t<value_type, EDim::_3, EDim::_3>& matrix)
+    {
+        value_type xscale = magnitude(matrix.column3(0));
+        value_type yscale = magnitude(matrix.column3(1));
+        return vector_t<value_type, EDim::_3>(xscale, yscale);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_3> get_scale3(const matrix_t<value_type, EDim::_3, EDim::_3>& matrix)
+    {
+        value_type xscale = magnitude(matrix.column3(0));
+        value_type yscale = magnitude(matrix.column3(1));
+        value_type zscale = magnitude(matrix.column3(2));
+        return vector_t<value_type, EDim::_3>(xscale, yscale, zscale);
+    }
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_3> get_scale(const matrix_t<value_type, EDim::_4, EDim::_4>& matrix)
+    {
+        value_type xscale = magnitude(matrix.column3(0));
+        value_type yscale = magnitude(matrix.column3(1));
+        value_type zscale = magnitude(matrix.column3(2));
+        return vector_t<value_type, EDim::_3>(xscale, yscale, zscale);
     }
 
     template<typename value_type>
