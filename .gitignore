@@ -1,5 +1,6 @@
 # Folders
 .vs/
+.vscode/
 [Bb]uild
 [Dd]ebug/
 [Dd]ebugPublic/
