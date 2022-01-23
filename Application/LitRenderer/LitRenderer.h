@@ -75,6 +75,7 @@ struct SceneObject
     virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const = 0;
     void SetTranslate(F x, F y, F z) { Transform.Translate.set(x, y, z); }
     void SetRotation(const math::quaternion<F>& q) { Transform.Rotation = q; }
+    void SetAlbedo(F r, F g, F b) { Material.Albedo.set(r, g, b); }
 
     Transform Transform;
     Material Material;
@@ -92,15 +93,20 @@ private:
     math::point3d<F> mWorldCenter;
 };
 
-struct ScenePlane : SceneObject
+struct SceneRect : SceneObject
 {
-    ScenePlane() : Plane(math::point3d<F>(), math::vector3<F>::unit_x()) { }
+    SceneRect() : Rect(math::point3d<F>(),
+        math::vector3<F>::unit_x(), math::norm,
+        math::vector3<F>::unit_z(), math::norm,
+        math::vector2<F>::one()) { }
     virtual void UpdateWorldTransform() override;
     virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
+    void SetExtends(F x, F y) { Rect.set_extends(x, y); }
 private:
-    math::plane<F> Plane;
+    math::rect<F> Rect;
     math::point3d<F> mWorldPosition;
     math::vector3<F> mWorldNormal;
+    math::vector3<F> mWorldTagent;
 };
 
 struct SceneCube : SceneObject
@@ -120,15 +126,12 @@ private:
 class Scene
 {
 public:
-    Scene();
+    Scene(F aspect);
     ~Scene();
     void UpdateWorldTransform();
     IntersectingInfo DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject);
     unsigned int GetLightCount() const { return (unsigned int)mLights.size(); }
     const Light&  GetLightByIndex(unsigned int index) const;
-
-    math::vector3<F> AmbientColor;
-
 private:
     std::vector<Light> mLights;
     std::vector<SceneObject*> mSceneObjects;

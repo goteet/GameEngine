@@ -11,44 +11,59 @@ bool Trace(Scene& scene, const math::ray3d<F>& ray, math::vector3<F>& outSpectra
     if (recursiveDepth == MaxRecursiveDepth)
         return false;
 
-    IntersectingInfo objInfo = scene.DetectIntersecting(ray, nullptr);
-    if (objInfo.Object == nullptr)
+    IntersectingInfo contactSurfaceInfo = scene.DetectIntersecting(ray, nullptr);
+    if (contactSurfaceInfo.Object == nullptr)
     {
         return false;
     }
 
-    math::point3d<F> intersetionWorldPos = ray.calc_offset(objInfo.Distance);
+    math::point3d<F> intersetionWorldPos = ray.calc_offset(contactSurfaceInfo.Distance);
 
     math::ray3d<F> shadowRay;
-    shadowRay.set_origin(intersetionWorldPos + objInfo.SurfaceNormal * RayBias);
+    shadowRay.set_origin(intersetionWorldPos + contactSurfaceInfo.SurfaceNormal * RayBias);
 
+    //Pucture Reflectance Equation.
     for (int lightIndex = 0, lightCount = scene.GetLightCount(); lightIndex < lightCount; ++lightIndex)
     {
         const Light& light = scene.GetLightByIndex(lightIndex);
+        bool isDirectional = light.LightType == ELightType::Directional;
 
-        math::vector3<F> towardLight = light.Position - intersetionWorldPos;
-        F lightDistanceSqr = math::magnitude_sqr(towardLight);
-        normalize(towardLight);
+        math::vector3<F> towardLight; F lightDistanceSqr = std::numeric_limits<F>::max();
+        if (isDirectional)
+        {
+            towardLight = -light.Position;
+        }
+        else
+        {
+            towardLight = light.Position - intersetionWorldPos;
+            lightDistanceSqr = math::magnitude_sqr(towardLight);
+            normalize(towardLight);
+        }
+
         shadowRay.set_direction(towardLight, math::norm);
-
-        IntersectingInfo shadowInfo = scene.DetectIntersecting(shadowRay, objInfo.Object);
+        IntersectingInfo shadowInfo = scene.DetectIntersecting(shadowRay, contactSurfaceInfo.Object);
         if (shadowInfo.Object == nullptr || (shadowInfo.Distance * shadowInfo.Distance) > lightDistanceSqr)
         {
-            //Lambertion
-            F NdotL = math::dot(objInfo.SurfaceNormal, towardLight);
-            NdotL = math::max2(NdotL, 0);
+            const math::vector3<F>& N = contactSurfaceInfo.SurfaceNormal;
+            const math::vector3<F>& L = towardLight;
 
-            F attenuation = light.Intensity / lightDistanceSqr;
-            math::vector3<F> diffuseTerm = light.Color * NdotL * attenuation;
-            outSpectral += scene.AmbientColor + diffuseTerm;
+            //Lambertion BRDF diffuse
+            const Material& material = contactSurfaceInfo.Object->Material;
+            math::vector3<F> BRDF = material.Albedo; //we ignore 1/PI.
+
+            F NdotL = math::max2(math::dot(N, L), 0);
+
+            F attenuation = isDirectional ? F(1) : (F(1) / lightDistanceSqr);
+            math::vector3<F> Li = light.Intensity * attenuation * light.Color;//we ignore PI here too...
+
+            math::vector3<F> Lo = BRDF * Li * NdotL;
+            outSpectral += Lo;
         }
         else
         {
             //in shadow.
-            outSpectral += scene.AmbientColor;
         }
     }
-
     return true;
 }
 
@@ -143,6 +158,7 @@ LitRenderer::LitRenderer(unsigned char * canvasDataPtr, int canvasWidth, int can
     , mClearColor(0, 0, 0)
     , mCamera(math::degree<F>(60))
     , mSampleArrayCount(canvasWidth * canvasHeight)
+    , mScene(F(canvasWidth) / F(canvasHeight))
 
 {
     mImageSamples = new std::vector<Sample>[canvasWidth * canvasHeight];
@@ -271,62 +287,97 @@ SimpleBackCamera::SimpleBackCamera(math::degree<F> verticalFov)
     , Position(0, 0, 0)
 { }
 
-Scene::Scene()
-    : AmbientColor(F(0.01), F(0.01), F(0.01))
+Scene::Scene(F aspect)
 {
+    const F SceneSize = 60;
+    const F SceneNear = 1;
+    const F SceneFar = SceneSize * F(2);
+    const F SceneBottom = -SceneSize;
+    const F SceneTop = SceneSize;
+    const F SceneLeft = -SceneSize * aspect;
+    const F SceneRight = SceneSize * aspect;
+
+    const F SceneCenterX = (SceneLeft + SceneRight) * F(0.5);
+    const F SceneCenterY = (SceneBottom + SceneTop) * F(0.5);
+    const F SceneCenterZ = (SceneNear + SceneFar) * F(0.5);
+    const F SceneExtendX = (SceneRight - SceneLeft)* F(0.5);
+    const F SceneExtendY = (SceneTop - SceneBottom)* F(0.5);
+    const F SceneExtendZ = (SceneFar - SceneNear)* F(0.5);
+
     const F SceneDistance = 5;
-    const F BigObjectSize = 10;
-    const F SmallObjectSize = BigObjectSize * F(0.5);
-    const F LightHeight = BigObjectSize * 4;
-    const F SceneSize = 40;
-    const F GroundHeight = -SceneSize;
+    const F SmallObjectSize = 5;
+    const F BigObjectSize = SmallObjectSize * F(1.75);
 
     Light mainLight;
-    mainLight.Position.set(0, GroundHeight + F(1.99) * SceneSize, -20);
+    mainLight.Position.set(SceneCenterX, SceneTop - F(1), SceneCenterZ);
     mainLight.Color.set(1, 1, 1);
-    mainLight.Intensity = 400;
-
+    mainLight.Intensity = SceneExtendY * 2 * 5;
+    mainLight.LightType = ELightType::Puncture;
     mLights.push_back(mainLight);
 
+    Light directionalLight;
+    directionalLight.Position.set(F(-0.1), F(-0.1), 1);
+    directionalLight.Color.set(1, 1, 1);
+    directionalLight.Intensity = F(0.075);
+    directionalLight.LightType = ELightType::Directional;
+    normalize(directionalLight.Position);
+    mLights.push_back(directionalLight);
+
     SceneSphere* lSphere = new SceneSphere(); mSceneObjects.push_back(lSphere);
-    SceneSphere* rSphere = new SceneSphere(); mSceneObjects.push_back(rSphere);
-
     lSphere->SetRadius(BigObjectSize);
-    lSphere->SetTranslate(-10 - BigObjectSize, GroundHeight + BigObjectSize, SceneDistance - BigObjectSize);
+    lSphere->SetTranslate(
+        SceneCenterX - 20,
+        SceneBottom + BigObjectSize,
+        SceneCenterZ - 5);
 
+    SceneSphere* rSphere = new SceneSphere(); mSceneObjects.push_back(rSphere);
     rSphere->SetRadius(SmallObjectSize);
-    rSphere->SetTranslate(-10 + SmallObjectSize, GroundHeight + SmallObjectSize, SceneDistance - 10 - SmallObjectSize);
+    rSphere->SetTranslate(
+        SceneCenterX - 20,
+        SceneBottom + SmallObjectSize,
+        SceneCenterZ - 30);
 
     SceneCube* lCube = new SceneCube(); mSceneObjects.push_back(lCube);
-    SceneCube* rCube = new SceneCube(); mSceneObjects.push_back(rCube);
-
     lCube->SetExtends(SmallObjectSize, BigObjectSize, SmallObjectSize);
-    lCube->SetTranslate(10 + BigObjectSize, GroundHeight + BigObjectSize, SceneDistance + 10 + BigObjectSize);
-    lCube->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(30)));
+    lCube->SetTranslate(
+        SceneCenterX + 20 + BigObjectSize,
+        SceneBottom + BigObjectSize,
+        SceneCenterZ + 30);
+    lCube->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(-30)));
 
+    SceneCube* rCube = new SceneCube(); mSceneObjects.push_back(rCube);
     rCube->SetExtends(SmallObjectSize, SmallObjectSize, SmallObjectSize);
-    rCube->SetTranslate(6 + SmallObjectSize, GroundHeight + SmallObjectSize, SceneDistance);
+    rCube->SetTranslate(
+        SceneCenterX + 15 + SmallObjectSize,
+        SceneBottom + SmallObjectSize,
+        SceneCenterZ + 5);
     rCube->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(60)));
+    
+    SceneRect* wallLeft = new SceneRect(); mSceneObjects.push_back(wallLeft);
+    wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
+    wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
+    wallLeft->SetAlbedo(1, 0, 0);
 
-    ScenePlane* lWall = new ScenePlane(); mSceneObjects.push_back(lWall);
-    ScenePlane* rWall = new ScenePlane(); mSceneObjects.push_back(rWall);
-    ScenePlane* tWall = new ScenePlane(); mSceneObjects.push_back(tWall);
-    ScenePlane* bWall = new ScenePlane(); mSceneObjects.push_back(bWall);
-    ScenePlane* fWall = new ScenePlane(); mSceneObjects.push_back(fWall);
+    SceneRect* wallRight = new SceneRect(); mSceneObjects.push_back(wallRight);
+    wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
+    wallRight->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
+    wallRight->SetExtends(SceneExtendZ, SceneExtendY);
+    wallRight->SetAlbedo(0, 1, 0);
 
-    lWall->SetTranslate(-SceneSize, 0, 0);
+    SceneRect* wallTop = new SceneRect(); mSceneObjects.push_back(wallTop);
+    wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
+    wallTop->SetExtends(SceneExtendZ, SceneExtendX);
+    wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
 
-    rWall->SetTranslate(SceneSize, 0, 0);
-    rWall->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
+    SceneRect* wallBottom = new SceneRect(); mSceneObjects.push_back(wallBottom);
+    wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
+    wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
+    wallBottom->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
 
-    tWall->SetTranslate(0, GroundHeight + 2 * SceneSize, 0);
-    tWall->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
-
-    bWall->SetTranslate(0, GroundHeight, 0);
-    bWall->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
-
-    fWall->SetTranslate(0, 0, F(1.5) * SceneSize);
-    fWall->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
+    SceneRect* wallFar = new SceneRect(); mSceneObjects.push_back(wallFar);
+    wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
+    wallFar->SetExtends(SceneExtendX, SceneExtendY);
+    wallFar->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
 }
 
 Scene::~Scene()
@@ -414,25 +465,26 @@ IntersectingInfo SceneSphere::IntersectWithRay(const math::ray3d<F>& ray) const
     return IntersectingInfo(const_cast<SceneSphere*>(this), surfaceNormal, t0);
 }
 
-void ScenePlane::UpdateWorldTransform()
+void SceneRect::UpdateWorldTransform()
 {
     SceneObject::UpdateWorldTransform();
 
-    mWorldPosition = transform(Transform.TransformMatrix, Plane.position());
-    mWorldNormal = transform(Transform.TransformMatrix, Plane.normal()); // no scale so there...
+    mWorldPosition = transform(Transform.TransformMatrix, Rect.position());
+    mWorldNormal = transform(Transform.TransformMatrix, Rect.normal()); // no scale so there...
+    mWorldTagent = transform(Transform.TransformMatrix, Rect.tangent());
 }
 
-IntersectingInfo ScenePlane::IntersectWithRay(const math::ray3d<F>& ray) const
+IntersectingInfo SceneRect::IntersectWithRay(const math::ray3d<F>& ray) const
 {
     F t;
-    math::intersection result = math::intersect_plane(ray, mWorldPosition, mWorldNormal, false, t);
+    math::intersection result = math::intersect_rect(ray, mWorldPosition, mWorldNormal, mWorldTagent, Rect.extends(), false, t);
     if (result == math::intersection::none)
     {
         return IntersectingInfo();
     }
     else
     {
-        return IntersectingInfo(const_cast<ScenePlane*>(this), mWorldNormal, t);
+        return IntersectingInfo(const_cast<SceneRect*>(this), mWorldNormal, t);
     }
 }
 
