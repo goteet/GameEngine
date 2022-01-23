@@ -11,7 +11,7 @@ bool Trace(Scene& scene, const math::ray3d<F>& ray, math::vector3<F>& outSpectra
     if (recursiveDepth == MaxRecursiveDepth)
         return false;
 
-    IntersectingInfo contactSurfaceInfo = scene.DetectIntersecting(ray, nullptr);
+    HitRecord contactSurfaceInfo = scene.DetectIntersecting(ray, nullptr);
     if (contactSurfaceInfo.Object == nullptr)
     {
         return false;
@@ -41,7 +41,7 @@ bool Trace(Scene& scene, const math::ray3d<F>& ray, math::vector3<F>& outSpectra
         }
 
         shadowRay.set_direction(towardLight, math::norm);
-        IntersectingInfo shadowInfo = scene.DetectIntersecting(shadowRay, contactSurfaceInfo.Object);
+        HitRecord shadowInfo = scene.DetectIntersecting(shadowRay, contactSurfaceInfo.Object);
         if (shadowInfo.Object == nullptr || (shadowInfo.Distance * shadowInfo.Distance) > lightDistanceSqr)
         {
             const math::vector3<F>& N = contactSurfaceInfo.SurfaceNormal;
@@ -397,14 +397,14 @@ void Scene::UpdateWorldTransform()
     }
 }
 
-IntersectingInfo Scene::DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject)
+HitRecord Scene::DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject)
 {
-    IntersectingInfo result;
+    HitRecord result;
     for (const SceneObject* obj : mSceneObjects)
     {
         if (excludeObject != obj)
         {
-            IntersectingInfo info = obj->IntersectWithRay(ray);
+            HitRecord info = obj->IntersectWithRay(ray);
             if (info.Object != nullptr)
             {
                 if (result.Object == nullptr || result.Distance > info.Distance)
@@ -446,13 +446,13 @@ void SceneSphere::UpdateWorldTransform()
     mWorldCenter = transform(Transform.TransformMatrix, mSphere.center());
 }
 
-IntersectingInfo SceneSphere::IntersectWithRay(const math::ray3d<F>& ray) const
+HitRecord SceneSphere::IntersectWithRay(const math::ray3d<F>& ray) const
 {
     F t0, t1;
     math::intersection result = math::intersect_sphere(ray, mWorldCenter, mSphere.radius_sqr(), t0, t1);
     if (result == math::intersection::none)
     {
-        return IntersectingInfo();
+        return HitRecord();
     }
     else if (result == math::intersection::inside)
     {
@@ -462,7 +462,7 @@ IntersectingInfo SceneSphere::IntersectWithRay(const math::ray3d<F>& ray) const
     math::point3d<F> intersectPosition = ray.calc_offset(t0);
     math::vector3<F> surfaceNormal = normalized(intersectPosition - mWorldCenter);
 
-    return IntersectingInfo(const_cast<SceneSphere*>(this), surfaceNormal, t0);
+    return HitRecord(const_cast<SceneSphere*>(this), surfaceNormal, t0);
 }
 
 void SceneRect::UpdateWorldTransform()
@@ -474,17 +474,17 @@ void SceneRect::UpdateWorldTransform()
     mWorldTagent = transform(Transform.TransformMatrix, Rect.tangent());
 }
 
-IntersectingInfo SceneRect::IntersectWithRay(const math::ray3d<F>& ray) const
+HitRecord SceneRect::IntersectWithRay(const math::ray3d<F>& ray) const
 {
     F t;
     math::intersection result = math::intersect_rect(ray, mWorldPosition, mWorldNormal, mWorldTagent, Rect.extends(), false, t);
     if (result == math::intersection::none)
     {
-        return IntersectingInfo();
+        return HitRecord();
     }
     else
     {
-        return IntersectingInfo(const_cast<SceneRect*>(this), mWorldNormal, t);
+        return HitRecord(const_cast<SceneRect*>(this), mWorldNormal, t);
     }
 }
 
@@ -497,7 +497,7 @@ void SceneCube::UpdateWorldTransform()
     mWorldAxisZ = transform(Transform.TransformMatrix, Cube.axis_z());
 }
 
-IntersectingInfo SceneCube::IntersectWithRay(const math::ray3d<F>& ray) const
+HitRecord SceneCube::IntersectWithRay(const math::ray3d<F>& ray) const
 {
     F t0, t1;
 
@@ -508,7 +508,7 @@ IntersectingInfo SceneCube::IntersectWithRay(const math::ray3d<F>& ray) const
         t0, t1, n0, n1);
     if (result == math::intersection::none)
     {
-        return IntersectingInfo();
+        return HitRecord();
     }
     else if (result == math::intersection::inside)
     {
@@ -516,5 +516,5 @@ IntersectingInfo SceneCube::IntersectWithRay(const math::ray3d<F>& ray) const
         t0 = t1;
     }
 
-    return IntersectingInfo(const_cast<SceneCube*>(this), n0, t0);
+    return HitRecord(const_cast<SceneCube*>(this), n0, t0);
 }

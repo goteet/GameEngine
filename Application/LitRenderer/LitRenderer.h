@@ -30,10 +30,10 @@ private:
 
 struct SceneObject;
 
-struct IntersectingInfo
+struct HitRecord
 {
-    IntersectingInfo() = default;
-    IntersectingInfo(SceneObject* o, math::vector3<F> n, F d)
+    HitRecord() = default;
+    HitRecord(SceneObject* o, math::vector3<F> n, F d)
         : Object(o), SurfaceNormal(n), Distance(d) { }
 
     SceneObject* Object = nullptr;
@@ -72,7 +72,7 @@ struct SceneObject
 {
     virtual ~SceneObject() { }
     virtual void UpdateWorldTransform();
-    virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const = 0;
+    virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray) const = 0;
     void SetTranslate(F x, F y, F z) { Transform.Translate.set(x, y, z); }
     void SetRotation(const math::quaternion<F>& q) { Transform.Rotation = q; }
     void SetAlbedo(F r, F g, F b) { Material.Albedo.set(r, g, b); }
@@ -86,7 +86,7 @@ struct SceneSphere : SceneObject
 {
     SceneSphere() : mSphere(math::point3d<F>(), 1) { }
     virtual void UpdateWorldTransform() override;
-    virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
+    virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray) const override;
     void SetRadius(F radius) { mSphere.set_radius(radius); }
 private:
     math::sphere<F> mSphere;
@@ -100,7 +100,7 @@ struct SceneRect : SceneObject
         math::vector3<F>::unit_z(), math::norm,
         math::vector2<F>::one()) { }
     virtual void UpdateWorldTransform() override;
-    virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
+    virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray) const override;
     void SetExtends(F x, F y) { Rect.set_extends(x, y); }
 private:
     math::rect<F> Rect;
@@ -113,7 +113,7 @@ struct SceneCube : SceneObject
 {
     SceneCube() : Cube(math::point3d<F>(), math::vector3<F>::one()) { }
     virtual void UpdateWorldTransform() override;
-    virtual IntersectingInfo IntersectWithRay(const math::ray3d<F>& ray) const override;
+    virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray) const override;
     void SetExtends(F x, F y, F z) { Cube.set_extends(x, y, z); }
 private:
     math::cube<F> Cube;
@@ -129,7 +129,7 @@ public:
     Scene(F aspect);
     ~Scene();
     void UpdateWorldTransform();
-    IntersectingInfo DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject);
+    HitRecord DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject);
     unsigned int GetLightCount() const { return (unsigned int)mLights.size(); }
     const Light&  GetLightByIndex(unsigned int index) const;
 private:
