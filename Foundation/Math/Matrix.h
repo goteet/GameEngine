@@ -1020,9 +1020,9 @@ namespace math
         vector_t<value_type, EDim::_3> r0 = matrix.rows[0];
         vector_t<value_type, EDim::_3> r1 = matrix.rows[1];
         vector_t<value_type, EDim::_3> r2 = matrix.rows[2];
-        if (!is_equal(length_sqr(r0), value_type(1)) ||
-            !is_equal(length_sqr(r1), value_type(1)) ||
-            !is_equal(length_sqr(r2), value_type(1)))
+        if (!is_equal(magnitude_sqr(r0), value_type(1)) ||
+            !is_equal(magnitude_sqr(r1), value_type(1)) ||
+            !is_equal(magnitude_sqr(r2), value_type(1)))
         {
             return false;
         }
@@ -1039,10 +1039,10 @@ namespace math
         vector_t<value_type, EDim::_4> r1 = matrix.rows[1];
         vector_t<value_type, EDim::_4> r2 = matrix.rows[2];
         vector_t<value_type, EDim::_4> r3 = matrix.rows[3];
-        if (!is_equal(length_sqr(r0), value_type(1)) ||
-            !is_equal(length_sqr(r1), value_type(1)) ||
-            !is_equal(length_sqr(r2), value_type(1)) ||
-            !is_equal(length_sqr(r3), value_type(1)))
+        if (!is_equal(magnitude_sqr(r0), value_type(1)) ||
+            !is_equal(magnitude_sqr(r1), value_type(1)) ||
+            !is_equal(magnitude_sqr(r2), value_type(1)) ||
+            !is_equal(magnitude_sqr(r3), value_type(1)))
         {
             return false;
         }
@@ -1155,7 +1155,7 @@ namespace math
             value_type det = determinant(matrix);
             if (!is_equal(det, value_type(0)))
             {
-                //calc adjoint matrix 
+                //calc adjoint matrix
                 std::swap(matrix.cells[0][0], matrix.cells[1][1]);
                 matrix.cells[0][1] = -matrix.cells[0][1];
                 matrix.cells[1][0] = -matrix.cells[1][0];
@@ -1261,25 +1261,25 @@ namespace math
 
                 //to-do det_impl is calculated above in determinant().
                 //try to gcd
-                matrix.cells[0][0] = +determinant3x3(old.cells[1][1], old.cells[1][2], old.cells[1][3], old.cells[2][1], old.cells[2][2], old.cells[2][3], old.cells[3][1], old.cells[3][2], old.cells[3][3]) * det;
-                matrix.cells[1][0] = -determinant3x3(old.cells[1][0], old.cells[1][2], old.cells[1][3], old.cells[2][0], old.cells[2][2], old.cells[2][3], old.cells[3][0], old.cells[3][2], old.cells[3][3]) * det;
-                matrix.cells[2][0] = +determinant3x3(old.cells[1][0], old.cells[1][1], old.cells[1][3], old.cells[2][0], old.cells[2][1], old.cells[2][3], old.cells[3][0], old.cells[3][1], old.cells[3][3]) * det;
-                matrix.cells[3][0] = -determinant3x3(old.cells[1][0], old.cells[1][1], old.cells[1][2], old.cells[2][0], old.cells[2][1], old.cells[2][2], old.cells[3][0], old.cells[3][1], old.cells[3][2]) * det;
+                matrix.cells[0][0] = +math_impl::determinant3x3(old.cells[1][1], old.cells[1][2], old.cells[1][3], old.cells[2][1], old.cells[2][2], old.cells[2][3], old.cells[3][1], old.cells[3][2], old.cells[3][3]) * det;
+                matrix.cells[1][0] = -math_impl::determinant3x3(old.cells[1][0], old.cells[1][2], old.cells[1][3], old.cells[2][0], old.cells[2][2], old.cells[2][3], old.cells[3][0], old.cells[3][2], old.cells[3][3]) * det;
+                matrix.cells[2][0] = +math_impl::determinant3x3(old.cells[1][0], old.cells[1][1], old.cells[1][3], old.cells[2][0], old.cells[2][1], old.cells[2][3], old.cells[3][0], old.cells[3][1], old.cells[3][3]) * det;
+                matrix.cells[3][0] = -math_impl::determinant3x3(old.cells[1][0], old.cells[1][1], old.cells[1][2], old.cells[2][0], old.cells[2][1], old.cells[2][2], old.cells[3][0], old.cells[3][1], old.cells[3][2]) * det;
 
-                matrix.cells[0][1] = -determinant3x3(old.cells[0][1], old.cells[0][2], old.cells[0][3], old.cells[2][1], old.cells[2][2], old.cells[2][3], old.cells[3][1], old.cells[3][2], old.cells[3][3]) * det;
-                matrix.cells[1][1] = +determinant3x3(old.cells[0][0], old.cells[0][2], old.cells[0][3], old.cells[2][0], old.cells[2][2], old.cells[2][3], old.cells[3][0], old.cells[3][2], old.cells[3][3]) * det;
-                matrix.cells[2][1] = -determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][3], old.cells[2][0], old.cells[2][1], old.cells[2][3], old.cells[3][0], old.cells[3][1], old.cells[3][3]) * det;
-                matrix.cells[3][1] = +determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][2], old.cells[2][0], old.cells[2][1], old.cells[2][2], old.cells[3][0], old.cells[3][1], old.cells[3][2]) * det;
+                matrix.cells[0][1] = -math_impl::determinant3x3(old.cells[0][1], old.cells[0][2], old.cells[0][3], old.cells[2][1], old.cells[2][2], old.cells[2][3], old.cells[3][1], old.cells[3][2], old.cells[3][3]) * det;
+                matrix.cells[1][1] = +math_impl::determinant3x3(old.cells[0][0], old.cells[0][2], old.cells[0][3], old.cells[2][0], old.cells[2][2], old.cells[2][3], old.cells[3][0], old.cells[3][2], old.cells[3][3]) * det;
+                matrix.cells[2][1] = -math_impl::determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][3], old.cells[2][0], old.cells[2][1], old.cells[2][3], old.cells[3][0], old.cells[3][1], old.cells[3][3]) * det;
+                matrix.cells[3][1] = +math_impl::determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][2], old.cells[2][0], old.cells[2][1], old.cells[2][2], old.cells[3][0], old.cells[3][1], old.cells[3][2]) * det;
 
-                matrix.cells[0][2] = +determinant3x3(old.cells[0][1], old.cells[0][2], old.cells[0][3], old.cells[1][1], old.cells[1][2], old.cells[1][3], old.cells[3][1], old.cells[3][2], old.cells[3][3]) * det;
-                matrix.cells[1][2] = -determinant3x3(old.cells[0][0], old.cells[0][2], old.cells[0][3], old.cells[1][0], old.cells[1][2], old.cells[1][3], old.cells[3][0], old.cells[3][2], old.cells[3][3]) * det;
-                matrix.cells[2][2] = +determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][3], old.cells[1][0], old.cells[1][1], old.cells[1][3], old.cells[3][0], old.cells[3][1], old.cells[3][3]) * det;
-                matrix.cells[3][2] = -determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][2], old.cells[1][0], old.cells[1][1], old.cells[1][2], old.cells[3][0], old.cells[3][1], old.cells[3][2]) * det;
+                matrix.cells[0][2] = +math_impl::determinant3x3(old.cells[0][1], old.cells[0][2], old.cells[0][3], old.cells[1][1], old.cells[1][2], old.cells[1][3], old.cells[3][1], old.cells[3][2], old.cells[3][3]) * det;
+                matrix.cells[1][2] = -math_impl::determinant3x3(old.cells[0][0], old.cells[0][2], old.cells[0][3], old.cells[1][0], old.cells[1][2], old.cells[1][3], old.cells[3][0], old.cells[3][2], old.cells[3][3]) * det;
+                matrix.cells[2][2] = +math_impl::determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][3], old.cells[1][0], old.cells[1][1], old.cells[1][3], old.cells[3][0], old.cells[3][1], old.cells[3][3]) * det;
+                matrix.cells[3][2] = -math_impl::determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][2], old.cells[1][0], old.cells[1][1], old.cells[1][2], old.cells[3][0], old.cells[3][1], old.cells[3][2]) * det;
 
-                matrix.cells[0][3] = -determinant3x3(old.cells[0][1], old.cells[0][2], old.cells[0][3], old.cells[1][1], old.cells[1][2], old.cells[1][3], old.cells[2][1], old.cells[2][2], old.cells[2][3]) * det;
-                matrix.cells[1][3] = +determinant3x3(old.cells[0][0], old.cells[0][2], old.cells[0][3], old.cells[1][0], old.cells[1][2], old.cells[1][3], old.cells[2][0], old.cells[2][2], old.cells[2][3]) * det;
-                matrix.cells[2][3] = -determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][3], old.cells[1][0], old.cells[1][1], old.cells[1][3], old.cells[2][0], old.cells[2][1], old.cells[2][3]) * det;
-                matrix.cells[3][3] = +determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][2], old.cells[1][0], old.cells[1][1], old.cells[1][2], old.cells[2][0], old.cells[2][1], old.cells[2][2]) * det;
+                matrix.cells[0][3] = -math_impl::determinant3x3(old.cells[0][1], old.cells[0][2], old.cells[0][3], old.cells[1][1], old.cells[1][2], old.cells[1][3], old.cells[2][1], old.cells[2][2], old.cells[2][3]) * det;
+                matrix.cells[1][3] = +math_impl::determinant3x3(old.cells[0][0], old.cells[0][2], old.cells[0][3], old.cells[1][0], old.cells[1][2], old.cells[1][3], old.cells[2][0], old.cells[2][2], old.cells[2][3]) * det;
+                matrix.cells[2][3] = -math_impl::determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][3], old.cells[1][0], old.cells[1][1], old.cells[1][3], old.cells[2][0], old.cells[2][1], old.cells[2][3]) * det;
+                matrix.cells[3][3] = +math_impl::determinant3x3(old.cells[0][0], old.cells[0][1], old.cells[0][2], old.cells[1][0], old.cells[1][1], old.cells[1][2], old.cells[2][0], old.cells[2][1], old.cells[2][2]) * det;
             }
             else
             {

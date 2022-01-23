@@ -587,7 +587,7 @@ namespace math
     }
 
     template<typename value_type, EDim dimension, typename = std::enable_if<dimension == EDim::_2 || dimension == EDim::_3>::type>
-    void normalize(vector_t<value_type, dimension>& _v) //为了避免链式连接过程中用错函数，这里特意改为 void 类型
+    void normalize(vector_t<value_type, dimension>& _v) //涓轰簡閬垮厤閾惧紡杩炴帴杩囩▼涓敤閿欏嚱鏁帮紝杩欓噷鐗规剰鏀逛负 void 绫诲瀷
     {
         value_type lengthSqr = magnitude_sqr(_v);
         if (!is_equal(lengthSqr, value_type(0)))
@@ -609,7 +609,7 @@ namespace math
     }
 
     template<typename value_type, EDim dimension>
-    constexpr void inverse(vector_t<value_type, dimension>& _v) //为了避免链式连接过程中用错函数，这里特意改为 void 类型
+    constexpr void inverse(vector_t<value_type, dimension>& _v) //涓轰簡閬垮厤閾惧紡杩炴帴杩囩▼涓敤閿欏嚱鏁帮紝杩欓噷鐗规剰鏀逛负 void 绫诲瀷
     {
         value_type lengthSqr = magnitude_sqr(_v);
         if (!is_equal(lengthSqr, value_type(0)))
