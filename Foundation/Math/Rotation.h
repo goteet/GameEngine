@@ -57,7 +57,7 @@ namespace math
         static constexpr quaternion identity_neg() { return quaternion(-value_type(1), value_type(0), value_type(0), value_type(0)); }
     };
 
-    // operations	
+    // operations
     template<typename value_type>
     constexpr bool operator==(const radian<value_type>& l, const radian<value_type>& r)
     {
@@ -761,13 +761,13 @@ namespace math
     //}
 
 
-    using quat_f = quaternion<float>;
-    using quat_d = quaternion<double>;
-    using degree_i = degree<int>;
-    using radian_f = radian<float>;
-    using degree_f = degree<float>;
-    using radian_d = radian<double>;
-    using degree_d = degree<double>;
+    using quatf = quaternion<float>;
+    using quatd = quaternion<double>;
+    using degreei = degree<int>;
+    using radianf = radian<float>;
+    using degreef = degree<float>;
+    using radiand = radian<double>;
+    using degreed = degree<double>;
 
 }
 
