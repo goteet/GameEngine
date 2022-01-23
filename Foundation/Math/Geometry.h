@@ -89,6 +89,31 @@ namespace math
     };
 
     template<typename value_type>
+    struct disk : private plane<value_type>
+    {
+        //n,t
+        disk(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n,
+            scaler_t<value_type> r) : plane<value_type>(p, n) { set_radius(r); }
+
+        //norm n
+        disk(const point<value_type, EDim::_3>& p,
+            const vector_t<value_type, EDim::_3>& n, normalize_hint,
+            scaler_t<value_type> r) : plane<value_type>(p, n, norm) { set_radius(r); }
+
+        void set_position(const point<value_type, EDim::_3>& p) { plane<value_type>::set_position(p); }
+        void set_normal(const vector_t<value_type, EDim::_3>& n) { plane<value_type>::set_normal(n); }
+        void set_normal(const vector_t<value_type, EDim::_3>& n, normalize_hint) { plane<value_type>::set_normal(n, normalize_hint::norm); }
+        void set_radius(scaler_t<value_type> r) { _radius = math::max2(r, value_type(0)); }
+        constexpr const point<value_type, EDim::_3>& position() const { return plane<value_type>::position(); }
+        constexpr point<value_type, EDim::_3>& position() { return plane<value_type>::position(); }
+        constexpr const vector_t<value_type, EDim::_3>& normal() const { return plane<value_type>::normal(); }
+        value_type radius() const { return _radius; }
+    private:
+        value_type _radius;
+    };
+
+    template<typename value_type>
     struct rect : private plane<value_type>
     {
         //n,t,e
@@ -210,7 +235,7 @@ namespace math
     template<typename value_type>
     intersection intersect_plane(const ray<value_type, EDim::_3>& ray,
         const point<value_type, EDim::_3>& pos, const vector_t<value_type, EDim::_3>& normal, bool dualface,
-        value_type& t)
+        value_type error, value_type& t)
     {
         value_type Dr_dot_N = dot(ray.direction(), normal);
 
@@ -218,7 +243,7 @@ namespace math
         {
             //t = -dot(N, Pp) / dot(Dr, N);
             t = dot(pos - ray.origin(), normal) / Dr_dot_N;
-            if (t > value_type(0))
+            if (t > error)
             {
                 return intersection::intersect;
             }
@@ -231,14 +256,45 @@ namespace math
     }
 
     template<typename value_type>
+    intersection intersect_disk(const ray<value_type, EDim::_3>& ray,
+        const point<value_type, EDim::_3>& pos,
+        const vector_t<value_type, EDim::_3>& normal,
+        scaler_t<value_type> radius, bool dualface,
+        value_type error, value_type& t)
+    {
+        intersection r = intersect_plane(ray, pos, normal, dualface, error, t);
+        if (r != intersection::none)
+        {
+            point<value_type, EDim::_3> intersection = ray.calc_offset(t);
+            vector_t<value_type, EDim::_3> offset = (intersection - pos);
+            value_type r = dot(offset, offset);
+            value_type radius_sqr = radius * radius;
+            if (r > radius_sqr)
+            {
+                intersection::none;
+            }
+            else if (r < radius_sqr)
+            {
+                return intersection::inside;
+            }
+            else
+            {
+                return intersection::tangent;
+            }
+        }
+
+        return intersection::none;
+    }
+
+    template<typename value_type>
     intersection intersect_rect(const ray<value_type, EDim::_3>& ray,
         const point<value_type, EDim::_3>& pos,
         const vector_t<value_type, EDim::_3>& normal,
         const vector_t<value_type, EDim::_3>& tangent,
         const vector_t<value_type, EDim::_2>& extends, bool dualface,
-        value_type& t)
+        value_type error, value_type& t)
     {
-        intersection r = intersect_plane(ray, pos, normal, dualface, t);
+        intersection r = intersect_plane(ray, pos, normal, dualface, error, t);
         if (r != intersection::none)
         {
             point<value_type, EDim::_3> intersection = ray.calc_offset(t);
@@ -266,23 +322,23 @@ namespace math
     template<typename value_type>
     intersection intersect(const ray<value_type, EDim::_3>& ray,
         const plane<value_type>& plane, dual_face_hint,
-        value_type& t)
+        value_type error, value_type& t)
     {
-        return intersect_plane(ray, plane.position(), plane.normal(), true, t);
+        return intersect_plane(ray, plane.position(), plane.normal(), true, error, t);
     }
 
     template<typename value_type>
     intersection intersect(const ray<value_type, EDim::_3>& ray,
-        const plane<value_type>& plane, value_type& t)
+        const plane<value_type>& plane, value_type error, value_type& t)
     {
-        return intersect_plane(ray, plane.position(), plane.normal(), false, t);
+        return intersect_plane(ray, plane.position(), plane.normal(), false, error, t);
     }
 
 
     template<typename value_type>
     intersection intersect_sphere(const ray<value_type, EDim::_3>& ray,
         const point<value_type, EDim::_3>& center, value_type radius_sqr,
-        value_type& t0, value_type& t1)
+        value_type error, value_type& t0, value_type& t1)
     {
         //dot(dir, dir)*t^2 + 2*dot(dir, Or-Os)*t + dot(Or-Os, Or-Os) - r^2 = 0
         //a = dot(Dr,Dr)
@@ -301,13 +357,13 @@ namespace math
             value_type inv2a = value_type(0.5) / a;
             t0 = (-b - det) * inv2a;
             t1 = (-b + det) * inv2a;
-            if (t1 < value_type(0))
+            if (t1 < error)
             {
                 return intersection::none;
             }
 
             if (t1 < t0) { std::swap(t0, t1); }
-            return (t0 < 0)
+            return (t0 < error)
                 ? intersection::inside
                 : intersection::intersect;
         }
@@ -319,15 +375,15 @@ namespace math
         {
             t0 = t1 = -b * value_type(0.5) / a;
 
-            return t0 > 0 ? intersection::tangent : intersection::none;
+            return t0 > error ? intersection::tangent : intersection::none;
         }
     }
 
     template<typename value_type>
     intersection intersect(const ray<value_type, EDim::_3>& ray, const sphere<value_type>& sphere,
-        value_type& t0, value_type& t1)
+        value_type error, value_type& t0, value_type& t1)
     {
-        return intersect_sphere(ray, sphere.center(), sphere.radius_sqr(), t0, t1);
+        return intersect_sphere(ray, sphere.center(), sphere.radius_sqr(), error, t0, t1);
     }
 
     template<typename value_type>
@@ -337,6 +393,7 @@ namespace math
         const vector_t<value_type, EDim::_3>& axis_y,
         const vector_t<value_type, EDim::_3>& axis_z,
         value_type extend_x, value_type extend_y, value_type extend_z,
+        value_type error,
         value_type& t0, value_type& t1,
         vector_t<value_type, EDim::_3>& n0,
         vector_t<value_type, EDim::_3>& n1)
@@ -412,11 +469,11 @@ namespace math
             }
         }
 
-        if (t1 < value_type(0))
+        if (t1 < error)
         {
             return intersection::none;
         }
-        else if (t0 < value_type(0))
+        else if (t0 < error)
         {
             return intersection::inside;
         }
@@ -428,18 +485,18 @@ namespace math
 
     template<typename value_type>
     intersection intersect(const ray<value_type, EDim::_3>& ray, const cube<value_type>& _cube,
-        value_type& t0, value_type& t1, vector_t<value_type, EDim::_3>& n0, vector_t<value_type, EDim::_3>& n1)
+        value_type error, value_type& t0, value_type& t1, vector_t<value_type, EDim::_3>& n0, vector_t<value_type, EDim::_3>& n1)
     {
         return intersect_cube(ray, _cube.center(),
             _cube.axis_x(), _cube.axis_y(), _cube.axis_z(),
             _cube.width(), _cube.height(), _cube.depth(),
-            t0, t1, n0, n1);
+            error, t0, t1, n0, n1);
     }
 
     template<typename value_type>
     intersection intersect_triangle(const ray<value_type, EDim::_3>& ray,
         const point<value_type, EDim::_3>& v0, const point<value_type, EDim::_3>& v1, const point<value_type, EDim::_3>& v2,
-        value_type& t, value_type&u, value_type& v, vector_t<value_type, EDim::_3>& normal)
+        value_type error, value_type& t, value_type&u, value_type& v, vector_t<value_type, EDim::_3>& normal)
     {
         //moller-trumbore
         vector_t<value_type, EDim::_3> v1v0 = v1 - v0;
@@ -447,35 +504,37 @@ namespace math
 
         vector_t<value_type, EDim::_3> pv = cross(ray.direction(), v2v0);
         float det = dot(v1v0, pv);
-        if (det == 0.0f)
+        if (det > value_type(0))
+        {
+            float invDet = F(1) / det;
+
+            vector_t<value_type, EDim::_3> tv = ray.origin() - v0;
+            u = dot(tv, pv) * invDet;
+            if (u < value_type(0) || u > value_type(1))
+            {
+                return intersection::none;
+            }
+
+            vector_t<value_type, EDim::_3> qv = cross(tv, v1v0);
+            v = dot(ray.direction(), qv) * invDet;
+            if (v < value_type(0) || u + v > value_type(1))
+            {
+                return intersection::none;
+            }
+
+            t = dot(v2v0, qv) * invDet;
+            if (t < error)
+            {
+                return intersection::none;
+            }
+
+            normal = cross(v2v0, v1v0).normalized();
+            return intersection::intersect;
+        }
+        else
         {
             return intersection::none;
         }
-
-        float invDet = 1.0f / det;
-
-        vector_t<value_type, EDim::_3> tv = ray.origin() - v0;
-        u = dot(tv, pv) * invDet;
-        if (u < 0.0f || u > 1.0f)
-        {
-            return intersection::none;
-        }
-
-        vector_t<value_type, EDim::_3> qv = cross(tv, v1v0);
-        v = dot(ray.direction(), qv) * invDet;
-        if (v < 0.0f || u + v > 1.0f)
-        {
-            return intersection::none;
-        }
-
-        t = dot(v2v0, qv) * invDet;
-        if (t < 0.0f)
-        {
-            return intersection::none;
-        }
-
-        normal = cross(v2v0, v1v0).normalized();
-        return intersection::intersect;
     }
 
     template<typename value_type> using point2d = point<value_type, EDim::_2>;
