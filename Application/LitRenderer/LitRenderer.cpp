@@ -74,14 +74,37 @@ math::vector3<F> GenerateHemisphereDirection(const math::vector3<F>& normal)
     return uvw.local(x, y, z);
 }
 
-bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation)
+math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F>& normal)
 {
-    math::vector3<F> Direction = GenerateHemisphereDirection(N);
+    // pdf = cos(theta) / Pi.
+    F cosTheta_sqr = random<F>::value(); //replace 1-e to e'
+    F cosTheta = sqrt(cosTheta_sqr);
+    F sinTheta = sqrt(F(1) - cosTheta_sqr);
+    math::radian<F> phi(F(2) * math::PI<F> *random<F>::value());
+    F cosPhi = math::cos(phi);
+    F sinPhi = math::sin(phi);
+
+    F x = sinTheta * cosPhi;
+    F y = sinTheta * sinPhi;
+    F z = cosTheta;
+
+    UVW uvw(normal);
+    return uvw.local(x, y, z);
+}
+
+bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering) const
+{
+    math::vector3<F> Direction = GenerateCosineWeightedHemisphereDirection(N);
     outScattering.set_origin(P);
     outScattering.set_direction(Direction, math::norm);
-    outAttenuation = Albedo;
     return true;
+}
+
+F Lambertian::ScatteringPDF(const math::vector3<F>& N, const math::vector3<F>& Scattering) const
+{
+    F cosTheta = math::dot(N, Scattering);
+    return cosTheta < F(0) ? F(0) : cosTheta / math::PI<F>;
 }
 
 math::vector3<F> Reflect(const math::vector3<F>& In, const math::vector3<F>& N)
@@ -90,13 +113,12 @@ math::vector3<F> Reflect(const math::vector3<F>& In, const math::vector3<F>& N)
 }
 
 bool Metal::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation)
+    math::ray3d<F>& outScattering) const
 {
     math::vector3<F> FuzzyDirection = Fuzzy * GenerateUnitSphereVector();
     math::vector3<F> Direction = Reflect(Ray.direction(), N) + FuzzyDirection;
     outScattering.set_origin(P);
     outScattering.set_direction(Direction);
-    outAttenuation = Albedo;
     return math::dot(Direction, N) > F(0);
 }
 
@@ -116,7 +138,7 @@ F ReflectanceSchlick(F CosTheta, F eta1, F eta2)
 }
 
 bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation)
+    math::ray3d<F>& outScattering) const
 {
     const F AirRefractiveIndex = F(1.0003);
 
@@ -147,18 +169,16 @@ bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N
 
     outScattering.set_origin(P);
     outScattering.set_direction(ScatteredDirection);
-
-    outAttenuation = math::vector3<F>::one();
     return true;
 }
 
 bool PureLight_ForTest::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation)
+    math::ray3d<F>& outScattering) const
 {
     return false;
 }
 
-math::vector3<F> PureLight_ForTest::Emitting()
+math::vector3<F> PureLight_ForTest::Emitting() const
 {
     return Emission;
 }
@@ -179,20 +199,75 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, int recursiveDep
     }
 
     //Collision occurred.
+    const SceneObject& shadingObject = *contactRecord.Object;
+    const IMaterial& material = *shadingObject.Material;
+    const math::vector3<F>& normal = contactRecord.SurfaceNormal;
     F biasedDistance = math::max2<F>(contactRecord.Distance, F(0));
-    math::point3d<F> surfacePoint = ray.calc_offset(biasedDistance);
+    math::point3d<F> shadingPoint = ray.calc_offset(biasedDistance);
 
-    math::vector3<F> attenuation;
+    F pdf = F(1);
+    math::vector3<F> Li;
     math::ray3d<F> scattering;
-    math::vector3<F> radiance = contactRecord.Object->Material->Emitting();
-    if (contactRecord.Object->Material->Scattering(surfacePoint, contactRecord.SurfaceNormal, ray, contactRecord.IsFrontFace, scattering, attenuation))
+    scattering.set_origin(shadingPoint);
+
+    F N = F(1) / F(scene.GetLightCount() + 1);
+    F Ln = scene.GetLightCount() * N;
+    F e = random<F>::value();
+    if (e < Ln)
     {
-        radiance += attenuation * Trace(scene, scattering, recursiveDepth + 1);
+        int lightIndex = math::clamp(math::floor2<int>(scene.GetLightCount() * e), 0, scene.GetLightCount() - 1);
+        SceneObject* LightObject = scene.GetLightSourceByIndex(lightIndex);
+        if (LightObject != contactRecord.Object)
+        {
+            math::vector3<F> LightNormal;
+            math::point3d<F> LightSamplePos = LightObject->SampleRandomPoint(LightNormal, pdf);
+            math::vector3<F> lightDirectoin = LightSamplePos - shadingPoint;
+            scattering.set_direction(lightDirectoin);
+            F cosThetaPrime = math::dot(-LightNormal, scattering.direction());
+            if (cosThetaPrime < -Epsilon && LightObject->IsDualface())
+            {
+                cosThetaPrime = -cosThetaPrime;
+            }
+            if (cosThetaPrime > Epsilon)
+            {
+                HitRecord lightHitRecord = scene.DetectIntersecting(scattering, nullptr, Epsilon);
+                if (lightHitRecord.Object == LightObject)
+                {
+                    //direct light sampling.
+                    F distSquare = math::dot(lightDirectoin, lightDirectoin);
+                    F invDistSquare = (distSquare > F(0)) ? math::clamp(F(1) / distSquare) : F(1);
+                    Li = LightObject->Material->Emitting() * cosThetaPrime * invDistSquare;
+                }
+            }
+        }
+    }
+    else
+    {
+        if (material.Scattering(shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering))
+        {
+            pdf = material.ScatteringPDF(normal, scattering.direction());
+            Li = Trace(scene, scattering, recursiveDepth + 1);
+        }
     }
 
+    F cosTheta = math::dot(normal, scattering.direction());
+    math::vector3<F> emit = material.Emitting();
+    math::vector3<F> radiance = emit + 
+        + material.BRDF() * Li * cosTheta / (pdf);
     return radiance;
 }
 
+math::point3d<F> SceneRect::SampleRandomPoint(math::vector3<F>& outN, F& outPDF)
+{
+    outN = mWorldNormal;
+    outPDF = F(1) / (Rect.width() * Rect.height());
+
+    F e1 = random<F>::value() * Rect.extends().x;
+    F e2 = random<F>::value() * Rect.extends().y;
+
+    math::vector3<F> Bitangent = math::cross(mWorldNormal, mWorldTagent);
+    return math::point3d<F>(mWorldPosition + e1 * mWorldTagent + e2 * Bitangent);
+}
 template<typename value_type>
 value_type LinearToGammaCorrected22(value_type value)
 {
@@ -225,16 +300,14 @@ RenderCanvas::RenderCanvas(unsigned char* canvasDataPtr, int width, int height, 
     , CanvasHeight(height)
     , CanvasLinePitch(linePitch)
 {
-    mBackbuffer = new AccumulatedBufferData[CanvasWidth * CanvasHeight];
+    mBackbuffer = new math::vector3<F>[CanvasWidth * CanvasHeight];
 
     for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
     {
         for (int colIndex = 0; colIndex < CanvasWidth; colIndex++)
         {
             int pixelIndex = colIndex + rowIndex * CanvasWidth;
-            AccumulatedBufferData& accumulated = mBackbuffer[pixelIndex];
-            accumulated.Data.set(F(0.0), F(0.0), F(0.0));
-            accumulated.Count = 0;
+            mBackbuffer[pixelIndex].set(F(0.0), F(0.0), F(0.0));
         }
     }
 }
@@ -259,6 +332,7 @@ bool RenderCanvas::NeedUpdate()
 
 void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData()
 {
+    F invSampleCout = F(1) / mSampleCount;
     for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
     {
         int bufferRowOffset = rowIndex * CanvasWidth;
@@ -268,10 +342,10 @@ void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData()
             int bufferIndex = colIndex + bufferRowOffset;
             int canvasIndex = colIndex * 3 + canvasRowOffset;
 
-            const AccumulatedBufferData& buffer = mBackbuffer[bufferIndex];
+            const math::vector3<F>& buffer = mBackbuffer[bufferIndex];
             for (int compIndex = 2; compIndex >= 0; compIndex--)
             {
-                F c = LinearToGammaCorrected22(buffer.Data.v[compIndex] / F(buffer.Count));
+                F c = LinearToGammaCorrected22(buffer[compIndex] * invSampleCout);
                 c = math::clamp(c, F(0.0), F(0.9999));
                 mOutCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(c * F(256.0));
             }
@@ -289,15 +363,11 @@ LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canv
 
 {
     mScene->Create(F(canvasWidth) / F(canvasHeight));
-    mImageSamples = new std::vector<Sample>[canvasWidth * canvasHeight];
+    mImageSamples = new Sample[canvasWidth * canvasHeight];
 }
 
 LitRenderer::~LitRenderer()
 {
-    for (int index = 0; index < mSampleArrayCount; index++)
-    {
-        mImageSamples[index].clear();
-    }
     SafeDeleteArray(mImageSamples);
 }
 
@@ -333,8 +403,7 @@ void LitRenderer::GenerateSamples()
     F cameraZ = halfHeight / mCamera.HalfVerticalFovTangent;
     mCamera.Position.z = -cameraZ;
 
-    Sample sample;
-    sample.ray.set_origin(mCamera.Position);
+    
 
 
     auto canvasPositionToRay = [&cameraZ](F x, F y) -> math::vector3<F> {
@@ -346,33 +415,28 @@ void LitRenderer::GenerateSamples()
     };
 
     const F QuaterPixelSize = F(0.5) * HalfPixelSize;
-    AccumulatedBufferData* canvasDataPtr = mCanvas.GetBackbufferPtr();
+    math::vector3<F>* canvasDataPtr = mCanvas.GetBackbufferPtr();
+    
     for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
     {
         int rowOffset = rowIndex * mCanvas.CanvasWidth;
         for (int colIndex = 0; colIndex < mCanvas.CanvasWidth; colIndex++)
         {
-            AccumulatedBufferData& canvasPixel = canvasDataPtr[colIndex + rowOffset];
-            if (canvasPixel.Count >= 20000)
-            {
-                continue;
-            }
-
-            sample.pixelCol = colIndex;
-            sample.pixelRow = rowIndex;
+            math::vector3<F>& pixel = canvasDataPtr[colIndex + rowOffset];
+            
 
             const F pixelCenterX = colIndex * PixelSize + HalfPixelSize - halfWidth;
             const F pixelCenterY = rowIndex * PixelSize + HalfPixelSize - halfHeight;
 
-            std::vector<Sample>& samples = mImageSamples[colIndex + rowOffset];
-            for (int sampleIndex = 0; sampleIndex < 2; sampleIndex++)
-            {
-                F x = F(2) * random<F>::value() - F(1);
-                F y = F(2) * random<F>::value() - F(1);
+            Sample& sample = mImageSamples[colIndex + rowOffset];
+            F x = F(2) * random<F>::value() - F(1);
+            F y = F(2) * random<F>::value() - F(1);
 
-                sample.ray.set_direction(canvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
-                samples.push_back(sample);
-            }
+            sample.pixelCol = colIndex;
+            sample.pixelRow = rowIndex;
+
+            sample.ray.set_origin(mCamera.Position);
+            sample.ray.set_direction(canvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
         }
     }
 }
@@ -380,26 +444,18 @@ void LitRenderer::GenerateSamples()
 void LitRenderer::ResolveSamples()
 {
     const int StartRecursiveDepth = 0;
-    AccumulatedBufferData* canvasDataPtr = mCanvas.GetBackbufferPtr();
+    math::vector3<F>* canvasDataPtr = mCanvas.GetBackbufferPtr();
     for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
     {
         int rowOffset = rowIndex * mCanvas.CanvasWidth;
         for (int colIndex = 0; colIndex < mCanvas.CanvasWidth; colIndex++)
         {
-            std::vector<Sample>& samples = mImageSamples[colIndex + rowOffset];
-            AccumulatedBufferData& canvasPixel = canvasDataPtr[colIndex + rowOffset];
-
-            const size_t sampleCount = samples.size();
-            math::vector3<F> accSpectral(0, 0, 0);
-            math::vector3<F> traceSpectral;
-            for (const Sample& sample : samples)
-            {
-                canvasPixel.Data += Trace(*mScene, sample.ray, StartRecursiveDepth);
-                canvasPixel.Count++;
-            }
-            samples.clear();
+            Sample& sample = mImageSamples[colIndex + rowOffset];
+            math::vector3<F>& canvasPixel = canvasDataPtr[colIndex + rowOffset];
+            canvasPixel += Trace(*mScene, sample.ray, StartRecursiveDepth);
         }
     }
+    mCanvas.IncreaseSampleCount();
 }
 
 SimpleBackCamera::SimpleBackCamera(math::degree<F> verticalFov)
@@ -444,6 +500,24 @@ HitRecord Scene::DetectIntersecting(const math::ray3d<F>& ray, const SceneObject
         }
     }
     return result;
+}
+
+void Scene::Create(F aspect)
+{
+    CreateScene(aspect, mSceneObjects);
+    FindAllLights();
+}
+
+void Scene::FindAllLights()
+{
+    for (SceneObject* objectPtr : mSceneObjects)
+    {
+        PureLight_ForTest* lightMaterial = dynamic_cast<PureLight_ForTest*>(objectPtr->Material.get());
+        if (lightMaterial != nullptr)
+        {
+            mSceneLights.push_back(objectPtr);
+        }
+    }
 }
 
 void Transform::UpdateWorldTransform()
@@ -602,14 +676,6 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneCenterZ + 10);
     metalSphere->Material = std::make_unique<Metal>(F(1.0), F(0.85), F(0.45), F(0.08));
 
-    SceneSphere* dielectricSphereFloat1 = new SceneSphere(); OutSceneObjects.push_back(dielectricSphereFloat1);
-    dielectricSphereFloat1->SetRadius(25);
-    dielectricSphereFloat1->SetTranslate(
-        SceneCenterX,
-        SceneCenterY,
-        SceneCenterZ);
-    dielectricSphereFloat1->Material = std::make_unique<Dielectric>(F(1.5));
-
     SceneSphere* dielectricSphereFloat = new SceneSphere(); OutSceneObjects.push_back(dielectricSphereFloat);
     dielectricSphereFloat->SetRadius(15);
     dielectricSphereFloat->SetTranslate(
@@ -677,7 +743,7 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
     LightDisk->SetTranslate(SceneCenterX, SceneTop - F(0.01), SceneCenterZ + F(10));
     LightDisk->SetExtends(25, 25);
     LightDisk->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
-    F Intensity = 10;
+    F Intensity = 1;
     LightDisk->Material = std::make_unique<PureLight_ForTest>(Intensity, Intensity, Intensity);
 }
 
@@ -685,7 +751,6 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
 
 void SimpleScene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
 {
-
     const F SceneSize = 60;
     const F SceneNear = 1;
     const F SceneFar = SceneSize * F(2.5);
@@ -711,31 +776,31 @@ void SimpleScene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjec
         SceneCenterX + 20,
         SceneBottom + 22,
         SceneCenterZ + 10);
-    dielectricSphereFloat->Material = std::make_unique<Dielectric>(F(1.5));
-
+    dielectricSphereFloat->Material = std::make_unique<Lambertian>();
+    
     SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
     wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
     wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
     wallLeft->Material = std::make_unique<Lambertian>(F(0.75), F(0.2), F(0.2));
-
+    
     SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
     wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
     wallRight->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
     wallRight->SetExtends(SceneExtendZ, SceneExtendY);
     wallRight->Material = std::make_unique<Lambertian>(F(0.2), F(0.2), F(0.75));
-
+    
     SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
     wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
     wallTop->SetExtends(SceneExtendZ, SceneExtendX);
     wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
     wallTop->Material = std::make_unique<Lambertian>(F(0.75), F(0.75), F(0.75));
-
+    
     SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
     wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
     wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
     wallBottom->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
     wallBottom->Material = std::make_unique<Lambertian>(F(0.2), F(0.75), F(0.2));
-
+    
     SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
     wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
     wallFar->SetExtends(SceneExtendX, SceneExtendY);
@@ -743,9 +808,10 @@ void SimpleScene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjec
     wallFar->Material = std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6));
 
     SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
+    LightDisk->SetDualFace(true);
     LightDisk->SetTranslate(SceneCenterX, SceneTop - F(0.01), SceneCenterZ + F(10));
     LightDisk->SetExtends(25, 25);
     LightDisk->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
-    F Intensity = 10;
+    F Intensity = 5;
     LightDisk->Material = std::make_unique<PureLight_ForTest>(Intensity, Intensity, Intensity);
 }

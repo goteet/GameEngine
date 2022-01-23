@@ -7,11 +7,7 @@
 #include <Foundation/Math/Geometry.h>
 
 using F = double;
-struct AccumulatedBufferData
-{
-    math::vector3<F> Data;
-    unsigned int Count;
-};
+
 class RenderCanvas
 {
 public:
@@ -20,18 +16,20 @@ public:
 
     bool NeedUpdate();
 
-    AccumulatedBufferData* GetBackbufferPtr() { return mBackbuffer; }
+    math::vector3<F>* GetBackbufferPtr() { return mBackbuffer; }
     bool NeedFlushBackbuffer = true;
     const int CanvasWidth;
     const int CanvasHeight;
     const int CanvasLinePitch;
+    void IncreaseSampleCount() { mSampleCount++; }
 
 private:
     void FlushLinearColorToGammaCorrectedCanvasData();
 
     bool mNeedUpdateWindowRect = false;
     unsigned char* mOutCanvasDataPtr;
-    AccumulatedBufferData* mBackbuffer = nullptr;
+    math::vector3<F>* mBackbuffer = nullptr;
+    int mSampleCount = 0;
 };
 
 struct SceneObject;
@@ -51,26 +49,14 @@ struct HitRecord
     F Distance = F(0);
 };
 
-enum class ELightType
-{
-    Directional, Puncture
-};
-
-struct Light
-{
-    Light() = default;
-    ELightType LightType = ELightType::Puncture;
-    math::vector3<F> Position = math::vector3<F>::zero();
-    math::vector3<F> Color = math::vector3<F>::zero();
-    F Intensity = 1.0;
-};
-
 struct IMaterial
 {
     virtual ~IMaterial() { }
     virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) = 0;
-    virtual math::vector3<F> Emitting() { return math::vector3<F>::zero(); }
+        math::ray3d<F>& outScattering) const = 0;
+    virtual math::vector3<F> Emitting() const { return math::vector3<F>::zero(); }
+    virtual math::vector3<F> BRDF() const { return math::vector3<F>::zero(); }
+    virtual F ScatteringPDF(const math::vector3<F>& N, const math::vector3<F>& Scattering) const { return F(1) / math::PI<F>; }
 };
 
 struct Lambertian : public IMaterial
@@ -80,7 +66,9 @@ struct Lambertian : public IMaterial
     Lambertian() = default;
     Lambertian(F r, F g, F b) : Albedo(r, g, b) { }
     virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) override;
+        math::ray3d<F>& outScattering) const override;
+    virtual math::vector3<F> BRDF() const override { return Albedo / math::PI<F>; }
+    virtual F ScatteringPDF(const math::vector3<F>& N, const math::vector3<F>& Scattering) const override;
 };
 
 struct Metal : public IMaterial
@@ -91,7 +79,8 @@ struct Metal : public IMaterial
     Metal() = default;
     Metal(F r, F g, F b, F f) : Albedo(r, g, b), Fuzzy(f) { }
     virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) override;
+        math::ray3d<F>& outScattering) const override;
+    virtual math::vector3<F> BRDF() const override { return Albedo / math::PI<F>; }
 };
 
 struct Dielectric : public IMaterial
@@ -101,7 +90,8 @@ struct Dielectric : public IMaterial
     Dielectric() = default;
     Dielectric(F ior) : RefractiveIndex(ior) { }
     virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) override;
+        math::ray3d<F>& outScattering) const override;
+    virtual math::vector3<F> BRDF() const override { return math::vector3<F>::one(); }
 };
 
 struct PureLight_ForTest : IMaterial
@@ -111,8 +101,8 @@ struct PureLight_ForTest : IMaterial
     PureLight_ForTest() = default;
     PureLight_ForTest(F x, F y, F z) : Emission(x, y, z) { }
     virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outAttenuation) override;
-    virtual math::vector3<F> Emitting() override;
+        math::ray3d<F>& outScattering) const override;
+    virtual math::vector3<F> Emitting() const override;
 };
 
 struct Transform
@@ -130,7 +120,8 @@ struct SceneObject
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const = 0;
     void SetTranslate(F x, F y, F z) { Transform.Translate.set(x, y, z); }
     void SetRotation(const math::quaternion<F>& q) { Transform.Rotation = q; }
-
+    virtual math::point3d<F> SampleRandomPoint(math::vector3<F>& outN, F& outPDF ) { return math::vector3<F>::zero(); }
+    virtual bool IsDualface() const { return false; }
     Transform Transform;
     std::unique_ptr<IMaterial> Material;
 };
@@ -157,6 +148,8 @@ struct SceneRect : SceneObject
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
     void SetExtends(F x, F y) { Rect.set_extends(x, y); }
     void SetDualFace(bool dual) { mDualFace = dual; }
+    virtual math::point3d<F> SampleRandomPoint(math::vector3<F>& outN, F& outPDF) override;
+    virtual bool IsDualface() const override { return mDualFace; }
 private:
     bool mDualFace = false;
     math::rect<F> Rect;
@@ -172,6 +165,7 @@ struct SceneDisk : SceneObject
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
     void SetRadius(F r) { Disk.set_radius(r); }
     void SetDualFace(bool dual) { mDualFace = dual; }
+    virtual bool IsDualface() const override { return mDualFace; }
 private:
     bool mDualFace = false;
     math::disk<F> Disk;
@@ -199,11 +193,15 @@ public:
     virtual ~Scene();
     void UpdateWorldTransform();
     HitRecord DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject, F epsilon);
-    void Create(F aspect) { CreateScene(aspect, mSceneObjects); }
+    void Create(F aspect);
+    int GetLightCount() const { return (int)mSceneLights.size(); }
+    SceneObject* GetLightSourceByIndex(int index) { return mSceneLights[index]; }
     
 private:
     virtual void CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects);
+    void FindAllLights();
     std::vector<SceneObject*> mSceneObjects;
+    std::vector<SceneObject*> mSceneLights;
 };
 
 class SimpleScene : public Scene
@@ -252,5 +250,5 @@ private:
     SimpleBackCamera mCamera;
     std::unique_ptr<Scene> mScene;
 
-    std::vector<Sample>* mImageSamples = nullptr;
+    Sample* mImageSamples = nullptr;
 };
