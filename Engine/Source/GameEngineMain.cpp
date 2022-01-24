@@ -2,9 +2,11 @@
 #include <Foundation/Base/ScopeHelper.h>
 #include "GEInclude.h"
 
+#include "Core/GameEngine.h"
+
 namespace GE
 {
-    GameEngine* sGlobalInstance = nullptr;
+    engine::GameEngine* sGlobalInstance = nullptr;
 
     bool GEObject::IsSameType(GEObject* other) const { return GetClassUID() == other->GetClassUID(); }
 
@@ -16,7 +18,7 @@ namespace GE
 
     GameEngine::InitializeResult GameEngine::Initialize(const GameEngine::CreationConfig& config, GameEngine*& outInstance)
     {
-        GameEngine*& pEngine = sGlobalInstance;
+        engine::GameEngine*& pEngine = sGlobalInstance;
 
         if (pEngine == nullptr)
         {
@@ -25,12 +27,12 @@ namespace GE
                     SafeDelete(pEngine);
                 });
 
-            //pEngine = new ::Engine();
+            pEngine = new engine::GameEngine();
 
-            //if (pEngine->Initialize(config, outInstance))
-            if (false)
+            if (pEngine->InitializeMe(config))
             {
                 failGuard.dismiss();
+                outInstance = pEngine;
                 return InitializeResult::Success;
             }
 
