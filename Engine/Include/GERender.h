@@ -83,14 +83,16 @@ namespace GE
 
     struct GameEngineAPI RenderSystem : public GEObject
     {
-        virtual void BeginRender() = 0;
-        virtual void EndRender() = 0;
-        virtual void RenderMesh(Mesh* mesh, Material* material, const math::float4x4& worldMatrix) = 0;
+        //virtual void BeginRender() = 0;
+        //virtual void EndRender() = 0;
+        //virtual void RenderMesh(Mesh* mesh, Material* material, const math::float4x4& worldMatrix) = 0;
 
         virtual unsigned int GetWindowWidth() const = 0;
+
         virtual unsigned int GetWindowHeight() const = 0;
 
         virtual math::point3d<float> ScreenToView(const math::point3d<int>& screen) const = 0;
+
         virtual math::point3d<int> ViewToScreen(const math::point3d<float>& view) const = 0;
     };
 }

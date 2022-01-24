@@ -40,8 +40,8 @@ void Uninitialize(HWND)
     SafeDelete(Renderer);
 }
 
-bool NeedUpdate() 
-{ 
+bool NeedUpdate()
+{
     return Renderer->NeedUpdate();
 }
 
@@ -50,7 +50,7 @@ LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
-    _In_ wchar_t*	lpCmdLine,
+    _In_ wchar_t* lpCmdLine,
     _In_ int		nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
@@ -95,7 +95,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             generate = true;
         }
 
-        
+
     }
 
     Uninitialize(hWindow);

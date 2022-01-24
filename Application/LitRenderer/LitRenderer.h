@@ -120,7 +120,7 @@ struct SceneObject
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const = 0;
     void SetTranslate(F x, F y, F z) { Transform.Translate.set(x, y, z); }
     void SetRotation(const math::quaternion<F>& q) { Transform.Rotation = q; }
-    virtual math::point3d<F> SampleRandomPoint(math::vector3<F>& outN, F& outPDF ) { return math::vector3<F>::zero(); }
+    virtual math::point3d<F> SampleRandomPoint(math::vector3<F>& outN, F& outPDF) { return math::vector3<F>::zero(); }
     virtual bool IsDualface() const { return false; }
     Transform Transform;
     std::unique_ptr<IMaterial> Material;
@@ -196,7 +196,7 @@ public:
     void Create(F aspect);
     int GetLightCount() const { return (int)mSceneLights.size(); }
     SceneObject* GetLightSourceByIndex(int index) { return mSceneLights[index]; }
-    
+
 private:
     virtual void CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects);
     void FindAllLights();

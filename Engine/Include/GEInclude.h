@@ -25,7 +25,7 @@ namespace GE
 
         enum class InitializeResult { Success, AlreadyInitialized, Error };
 
-        static InitializeResult Initialize(const CreationConfig& config, GameEngine* &outInstance);
+        static InitializeResult Initialize(const CreationConfig& config, GameEngine*& outInstance);
         static void Uninitialize();
         static bool IsInitialized();
         static GameEngine* GetInstance();

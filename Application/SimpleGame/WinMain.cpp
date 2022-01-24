@@ -25,9 +25,9 @@ BOOL InitInstance(HINSTANCE, int);
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-    _In_opt_ HINSTANCE hPrevInstance,
-    _In_ wchar_t*	lpCmdLine,
-    _In_ int		nCmdShow)
+    _In_opt_ HINSTANCE  hPrevInstance,
+    _In_ wchar_t*       lpCmdLine,
+    _In_ int            nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);

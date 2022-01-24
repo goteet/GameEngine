@@ -10,7 +10,7 @@ set(LitRenderer_SourceFiles
     ${CMAKE_CURRENT_SOURCE_DIR}/LitRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/WinMain.cpp
     
-#   ¾­¹ıÁË¶àÖÖ³¢ÊÔ£¬·¢ÏÖÖ±½Ó¼ÓÈëÏîÄ¿ÀïÊÇ×î·½±ãµÄ¡£
+#   ç»è¿‡äº†å¤šç§å°è¯•ï¼Œå‘ç°ç›´æ¥åŠ å…¥é¡¹ç›®é‡Œæ˜¯æœ€æ–¹ä¾¿çš„ã€‚
     ${FoundationBase_SourceFiles}
     ${FoundationMath_SourceFiles}
 )

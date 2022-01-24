@@ -14,11 +14,11 @@ namespace GE
         return ++sNextClassID;
     }
 
-    GameEngine::InitializeResult GameEngine::Initialize(const GameEngine::CreationConfig & config, GameEngine* &outInstance)
+    GameEngine::InitializeResult GameEngine::Initialize(const GameEngine::CreationConfig& config, GameEngine*& outInstance)
     {
         //::Engine*& pEngine = ::GameEngine::Instance;
 
-        GameEngine *pEngine = sGlobalInstance;
+        GameEngine* pEngine = sGlobalInstance;
 
         if (pEngine != nullptr)
         {
