@@ -10,6 +10,7 @@
 #include <malloc.h>
 #include <memory.h>
 #include <GEInclude.h>
+#include "SimpleTimer.h"
 
 GE::GameEngine* g_GameEngine;
 
@@ -62,6 +63,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
     bool running = true;
+    SimpleTimer mainLoopTimer;
     while (running)
     {
         while (::PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
@@ -75,6 +77,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                 break;
             }
         }
+
+        int64_t deltaMilliseconds = mainLoopTimer.ElapsedMilliseconds();
+        mainLoopTimer.Record();
+        g_GameEngine->Update((unsigned int)deltaMilliseconds);
 
         if (NeedUpdate())
         {

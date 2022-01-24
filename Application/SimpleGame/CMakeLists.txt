@@ -7,6 +7,7 @@ if(MSVC)
 
 set(SimpleGame_SourceFiles
     WinMain.cpp
+    SimpleTimer.h
     
 #   经过了多种尝试，发现直接加入项目里是最方便的。
     ${FoundationBase_SourceFiles}
