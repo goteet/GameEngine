@@ -1,7 +1,25 @@
 #include <Foundation/Base/MemoryHelper.h>
 #include <Foundation/Base/ScopeHelper.h>
 #include "GEInclude.h"
+#include "GameEngine.h"
 
-namespace GE
+namespace engine
 {
+    GE::RenderSystem* GameEngine::GetRenderSystem()
+    {
+        return mRenderSystem.get();
+    }
+
+    bool GameEngine::OnResizeWindow(void* hWndinw, unsigned int width, unsigned int height)
+    {
+        return mRenderSystem->OnResizeWindow(hWndinw, width, height);
+    }
+
+    bool GameEngine::InitializeMe(const GE::GameEngine::CreationConfig& config)
+    {
+        mRenderSystem = std::make_unique<RenderSystem>(config.NativeWindow, config.IsFullScreen, config.InitialWidth, config.InitialHeight);
+        return true;
+    }
+
 }
+

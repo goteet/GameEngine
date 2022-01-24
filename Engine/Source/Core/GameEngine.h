@@ -1,13 +1,16 @@
+#pragma once
+#include <memory>
 #include "GEInclude.h"
+#include "Render/RenderSystem.h"
 
 namespace engine
 {
     class GameEngine : public GE::GameEngine
     {
     public:
-        DefineRTTI
+        DefineRTTI;
 
-        virtual GE::RenderSystem* GetRenderSystem() { return nullptr; }
+        virtual GE::RenderSystem* GetRenderSystem() override;
 
         virtual GE::Scene* CreateNewScene() { return nullptr; }
 
@@ -15,8 +18,11 @@ namespace engine
 
         virtual void OnMessage(const GE::Message& message) { }
 
-        virtual bool OnResize(unsigned int width, unsigned int height) { return true; }
+        virtual bool OnResizeWindow(void* hWindow, unsigned int width, unsigned int height) override;
 
-        bool InitializeMe(const GE::GameEngine::CreationConfig& ) { return true; }
+        bool InitializeMe(const GE::GameEngine::CreationConfig&);
+
+    private:
+        std::unique_ptr<engine::RenderSystem> mRenderSystem;
     };
 }

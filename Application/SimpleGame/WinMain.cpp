@@ -138,6 +138,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ::EndPaint(hWnd, &ps);
     }
     break;
+    case WM_SIZE:
+    {
+        if (g_GameEngine != nullptr)
+        {
+            int clientWidth = LOWORD(lParam);
+            int clientHeight = HIWORD(lParam);
+            g_GameEngine->OnResizeWindow(hWnd, clientWidth, clientHeight);
+        }
+    }
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }

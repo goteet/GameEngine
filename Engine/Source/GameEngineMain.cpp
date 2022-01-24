@@ -24,6 +24,7 @@ namespace GE
         {
             auto failGuard = base::make_scope_guard([&]
                 {
+                    outInstance = nullptr;
                     SafeDelete(pEngine);
                 });
 

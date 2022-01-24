@@ -2,42 +2,66 @@ cmake_minimum_required(VERSION 3.12)
 
 project(GameEngine)
 
-set(GameEngine_InterIncludeFiles 
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include/GEPredefinedMacros.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include/GEInput.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include/GEScene.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include/GERender.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include/GEInclude.h
+set(GameEngine_IncludeDir ${CMAKE_CURRENT_SOURCE_DIR}/Include)
+set(GameEngine_SourceDir ${CMAKE_CURRENT_SOURCE_DIR}/Source)
+set(GameEngine_SourceDir_Core ${GameEngine_SourceDir}/Core)
+set(GameEngine_SourceDir_Render ${GameEngine_SourceDir}/Render)
+
+set(GameEngine_HeaderFiles_Interface
+    ${GameEngine_IncludeDir}/GEPredefinedMacros.h
+    ${GameEngine_IncludeDir}/GEInput.h
+    ${GameEngine_IncludeDir}/GEScene.h
+    ${GameEngine_IncludeDir}/GERender.h
+    ${GameEngine_IncludeDir}/GEInclude.h
 )
 
-set(GameEngine_Core
-    ${CMAKE_CURRENT_SOURCE_DIR}/Source/Core/GameEngine.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Source/Core/GameEngine.cpp
+set(GameEngine_SourceFiles_Root
+    ${GameEngine_SourceDir}/GameEngineMain.cpp
 )
 
-set(GameEngine_InterSourceFiles
-    ${CMAKE_CURRENT_SOURCE_DIR}/Source/GameEngineMain.cpp
+set(GameEngine_HeaderFiles_Core
+    ${GameEngine_SourceDir_Core}/GameEngine.h
 )
+
+set(GameEngine_SourceFiles_Core
+    ${GameEngine_SourceDir_Core}/GameEngine.cpp
+)
+
+set(GameEngine_HeaderFiles_Render
+    ${GameEngine_SourceDir_Render}/RenderSystem.h
+)
+set(GameEngine_SourceFiles_Render
+    ${GameEngine_SourceDir_Render}/RenderSystem.cpp
+)
+
 
 set(GameEngine_SourceFiles 
-    ${GameEngine_InterIncludeFiles}
-    ${GameEngine_Core}
-    ${GameEngine_InterSourceFiles}
+    ${GameEngine_HeaderFiles_Interface}
+    ${GameEngine_SourceFiles_Root}
     
     ${FoundationBase_SourceFiles}
     ${FoundationMath_SourceFiles}
+
+    ${GameEngine_HeaderFiles_Core}
+    ${GameEngine_SourceFiles_Core}
+    ${GameEngine_HeaderFiles_Render}
+    ${GameEngine_SourceFiles_Render}
 )
 
-source_group(Foundation/Math FILES ${FoundationBase_SourceFiles})
-source_group(Foundation/Base FILES ${FoundationMath_SourceFiles})
-source_group(Engine/Include FILES ${GameEngine_InterIncludeFiles})
-source_group(Engine/Source FILES ${GameEngine_InterSourceFiles})
-source_group(Engine/Source/Core FILES ${GameEngine_Core})
+source_group("Foundation/Math"              FILES ${FoundationBase_SourceFiles})
+source_group("Foundation/Base"              FILES ${FoundationMath_SourceFiles})
+source_group("Engine/Include"               FILES ${GameEngine_HeaderFiles_Interface})
+source_group("Engine/Source"                FILES ${GameEngine_SourceFiles_Root})
+source_group("Engine/Source/Core/Include"   FILES ${GameEngine_HeaderFiles_Core})
+source_group("Engine/Source/Core/Source"    FILES ${GameEngine_SourceFiles_Core})
+source_group("Engine/Source/Render/Include" FILES ${GameEngine_HeaderFiles_Render})
+source_group("Engine/Source/Render/Source"  FILES ${GameEngine_SourceFiles_Render})
 
 
 
-add_library(GameEngine SHARED ${GameEngine_SourceFiles} )
-target_include_directories(GameEngine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Include" "${CMAKE_SOURCE_DIR}")
+add_library(GameEngine SHARED ${GameEngine_SourceFiles})
+target_include_directories(GameEngine PUBLIC "${GameEngine_IncludeDir}" "${CMAKE_SOURCE_DIR}")
+target_include_directories(GameEngine PRIVATE "${GameEngine_SourceDir}")
 
 if(MSVC)
     target_link_libraries(GameEngine d3d11.lib dxgi.lib d3dcompiler.lib)
