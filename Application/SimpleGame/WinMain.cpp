@@ -12,21 +12,38 @@
 #include <GEInclude.h>
 #include "SimpleTimer.h"
 
+const wchar_t* AppClassName = L"SimpleGameWindowClass";
+const wchar_t* AppWindowName = L"Simple Game";
+HWND hWindow;
 GE::GameEngine* g_GameEngine;
 
-bool Initialize(HWND hWindow)
+bool Initialize(HINSTANCE hInstance, int nCmdShow)
 {
-    GE::GameEngine::CreationConfig Config;
-    Config.NativeWindow = &hWindow;
-    Config.AbsoluteResourceFolderPath = nullptr;
-    Config.IsFullScreen = false;
-    Config.InitialWidth = 1280;
-    Config.InitialHeight = 720;
+    int windowWidth = 1280;
+    int windowHeight = 720;
 
-    using GE::GameEngine;
-    GameEngine::InitializeResult result = GE::GameEngine::Initialize(Config, g_GameEngine);
+    HWND hWindow = CreateWindow(AppClassName, AppWindowName, WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, 0,
+        windowWidth, windowHeight, NULL, NULL, hInstance, NULL);
 
-    return result == GameEngine::InitializeResult::Success;
+    if (hWindow)
+    {
+        ShowWindow(hWindow, nCmdShow);
+        UpdateWindow(hWindow);
+
+        GE::GameEngine::CreationConfig Config;
+        Config.NativeWindow = hWindow;
+        Config.AbsoluteResourceFolderPath = nullptr;
+        Config.IsFullScreen = false;
+        Config.InitialWidth = windowWidth;
+        Config.InitialHeight = windowHeight;
+
+        using GE::GameEngine;
+        GameEngine::InitializeResult result = GE::GameEngine::Initialize(Config, g_GameEngine);
+
+        return result == GameEngine::InitializeResult::Success;
+    }
+    return false;
 }
 
 bool Uninitialize(HWND)
@@ -39,12 +56,8 @@ bool NeedUpdate() { return false; }
 
 bool Present(HDC) { return true; }
 
-const wchar_t* AppClassName = L"SimpleGameWindowClass";
-const wchar_t* AppWindowName = L"Simple Game";
-HWND hWindow;
 
 ATOM MyRegisterClass(HINSTANCE hInstance);
-BOOL InitInstance(HINSTANCE, int);
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -56,7 +69,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     MyRegisterClass(hInstance);
-    if (!InitInstance(hInstance, nCmdShow) || !Initialize(hWindow))
+    if (!Initialize(hInstance, nCmdShow))
     {
         return FALSE;
     }
@@ -111,22 +124,6 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hIconSm = NULL;
 
     return RegisterClassEx(&wcex);
-}
-
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
-    hWindow = CreateWindow(AppClassName, AppWindowName, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
-
-    if (!hWindow)
-    {
-        return FALSE;
-    }
-
-    ShowWindow(hWindow, nCmdShow);
-    UpdateWindow(hWindow);
-
-    return TRUE;
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)

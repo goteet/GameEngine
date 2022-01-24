@@ -14,7 +14,7 @@ namespace engine
 
         virtual GE::Scene* CreateNewScene() { return nullptr; }
 
-        virtual void Update(unsigned int deltaMillisec) { }
+        virtual void Update(unsigned int deltaMillisec);
 
         virtual void OnMessage(const GE::Message& message) { }
 

@@ -10,6 +10,11 @@ namespace engine
         return mRenderSystem.get();
     }
 
+    void GameEngine::Update(unsigned int deltaMillisec)
+    {
+        mRenderSystem->RenderFrame();
+    }
+
     bool GameEngine::OnResizeWindow(void* hWndinw, unsigned int width, unsigned int height)
     {
         return mRenderSystem->OnResizeWindow(hWndinw, width, height);
@@ -18,7 +23,7 @@ namespace engine
     bool GameEngine::InitializeMe(const GE::GameEngine::CreationConfig& config)
     {
         mRenderSystem = std::make_unique<RenderSystem>(config.NativeWindow, config.IsFullScreen, config.InitialWidth, config.InitialHeight);
-        return true;
+        return mRenderSystem->InitializeGfxDevice();
     }
 
 }

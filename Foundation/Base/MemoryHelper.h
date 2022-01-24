@@ -25,6 +25,15 @@ void SafeRelease(InterfaceType& pointer)
     }
 }
 
+template<class InterfaceType>
+void SafeReleaseCom(InterfaceType& pointer)
+{
+    if (pointer != nullptr)
+    {
+        pointer->Release(); pointer = nullptr;
+    }
+}
+
 template<class InterfaceType, class = base_impl::enable_release<InterfaceType>::value>
 void safe_release(InterfaceType& pointer)
 {
