@@ -16,11 +16,9 @@ namespace GE
 
     GameEngine::InitializeResult GameEngine::Initialize(const GameEngine::CreationConfig& config, GameEngine*& outInstance)
     {
-        //::Engine*& pEngine = ::GameEngine::Instance;
+        GameEngine*& pEngine = sGlobalInstance;
 
-        GameEngine* pEngine = sGlobalInstance;
-
-        if (pEngine != nullptr)
+        if (pEngine == nullptr)
         {
             auto failGuard = base::make_scope_guard([&]
                 {

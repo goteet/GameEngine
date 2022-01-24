@@ -9,11 +9,33 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <memory.h>
+#include <GEInclude.h>
 
+GE::GameEngine* g_GameEngine;
 
-bool Initialize(HWND) { return true; }
-bool Uninitialize(HWND) { return true; }
+bool Initialize(HWND hWindow)
+{
+    GE::GameEngine::CreationConfig Config;
+    Config.NativeWindow = &hWindow;
+    Config.AbsoluteResourceFolderPath = nullptr;
+    Config.IsFullScreen = false;
+    Config.InitialWidth = 1280;
+    Config.InitialHeight = 720;
+
+    using GE::GameEngine;
+    GameEngine::InitializeResult result = GE::GameEngine::Initialize(Config, g_GameEngine);
+
+    return result == GameEngine::InitializeResult::Success;
+}
+
+bool Uninitialize(HWND)
+{
+    GE::GameEngine::Uninitialize();
+    return true;
+}
+
 bool NeedUpdate() { return false; }
+
 bool Present(HDC) { return true; }
 
 const wchar_t* AppClassName = L"SimpleGameWindowClass";

@@ -19,7 +19,10 @@ source_group(Foundation/Math FILES ${FoundationMath_SourceFiles})
 add_executable(SimpleGame WIN32 ${SimpleGame_SourceFiles})
 target_include_directories(SimpleGame PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(SimpleGame GameEngine)
-set_target_properties(SimpleGame PROPERTIES COMPILE_DEFINITIONS "UNICODE;_UNICODE")
-set_target_properties(SimpleGame PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
+set_target_properties(SimpleGame PROPERTIES
+    COMPILE_DEFINITIONS "UNICODE;_UNICODE"
+    RUNTIME_OUTPUT_DIRECTORY ${GameEngineOutputDirectory}
+    VS_DEBUGGER_WORKING_DIRECTORY ${GameEngineOutputDirectory}
+)
 
 endif(MSVC)
