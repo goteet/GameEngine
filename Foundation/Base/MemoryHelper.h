@@ -16,29 +16,22 @@ namespace base_impl
     template<class T> using enable_release = std::enable_if_t<has_release_interface<T>::value>;
 }
 
-template<class InterfaceType, class = base_impl::EnableRelease<InterfaceType>::value>
+template<typename InterfaceType, typename = base_impl::EnableRelease<InterfaceType>>
 void SafeRelease(InterfaceType& pointer)
 {
     if (pointer != nullptr)
     {
-        pointer->Release(); pointer = nullptr;
+        pointer->Release();
+        pointer = nullptr;
     }
 }
 
-template<class InterfaceType>
-void SafeReleaseCom(InterfaceType& pointer)
-{
-    if (pointer != nullptr)
-    {
-        pointer->Release(); pointer = nullptr;
-    }
-}
-
-template<class InterfaceType, class = base_impl::enable_release<InterfaceType>::value>
+template<typename InterfaceType, typename = base_impl::enable_release<InterfaceType>>
 void safe_release(InterfaceType& pointer)
 {
     if (pointer != nullptr)
     {
-        pointer->release(); pointer = nullptr;
+        pointer->release();
+        pointer = nullptr;
     }
 }
