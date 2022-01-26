@@ -128,7 +128,7 @@ namespace GE
         virtual SceneNode* SetForwardDirection(const math::float3& up) = 0;
         virtual const math::float3 GetForwardDirection() = 0;
         virtual SceneNode* SetLocalScale(const math::float3& scale) = 0;
-        virtual const math::float3& GetLocalScale() const = 0;
+        virtual const math::float3 GetLocalScale() const = 0;
         //virtual SceneNode* SetLocalRotation(math::radian<float> r) = 0;
         //virtual math::radian<float> GetLocalRotation() const = 0;
         virtual void SetVisible(bool) = 0;
@@ -143,8 +143,6 @@ namespace GE
         virtual math::point3d<float> WorldToLocal(const math::point3d<float>& pos) = 0;
         virtual math::point3d<float> LocalToWorld(const math::point3d<float>& pos) = 0;
         //virtual math::point3d<float> WorldToParent(const math::point3d<float>& pos) = 0;
-
-        virtual void Release() = 0;
     };
 
     struct GameEngineAPI Scene : public GEObject

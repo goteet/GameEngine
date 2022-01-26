@@ -37,9 +37,11 @@ set(GameEngine_SourceFiles_Render
 
 set(GameEngine_HeaderFiles_Scene
     ${GameEngine_SourceDir_Scene}/Scene.h
+    ${GameEngine_SourceDir_Scene}/SceneNode.h
 )
 set(GameEngine_SourceFiles_Scene
     ${GameEngine_SourceDir_Scene}/Scene.cpp
+    ${GameEngine_SourceDir_Scene}/SceneNode.cpp
 )
 
 

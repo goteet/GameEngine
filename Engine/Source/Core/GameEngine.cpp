@@ -14,7 +14,7 @@ namespace engine
     {
         if (mDefualtScene == nullptr)
         {
-            mDefualtScene = std::make_unique_ptr<engine::Scene>();
+            mDefualtScene = std::make_unique<engine::Scene>();
         }
         return mDefualtScene.get();
     }

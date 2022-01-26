@@ -1,5 +1,6 @@
 #pragma once
 #include "GEInclude.h"
+#include "SceneNode.h"
 
 namespace engine
 {
@@ -13,9 +14,11 @@ namespace engine
         virtual GE::Camera* GetCameraByIndex(unsigned int index)override { return nullptr; }
         virtual unsigned int GetCameraCount() const override { return 0; }
         virtual GE::SceneNode* CreateSceneNode() override { return nullptr; }
-        virtual GE::SceneNode* GetSceneNodeByIndex(unsigned int index) override{ return nullptr; }
+        virtual GE::SceneNode* GetSceneNodeByIndex(unsigned int index) override { return nullptr; }
         virtual unsigned int GetSceneNodeCount() const override { return 0; }
-    private:
 
+        Scene() : mRoot(this) { }
+    private:
+        InvalidateRootSceneNode mRoot;
     };
 }
