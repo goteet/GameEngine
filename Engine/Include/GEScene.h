@@ -156,7 +156,5 @@ namespace GE
         virtual SceneNode* CreateSceneNode() = 0;
         virtual SceneNode* GetSceneNodeByIndex(unsigned int index) = 0;
         virtual unsigned int GetSceneNodeCount() const = 0;
-        virtual void Render() = 0;
-        virtual void Release() = 0;
     };
 }

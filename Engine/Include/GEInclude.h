@@ -37,7 +37,7 @@ namespace GE
 
         //engine interface
         virtual RenderSystem* GetRenderSystem() = 0;
-        virtual Scene* CreateNewScene() = 0;
+        virtual Scene* CreateOrGetDefaultScene() = 0;
         virtual void Update(unsigned int deltaMillisec) = 0;
         virtual void OnMessage(const Message& message) = 0;
         virtual bool OnResizeWindow(void* hWindow, unsigned int width, unsigned int height) = 0;

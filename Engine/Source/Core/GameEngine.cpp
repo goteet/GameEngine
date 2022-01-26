@@ -10,6 +10,15 @@ namespace engine
         return mRenderSystem.get();
     }
 
+    GE::Scene* GameEngine::CreateOrGetDefaultScene()
+    {
+        if (mDefualtScene == nullptr)
+        {
+            mDefualtScene = std::make_unique_ptr<engine::Scene>();
+        }
+        return mDefualtScene.get();
+    }
+
     void GameEngine::Update(unsigned int deltaMillisec)
     {
         mRenderSystem->RenderFrame();

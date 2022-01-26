@@ -2,6 +2,7 @@
 #include <memory>
 #include "GEInclude.h"
 #include "Render/RenderSystem.h"
+#include "Scene/Scene.h"
 
 namespace engine
 {
@@ -12,11 +13,11 @@ namespace engine
 
         virtual GE::RenderSystem* GetRenderSystem() override;
 
-        virtual GE::Scene* CreateNewScene() { return nullptr; }
+        virtual GE::Scene* CreateOrGetDefaultScene() override;
 
-        virtual void Update(unsigned int deltaMillisec);
+        virtual void Update(unsigned int deltaMillisec) override;
 
-        virtual void OnMessage(const GE::Message& message) { }
+        virtual void OnMessage(const GE::Message& message) override { }
 
         virtual bool OnResizeWindow(void* hWindow, unsigned int width, unsigned int height) override;
 
@@ -24,5 +25,6 @@ namespace engine
 
     private:
         std::unique_ptr<engine::RenderSystem> mRenderSystem;
+        std::unique_ptr<engine::Scene> mDefualtScene;
     };
 }
