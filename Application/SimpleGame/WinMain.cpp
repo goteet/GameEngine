@@ -16,6 +16,7 @@ const wchar_t* AppClassName = L"SimpleGameWindowClass";
 const wchar_t* AppWindowName = L"Simple Game";
 HWND hWindow;
 GE::GameEngine* g_GameEngine;
+GE::Scene* g_DefaultScene;
 
 bool Initialize(HINSTANCE hInstance, int nCmdShow)
 {
@@ -52,6 +53,25 @@ bool Uninitialize(HWND)
     return true;
 }
 
+void InitializeSimpleScene()
+{
+    g_DefaultScene = g_GameEngine->CreateOrGetDefaultScene();
+
+    auto nodeSphere = g_DefaultScene->CreateSceneNode();
+
+    auto nodeLeftWall = g_DefaultScene->CreateSceneNode();
+    auto nodeRightWall = g_DefaultScene->CreateSceneNode();
+    auto nodeBackWall = g_DefaultScene->CreateSceneNode();
+    auto nodeTopWall = g_DefaultScene->CreateSceneNode();
+    auto nodeBottomWall = g_DefaultScene->CreateSceneNode();
+
+    nodeLeftWall->SetForwardDirection(math::normalized_float3::unit_x());
+    nodeRightWall->SetForwardDirection(math::normalized_float3::unit_x_neg());
+    nodeBackWall->SetForwardDirection(math::normalized_float3::unit_y_neg());
+    nodeTopWall->SetForwardDirection(math::normalized_float3::unit_z_neg());
+    nodeBottomWall->SetForwardDirection(math::normalized_float3::unit_z());
+}
+
 bool NeedUpdate() { return false; }
 
 bool Present(HDC) { return true; }
@@ -73,6 +93,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     {
         return FALSE;
     }
+
+    InitializeSimpleScene();
 
     MSG msg;
     bool running = true;
