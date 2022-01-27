@@ -37,13 +37,13 @@ namespace math
         return static_cast<n_value_type>(std::ceil(f));
     }
 
-    template<typename value_type>
+    template<typename value_type, typename std::enable_if<!std::is_floating_point_v<value_type>, bool>::type = true>
     constexpr bool is_equal(value_type lhs, value_type rhs)
     {
         return lhs == rhs;
     }
 
-    template<typename value_type, std::enable_if_t<std::is_floating_point_v<value_type>> = true>
+    template<typename value_type, typename std::enable_if<std::is_floating_point_v<value_type>, bool>::type = true>
     constexpr bool is_equal(value_type lhs, value_type rhs)
     {
         return lhs == rhs || near_zero<value_type>(lhs - rhs);

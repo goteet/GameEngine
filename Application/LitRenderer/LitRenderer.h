@@ -141,8 +141,8 @@ private:
 struct SceneRect : SceneObject
 {
     SceneRect() : Rect(math::point3d<F>(),
-        math::vector3<F>::unit_x(), math::norm,
-        math::vector3<F>::unit_z(), math::norm,
+        math::normalized_vector3<F>::unit_x(),
+        math::normalized_vector3<F>::unit_z(),
         math::vector2<F>::one()) { }
     virtual void UpdateWorldTransform() override;
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
@@ -160,7 +160,7 @@ private:
 
 struct SceneDisk : SceneObject
 {
-    SceneDisk() : Disk(math::point3d<F>(), math::vector3<F>::unit_x(), math::norm, F(1)) { }
+    SceneDisk() : Disk(math::point3d<F>(), math::normalized_vector3<F>::unit_x(), F(1)) { }
     virtual void UpdateWorldTransform() override;
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
     void SetRadius(F r) { Disk.set_radius(r); }

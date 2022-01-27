@@ -583,6 +583,13 @@ namespace math
             cells[3][index] = v.w;
         }
 
+        constexpr void set_column3(size_t index, vector_t<value_type, EDim::_3> v)
+        {
+            cells[0][index] = v.x;
+            cells[1][index] = v.y;
+            cells[2][index] = v.z;
+        }
+
         // static utilities
         static constexpr matrix_t identity()
         {
@@ -2029,14 +2036,14 @@ namespace math
     template<typename value_type> using matrix4x4 = matrix_t<value_type, EDim::_4, EDim::_4>;
 
 
-    template<typename value_type> using tmatrix2x3 = translation_matrix_t<value_type, EDim::_2, EDim::_3>;
-    template<typename value_type> using tmatrix3x3 = translation_matrix_t<value_type, EDim::_3, EDim::_3>;
-    template<typename value_type> using tmatrix4x4 = translation_matrix_t<value_type, EDim::_4, EDim::_4>;
-    template<typename value_type> using rmatrix3x3 = rotation_matrix_t<value_type, EDim::_3, EDim::_3>;
-    template<typename value_type> using rmatrix4x4 = rotation_matrix_t<value_type, EDim::_4, EDim::_4>;
-    template<typename value_type> using smatrix2x3 = scale_matrix_t<value_type, EDim::_2, EDim::_3>;
-    template<typename value_type> using smatrix3x3 = scale_matrix_t<value_type, EDim::_3, EDim::_3>;
-    template<typename value_type> using smatrix4x4 = scale_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using translation_matrix2x3 = translation_matrix_t<value_type, EDim::_2, EDim::_3>;
+    template<typename value_type> using translation_matrix3x3 = translation_matrix_t<value_type, EDim::_3, EDim::_3>;
+    template<typename value_type> using translation_matrix4x4 = translation_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using rotation_matrix3x3 = rotation_matrix_t<value_type, EDim::_3, EDim::_3>;
+    template<typename value_type> using rotation_matrix4x4 = rotation_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using scale_matrix2x3 = scale_matrix_t<value_type, EDim::_2, EDim::_3>;
+    template<typename value_type> using scale_matrix3x3 = scale_matrix_t<value_type, EDim::_3, EDim::_3>;
+    template<typename value_type> using scale_matrix4x4 = scale_matrix_t<value_type, EDim::_4, EDim::_4>;
 
     using float2x2 = matrix2x2<float>;
     using float2x3 = matrix2x3<float>;
@@ -2047,4 +2054,9 @@ namespace math
     using double2x3 = matrix2x3<double>;
     using double3x3 = matrix3x3<double>;
     using double4x4 = matrix4x4<double>;
+
+
+    using translation_float4x4 = translation_matrix4x4<float>;
+    using rotation_float4x4 = rotation_matrix4x4<float>;
+    using scale_float4x4 = scale_matrix4x4<float>;
 }

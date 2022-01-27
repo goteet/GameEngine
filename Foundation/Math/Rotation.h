@@ -41,7 +41,7 @@ namespace math
 
         constexpr quaternion() = default;
         constexpr quaternion(const quaternion& q) : w(q.w), v(q.v) { }
-        inline quaternion(const vector_t<value_type, EDim::_3>& axis, const radian<value_type>& r);
+        inline quaternion(const normalized_vector_t<value_type, EDim::_3>& axis, const radian<value_type>& r);
         constexpr quaternion(value_type _w, vector_t<value_type, EDim::_3> _v) : w(_w), v(_v) { }
         constexpr quaternion(const vector_t<value_type, EDim::_4>& v4) : w(v4.w), v(v4.x, v4.y, v4.z) { }
         constexpr quaternion(value_type _w, value_type _x, value_type _y, value_type _z) : w(_w), v(_x, _y, _z) { }
@@ -663,19 +663,19 @@ namespace math
     template<typename value_type>
     inline quaternion<value_type> make_rotation_x_axis(radian<value_type> r)
     {
-        return quaternion<value_type>(vector3<value_type>::unit_x(), r);
+        return quaternion<value_type>(normalized_vector3<value_type>::unit_x(), r);
     }
 
     template<typename value_type>
     inline quaternion<value_type> make_rotation_y_axis(radian<value_type> r)
     {
-        return quaternion<value_type>(vector3<value_type>::unit_y(), r);
+        return quaternion<value_type>(normalized_vector3<value_type>::unit_y(), r);
     }
 
     template<typename value_type>
     inline quaternion<value_type> make_rotation_z_axis(radian<value_type> r)
     {
-        return quaternion<value_type>(vector3<value_type>::unit_z(), r);
+        return quaternion<value_type>(normalized_vector3<value_type>::unit_z(), r);
     }
 
     template<typename value_type>
@@ -717,7 +717,7 @@ namespace math
 
     // implements
     template<typename value_type>
-    inline quaternion<value_type>::quaternion(const vector_t<value_type, EDim::_3>& axis, const radian<value_type>& r)
+    inline quaternion<value_type>::quaternion(const normalized_vector_t<value_type, EDim::_3>& axis, const radian<value_type>& r)
     {
         radian<value_type> halfRadian = r * value_type(0.5);
 
@@ -761,8 +761,8 @@ namespace math
     //}
 
 
-    using quatf = quaternion<float>;
-    using quatd = quaternion<double>;
+    using quaternionf = quaternion<float>;
+    using quaterniond = quaternion<double>;
     using degreei = degree<int>;
     using radianf = radian<float>;
     using degreef = degree<float>;

@@ -13,6 +13,9 @@ namespace math
     template<typename value_type, EDim dimension>
     struct vector_t;
 
+    template<typename value_type, EDim dimension>
+    struct normalized_vector_t;
+
     template<typename value_type>
     struct vector_t<value_type, EDim::_2>
     {
@@ -34,8 +37,6 @@ namespace math
 
         static constexpr vector_t   zero() { return vector_t(value_type(0), value_type(0)); }
         static constexpr vector_t    one() { return vector_t(value_type(1), value_type(1)); }
-        static constexpr vector_t unit_x() { return vector_t(value_type(1), value_type(0)); }
-        static constexpr vector_t unit_y() { return vector_t(value_type(0), value_type(1)); }
     };
 
     template<typename value_type>
@@ -63,12 +64,6 @@ namespace math
 
         static constexpr vector_t zero() { return vector_t(value_type(0), value_type(0), value_type(0)); }
         static constexpr vector_t one() { return vector_t(value_type(1), value_type(1), value_type(1)); }
-        static constexpr vector_t unit_x() { return vector_t(value_type(1), value_type(0), value_type(0)); }
-        static constexpr vector_t unit_y() { return vector_t(value_type(0), value_type(1), value_type(0)); }
-        static constexpr vector_t unit_z() { return vector_t(value_type(0), value_type(0), value_type(1)); }
-        static constexpr vector_t unit_x_neg() { return vector_t(-value_type(1), value_type(0), value_type(0)); }
-        static constexpr vector_t unit_y_neg() { return vector_t(value_type(0), -value_type(1), value_type(0)); }
-        static constexpr vector_t unit_z_neg() { return vector_t(value_type(0), value_type(0), -value_type(1)); }
     };
 
     template<typename value_type>
@@ -121,6 +116,8 @@ namespace math
     template <typename value_type> using vector2 = vector_t<value_type, EDim::_2>;
     template <typename value_type> using vector3 = vector_t<value_type, EDim::_3>;
     template <typename value_type> using vector4 = vector_t<value_type, EDim::_4>;
+    template <typename value_type> using normalized_vector2 = normalized_vector_t<value_type, EDim::_2>;
+    template <typename value_type> using normalized_vector3 = normalized_vector_t<value_type, EDim::_3>;
 
     using byte2 = vector2<unsigned char>;
     using byte3 = vector3<unsigned char>;
@@ -133,6 +130,8 @@ namespace math
     using float2 = vector2<float>;
     using float3 = vector3<float>;
     using float4 = vector4<float>;
+    using normalized_float2 = normalized_vector2<float>;
+    using normalized_float3 = normalized_vector3<float>;
 
     using double2 = vector2<double>;
     using double3 = vector3<double>;
@@ -658,6 +657,37 @@ namespace math
     }
 
 
+    template<typename value_type>
+    struct normalized_vector_t<value_type, EDim::_2>
+        : vector_t<value_type, EDim::_2>
+    {
+        constexpr normalized_vector_t() = default;
+        constexpr normalized_vector_t(value_type _x, value_type _y)
+            : vector_t<value_type, EDim::_2>(_x, _y) { normalize(*this); }
+        constexpr normalized_vector_t(const vector_t<value_type, EDim::_2>& value)
+            : vector_t<value_type, EDim::_2>(value) { normalize(*this); }
+
+        static constexpr normalized_vector_t unit_x() { return normalized_vector_t(value_type(1), value_type(0)); }
+        static constexpr normalized_vector_t unit_y() { return normalized_vector_t(value_type(0), value_type(1)); }
+    };
+
+    template<typename value_type>
+    struct normalized_vector_t<value_type, EDim::_3>
+        : vector_t<value_type, EDim::_3>
+    {
+        constexpr normalized_vector_t() = default;
+        constexpr normalized_vector_t(value_type _x, value_type _y, value_type _z)
+            : vector_t<value_type, EDim::_3>(_x, _y,_z) { normalize(*this); }
+        constexpr normalized_vector_t(const vector_t<value_type, EDim::_3>& value)
+            : vector_t<value_type, EDim::_3>(value) { normalize(*this); }
+
+        static constexpr normalized_vector_t unit_x() { return normalized_vector_t(value_type(1), value_type(0), value_type(0)); }
+        static constexpr normalized_vector_t unit_y() { return normalized_vector_t(value_type(0), value_type(1), value_type(0)); }
+        static constexpr normalized_vector_t unit_z() { return normalized_vector_t(value_type(0), value_type(0), value_type(1)); }
+        static constexpr normalized_vector_t unit_x_neg() { return normalized_vector_t(-value_type(1), value_type(0), value_type(0)); }
+        static constexpr normalized_vector_t unit_y_neg() { return normalized_vector_t(value_type(0), -value_type(1), value_type(0)); }
+        static constexpr normalized_vector_t unit_z_neg() { return normalized_vector_t(value_type(0), value_type(0), -value_type(1)); }
+    };
 
     template<typename value_type> constexpr value_type min_component(const vector_t<value_type, EDim::_2>& v) { return min2(v.x, v.y); }
     template<typename value_type> constexpr value_type max_component(const vector_t<value_type, EDim::_2>& v) { return max2(v.x, v.y); }

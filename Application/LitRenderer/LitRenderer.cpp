@@ -47,7 +47,7 @@ struct UVW
     void from_normal(const math::vector3<F>& normal)
     {
         w = normalized(normal);
-        v = fabs(w.x) > F(0.95) ? math::vector3<F>::unit_y() : math::vector3<F>::unit_x();
+        v = fabs(w.x) > F(0.95) ? math::normalized_vector3<F>::unit_y() : math::normalized_vector3<F>::unit_x();
         v = normalized(math::cross(w, v));
         u = normalized(math::cross(w, v));
     }
@@ -58,7 +58,7 @@ struct UVW
     }
 };
 
-math::vector3<F> GenerateHemisphereDirection(const math::vector3<F>& normal)
+math::normalized_vector3<F> GenerateHemisphereDirection(const math::vector3<F>& normal)
 {
     F cosTheta = F(1) - F(2) * random<F>::value();
     F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
@@ -74,7 +74,7 @@ math::vector3<F> GenerateHemisphereDirection(const math::vector3<F>& normal)
     return uvw.local(x, y, z);
 }
 
-math::vector3<F> GenUniformHemisphereDirection(const math::vector3<F>& normal)
+math::normalized_vector3<F> GenUniformHemisphereDirection(const math::vector3<F>& normal)
 {
     // pdf = 1/2PI
     // => cdf = 1/2PI*phi*(1-cos_theta)
@@ -82,7 +82,7 @@ math::vector3<F> GenUniformHemisphereDirection(const math::vector3<F>& normal)
     // => f_theta = 1-cos_theta   --> cos_theta(x) = 1-x = x'
     F cosTheta = random<F>::value(); //replace 1-e to e'
     F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
-    math::radian<F> phi(math::constant_value<F>::two_pi * random<F>::value());
+    math::radian<F> phi(math::TWO_PI<F> * random<F>::value());
     F cosPhi = math::cos(phi);
     F sinPhi = math::sin(phi);
 
@@ -115,9 +115,9 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F
 bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering) const
 {
-    math::vector3<F> Direction = GenUniformHemisphereDirection(N);
+    math::normalized_vector3<F> Direction = GenUniformHemisphereDirection(N);
     outScattering.set_origin(P);
-    outScattering.set_direction(Direction, math::norm);
+    outScattering.set_direction(Direction);
     return true;
 }
 
