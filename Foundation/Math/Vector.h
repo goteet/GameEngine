@@ -600,11 +600,9 @@ namespace math
     }
 
     template<typename value_type, EDim dimension, typename = std::enable_if<dimension == EDim::_2 || dimension == EDim::_3>::type>
-    constexpr vector_t<value_type, dimension> normalized(const vector_t<value_type, dimension>& _v)
+    constexpr normalized_vector_t<value_type, dimension> normalized(const vector_t<value_type, dimension>& _v)
     {
-        vector_t<value_type, dimension> rst(_v);
-        normalize(rst);
-        return rst;
+        return normalized_vector_t<value_type, dimension>(_v);
     }
 
     template<typename value_type, EDim dimension>

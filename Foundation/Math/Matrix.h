@@ -16,6 +16,11 @@ namespace math
     template<typename value_type, EDim row_dim, EDim col_dim>
     struct scale_matrix_t;
 
+    template<typename value_type, EDim row_dim, EDim col_dim>
+    struct view_matrix_t;
+
+    template<typename value_type, EDim row_dim, EDim col_dim>
+    struct projection_matrix_t;
 
     template<typename value_type>
     struct matrix_t<value_type, EDim::_2, EDim::_2>
@@ -100,10 +105,10 @@ namespace math
                 value_type(0), -value_type(1));
         }
 
-        static inline matrix_t rotation(const radian<value_type>& r);
-        static constexpr matrix_t scale(value_type sx, value_type sy);
-        static constexpr matrix_t scale(value_type s);
-        static constexpr matrix_t scale(const vector_t<value_type, EDim::_2>& s);
+        static inline rotation_matrix_t<value_type, EDim::_2, EDim::_2> rotation(const radian<value_type>& r);
+        static constexpr scale_matrix_t<value_type, EDim::_2, EDim::_2> scale(value_type sx, value_type sy);
+        static constexpr scale_matrix_t<value_type, EDim::_2, EDim::_2> scale(value_type s);
+        static constexpr scale_matrix_t<value_type, EDim::_2, EDim::_2> scale(const vector_t<value_type, EDim::_2>& s);
     };
 
     template<typename value_type>
@@ -278,12 +283,12 @@ namespace math
                 sinr * s.x, +cosr * s.y, -sinr * p.x - cosr * p.y + t.y);
         }
 
-        static constexpr matrix_t translation(value_type tx, value_type ty);
-        static constexpr matrix_t translation(const vector_t < value_type, EDim::_2>& t);
-        static inline matrix_t rotation(const radian<value_type>& r);
-        static constexpr matrix_t scale(value_type sx, value_type sy);
-        static constexpr matrix_t scale(value_type s);
-        static constexpr matrix_t scale(const vector_t<value_type, EDim::_2>& s);
+        static constexpr translation_matrix_t<value_type, EDim::_2, EDim::_3> translation(value_type tx, value_type ty);
+        static constexpr translation_matrix_t<value_type, EDim::_2, EDim::_3> translation(const vector_t < value_type, EDim::_2>& t);
+        static inline rotation_matrix_t<value_type, EDim::_2, EDim::_3> rotation(const radian<value_type>& r);
+        static constexpr scale_matrix_t<value_type, EDim::_2, EDim::_3> scale(value_type sx, value_type sy);
+        static constexpr scale_matrix_t<value_type, EDim::_2, EDim::_3> scale(value_type s);
+        static constexpr scale_matrix_t<value_type, EDim::_2, EDim::_3> scale(const vector_t<value_type, EDim::_2>& s);
     };
 
     template<typename value_type>
@@ -469,16 +474,16 @@ namespace math
                 value_type(0), value_type(0), value_type(1));
         }
 
-        static constexpr matrix_t translation(value_type tx, value_type ty);
-        static constexpr matrix_t translation(const vector_t < value_type, EDim::_2>& t);
-        static inline matrix_t rotation(const radian<value_type>& r);
-        static constexpr matrix_t rotation(const quaternion<value_type>& q);
-        static constexpr matrix_t scale(value_type sx, value_type sy, value_type sz);
-        static constexpr matrix_t scale(value_type s);
-        static constexpr matrix_t scale(const vector_t<value_type, EDim::_3>& s);
-        static constexpr matrix_t scale2d(value_type sx, value_type sy);
-        static constexpr matrix_t scale2d(value_type s);
-        static constexpr matrix_t scale2d(const vector_t<value_type, EDim::_2>& s);
+        static constexpr translation_matrix_t<value_type, EDim::_3, EDim::_3> translation(value_type tx, value_type ty);
+        static constexpr translation_matrix_t<value_type, EDim::_3, EDim::_3> translation(const vector_t < value_type, EDim::_2>& t);
+        static inline rotation_matrix_t<value_type, EDim::_3, EDim::_3> rotation(const radian<value_type>& r);
+        static constexpr rotation_matrix_t<value_type, EDim::_3, EDim::_3> rotation(const quaternion<value_type>& q);
+        static constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3> scale(value_type sx, value_type sy, value_type sz);
+        static constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3> scale(value_type s);
+        static constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3> scale(const vector_t<value_type, EDim::_3>& s);
+        static constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3> scale2d(value_type sx, value_type sy);
+        static constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3> scale2d(value_type s);
+        static constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3> scale2d(const vector_t<value_type, EDim::_2>& s);
     };
 
     template<typename value_type>
@@ -679,20 +684,6 @@ namespace math
             return matt * matr * mats;
         }
 
-        static inline matrix_t look_at(
-            const vector_t<value_type, EDim::_3>& eye,
-            const vector_t<value_type, EDim::_3>& look,
-            const vector_t<value_type, EDim::_3>& up)
-        {
-            vector_t<value_type, EDim::_3> forward = normalized(look - eye);
-            vector_t<value_type, EDim::_3> real_up = normalized(up - forward * dot(forward, up));
-            vector_t<value_type, EDim::_3> right = cross(real_up, forward);
-            return matrix_t(
-                vector_t<value_type, EDim::_4>(right, -dot(eye, right)),
-                vector_t<value_type, EDim::_4>(real_up, -dot(eye, real_up)),
-                vector_t<value_type, EDim::_4>(forward, -dot(eye, forward)),
-                vector_t<value_type, EDim::_4>(value_type(0), value_type(0), value_type(0), value_type(1)));
-        }
 
         static inline matrix_t perspective_lh(const radian<value_type>& fov, value_type aspect, value_type znear, value_type zfar)
         {
@@ -735,13 +726,18 @@ namespace math
 
         static inline matrix_t ortho2d_lh(const vector2<value_type>& size, const vector2<value_type>& zpair) { ortho2d_lh(size.x, size.y, zpair.x, zpair.y); }
 
-        static constexpr matrix_t translation(value_type tx, value_type ty, value_type tz);
-        static constexpr matrix_t translation(const vector_t<value_type, EDim::_3>& t);
-        static constexpr matrix_t rotation(const quaternion<value_type>& q);
-        static constexpr matrix_t scale(value_type sx, value_type sy, value_type sz);
-        static constexpr matrix_t scale(value_type s);
-        static constexpr matrix_t scale(const vector_t<value_type, EDim::_3>& s);
+        static constexpr translation_matrix_t<value_type, EDim::_4, EDim::_4> translation(value_type tx, value_type ty, value_type tz);
+        static constexpr translation_matrix_t<value_type, EDim::_4, EDim::_4> translation(const vector_t<value_type, EDim::_3>& t);
+        static constexpr rotation_matrix_t<value_type, EDim::_4, EDim::_4> rotation(const quaternion<value_type>& q);
+        static constexpr scale_matrix_t<value_type, EDim::_4, EDim::_4> scale(value_type sx, value_type sy, value_type sz);
+        static constexpr scale_matrix_t<value_type, EDim::_4, EDim::_4> scale(value_type s);
+        static constexpr scale_matrix_t<value_type, EDim::_4, EDim::_4> scale(const vector_t<value_type, EDim::_3>& s);
+        static inline view_matrix_t<value_type, EDim::_4, EDim::_4> look_at(
+            const normalized_vector_t<value_type, EDim::_3>& eye,
+            const normalized_vector_t<value_type, EDim::_3>& look,
+            const normalized_vector_t<value_type, EDim::_3>& up);
     };
+
 
     template<typename value_type>
     struct translation_matrix_t<value_type, EDim::_2, EDim::_3>
@@ -932,7 +928,7 @@ namespace math
 
         constexpr scale_matrix_t(value_type s) : scale_matrix_t(s, s, s) { }
 
-        constexpr scale_matrix_t(const vector_t<value_type, EDim::_3>&s) : scale_matrix_t(s.x, s.y, s.z) { }
+        constexpr scale_matrix_t(const vector_t<value_type, EDim::_3>& s) : scale_matrix_t(s.x, s.y, s.z) { }
 
         static constexpr scale_matrix_t make2d(value_type sx, value_type sy)
         {
@@ -965,7 +961,43 @@ namespace math
 
         constexpr scale_matrix_t(value_type s) : scale_matrix_t(s, s, s) { }
 
-        constexpr scale_matrix_t(const vector_t<value_type, EDim::_3>&s) : scale_matrix_t(s.x, s.y, s.z) { }
+        constexpr scale_matrix_t(const vector_t<value_type, EDim::_3>& s) : scale_matrix_t(s.x, s.y, s.z) { }
+    };
+
+
+    template<typename value_type>
+    struct view_matrix_t<value_type, EDim::_4, EDim::_4>
+        : public matrix_t<value_type, EDim::_4, EDim::_4>
+    {
+        constexpr view_matrix_t(
+            const vector_t<value_type, EDim::_3>& position,
+            const normalized_vector_t<value_type, EDim::_3>& forward,
+            const normalized_vector_t<value_type, EDim::_3>& up,
+            const normalized_vector_t<value_type, EDim::_3>& right
+        ) : matrix_t<value_type, EDim::_4, EDim::_4>
+            (
+                vector_t<value_type, EDim::_4>(right, -dot(position, right)),
+                vector_t<value_type, EDim::_4>(up, -dot(position, up)),
+                vector_t<value_type, EDim::_4>(forward, -dot(position, forward)),
+                vector_t<value_type, EDim::_4>(value_type(0), value_type(0), value_type(0), value_type(1))
+            )
+        {   }
+
+        view_matrix_t(
+            const normalized_vector_t<value_type, EDim::_3>& eye,
+            const normalized_vector_t<value_type, EDim::_3>& look,
+            const normalized_vector_t<value_type, EDim::_3>& up
+        ) : matrix_t<value_type, EDim::_4, EDim::_4>()
+        {
+            const normalized_vector_t<value_type, EDim::_3> forward = normalized(look - eye);
+            const normalized_vector_t<value_type, EDim::_3> real_up = normalized(up - forward * dot(forward, up));
+            const normalized_vector_t<value_type, EDim::_3> right = cross(real_up, forward);
+
+            rows[0].set(right, -dot(eye, right));
+            rows[1].set(real_up, -dot(eye, real_up));
+            rows[2].set(forward, -dot(eye, forward));
+            rows[3].set(value_type(0), value_type(0), value_type(0), value_type(1));
+        }
     };
 
     namespace math_impl
@@ -1021,186 +1053,197 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+    constexpr translation_matrix_t<value_type, EDim::_2, EDim::_3>
         matrix_t<value_type, EDim::_2, EDim::_3>::translation(value_type tx, value_type ty)
     {
         return translation_matrix_t<value_type, EDim::_2, EDim::_3>(tx, ty);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+    constexpr translation_matrix_t<value_type, EDim::_2, EDim::_3>
         matrix_t<value_type, EDim::_2, EDim::_3>::translation(const vector_t<value_type, EDim::_2>& translation)
     {
         return translation_matrix_t<value_type, EDim::_2, EDim::_3>(translation);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+    constexpr translation_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::translation(value_type tx, value_type ty)
     {
         return translation_matrix_t<value_type, EDim::_3, EDim::_3>(tx, ty);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+    constexpr translation_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::translation(const vector_t<value_type, EDim::_2>& translation)
     {
         return translation_matrix_t<value_type, EDim::_3, EDim::_3>(translation);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+    constexpr translation_matrix_t<value_type, EDim::_4, EDim::_4>
         matrix_t<value_type, EDim::_4, EDim::_4>::translation(value_type tx, value_type ty, value_type tz)
     {
         return translation_matrix_t<value_type, EDim::_4, EDim::_4>(tx, ty, tz);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+    constexpr translation_matrix_t<value_type, EDim::_4, EDim::_4>
         matrix_t<value_type, EDim::_4, EDim::_4>::translation(const vector_t<value_type, EDim::_3>& translation)
     {
         return translation_matrix_t<value_type, EDim::_4, EDim::_4>(translation);
     }
 
     template<typename value_type>
-    inline matrix_t<value_type, EDim::_2, EDim::_2>
+    inline rotation_matrix_t<value_type, EDim::_2, EDim::_2>
         matrix_t<value_type, EDim::_2, EDim::_2>::rotation(const radian<value_type>& r)
     {
         return rotation_matrix_t<value_type, EDim::_2, EDim::_2>(r);
     }
 
     template<typename value_type>
-    inline matrix_t<value_type, EDim::_2, EDim::_3>
+    inline rotation_matrix_t<value_type, EDim::_2, EDim::_3>
         matrix_t<value_type, EDim::_2, EDim::_3>::rotation(const radian<value_type>& r)
     {
         return rotation_matrix_t<value_type, EDim::_2, EDim::_3>(r);
     }
 
     template<typename value_type>
-    inline matrix_t<value_type, EDim::_3, EDim::_3>
+    inline rotation_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::rotation(const radian<value_type>& r)
     {
         return rotation_matrix_t<value_type, EDim::_3, EDim::_3>(r);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+    constexpr rotation_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::rotation(const quaternion<value_type>& q)
     {
         return rotation_matrix_t<value_type, EDim::_3, EDim::_3>(q);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+    constexpr rotation_matrix_t<value_type, EDim::_4, EDim::_4>
         matrix_t<value_type, EDim::_4, EDim::_4>::rotation(const quaternion<value_type>& q)
     {
         return rotation_matrix_t<value_type, EDim::_4, EDim::_4>(q);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_2, EDim::_2>
+    constexpr scale_matrix_t<value_type, EDim::_2, EDim::_2>
         matrix_t<value_type, EDim::_2, EDim::_2>::scale(value_type sx, value_type sy)
     {
         return scale_matrix_t<value_type, EDim::_2, EDim::_2>(sx, sy);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_2, EDim::_2>
+    constexpr scale_matrix_t<value_type, EDim::_2, EDim::_2>
         matrix_t<value_type, EDim::_2, EDim::_2>::scale(value_type s)
     {
         return scale_matrix_t<value_type, EDim::_2, EDim::_2>(s);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_2, EDim::_2>
+    constexpr scale_matrix_t<value_type, EDim::_2, EDim::_2>
         matrix_t<value_type, EDim::_2, EDim::_2>::scale(const vector_t<value_type, EDim::_2>& s)
     {
         return scale_matrix_t<value_type, EDim::_2, EDim::_2>(s);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+    constexpr scale_matrix_t<value_type, EDim::_2, EDim::_3>
         matrix_t<value_type, EDim::_2, EDim::_3>::scale(value_type sx, value_type sy)
     {
         return scale_matrix_t<value_type, EDim::_2, EDim::_3>(sx, sy);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+    constexpr scale_matrix_t<value_type, EDim::_2, EDim::_3>
         matrix_t<value_type, EDim::_2, EDim::_3>::scale(value_type s)
     {
         return scale_matrix_t<value_type, EDim::_2, EDim::_3>(s);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_2, EDim::_3>
+    constexpr scale_matrix_t<value_type, EDim::_2, EDim::_3>
         matrix_t<value_type, EDim::_2, EDim::_3>::scale(const vector_t<value_type, EDim::_2>& s)
     {
         return scale_matrix_t<value_type, EDim::_2, EDim::_3>(s);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+    constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::scale(value_type sx, value_type sy, value_type sz)
     {
         return scale_matrix_t<value_type, EDim::_3, EDim::_3>(sx, sy, sz);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+    constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::scale(value_type s)
     {
         return scale_matrix_t<value_type, EDim::_3, EDim::_3>(s);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+    constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::scale(const vector_t<value_type, EDim::_3>& s)
     {
         return scale_matrix_t<value_type, EDim::_3, EDim::_3>(s);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+    constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::scale2d(value_type sx, value_type sy)
     {
         return scale_matrix_t<value_type, EDim::_3, EDim::_3>::make2d(sx, sy);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+    constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::scale2d(value_type s)
     {
         return scale_matrix_t<value_type, EDim::_3, EDim::_3>::make2d(s);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_3, EDim::_3>
+    constexpr scale_matrix_t<value_type, EDim::_3, EDim::_3>
         matrix_t<value_type, EDim::_3, EDim::_3>::scale2d(const vector_t<value_type, EDim::_2>& s)
     {
         return scale_matrix_t<value_type, EDim::_3, EDim::_3>::make2d(s);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+    constexpr scale_matrix_t<value_type, EDim::_4, EDim::_4>
         matrix_t<value_type, EDim::_4, EDim::_4>::scale(value_type sx, value_type sy, value_type sz)
     {
         return scale_matrix_t<value_type, EDim::_4, EDim::_4>(sx, sy, sz);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+    constexpr scale_matrix_t<value_type, EDim::_4, EDim::_4>
         matrix_t<value_type, EDim::_4, EDim::_4>::scale(value_type s)
     {
         return scale_matrix_t<value_type, EDim::_4, EDim::_4>(s);
     }
 
     template<typename value_type>
-    constexpr matrix_t<value_type, EDim::_4, EDim::_4>
+    constexpr scale_matrix_t<value_type, EDim::_4, EDim::_4>
         matrix_t<value_type, EDim::_4, EDim::_4>::scale(const vector_t<value_type, EDim::_3>& s)
     {
         return scale_matrix_t<value_type, EDim::_4, EDim::_4>(s);
     }
+
+    template<typename value_type>
+    inline view_matrix_t<value_type, EDim::_4, EDim::_4>
+        matrix_t<value_type, EDim::_4, EDim::_4>::look_at(
+            const normalized_vector_t<value_type, EDim::_3>& eye,
+            const normalized_vector_t<value_type, EDim::_3>& look,
+            const normalized_vector_t<value_type, EDim::_3>& up)
+    {
+        return view_matrix_t<value_type, EDim::_4, EDim::_4>(eye, look, up);
+    }
+
 
     template<typename value_type, EDim Row, EDim Col>
     constexpr bool operator== (const matrix_t<value_type, Row, Col>& l, const matrix_t<value_type, Row, Col>& r)
@@ -2039,11 +2082,15 @@ namespace math
     template<typename value_type> using translation_matrix2x3 = translation_matrix_t<value_type, EDim::_2, EDim::_3>;
     template<typename value_type> using translation_matrix3x3 = translation_matrix_t<value_type, EDim::_3, EDim::_3>;
     template<typename value_type> using translation_matrix4x4 = translation_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using rotation_matrix2x2 = rotation_matrix_t<value_type, EDim::_2, EDim::_2>;
+    template<typename value_type> using rotation_matrix2x3 = rotation_matrix_t<value_type, EDim::_2, EDim::_3>;
     template<typename value_type> using rotation_matrix3x3 = rotation_matrix_t<value_type, EDim::_3, EDim::_3>;
     template<typename value_type> using rotation_matrix4x4 = rotation_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using scale_matrix2x2 = scale_matrix_t<value_type, EDim::_2, EDim::_2>;
     template<typename value_type> using scale_matrix2x3 = scale_matrix_t<value_type, EDim::_2, EDim::_3>;
     template<typename value_type> using scale_matrix3x3 = scale_matrix_t<value_type, EDim::_3, EDim::_3>;
     template<typename value_type> using scale_matrix4x4 = scale_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using view_matrix4x4 = view_matrix_t<value_type, EDim::_4, EDim::_4>;
 
     using float2x2 = matrix2x2<float>;
     using float2x3 = matrix2x3<float>;
@@ -2056,7 +2103,8 @@ namespace math
     using double4x4 = matrix4x4<double>;
 
 
-    using translation_float4x4 = translation_matrix4x4<float>;
-    using rotation_float4x4 = rotation_matrix4x4<float>;
-    using scale_float4x4 = scale_matrix4x4<float>;
+    using float_translation_matrix4x4 = translation_matrix4x4<float>;
+    using float_rotation_matrix4x4 = rotation_matrix4x4<float>;
+    using float_scale_matrix4x4 = scale_matrix4x4<float>;
+    using float_view_matrix4x4 = view_matrix4x4<float>;
 }
