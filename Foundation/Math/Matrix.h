@@ -20,7 +20,10 @@ namespace math
     struct view_matrix_t;
 
     template<typename value_type, EDim row_dim, EDim col_dim>
-    struct projection_matrix_t;
+    struct perspective_lh_matrix_t;
+
+    template<typename value_type, EDim row_dim, EDim col_dim>
+    struct ortho_lh_matrix_t;
 
     template<typename value_type>
     struct matrix_t<value_type, EDim::_2, EDim::_2>
@@ -684,48 +687,6 @@ namespace math
             return matt * matr * mats;
         }
 
-
-        static inline matrix_t perspective_lh(const radian<value_type>& fov, value_type aspect, value_type znear, value_type zfar)
-        {
-            value_type near_top = tan(fov * value_type(0.5));
-            value_type near_right = near_top * aspect;
-            value_type znear2 = value_type(2) * znear;
-            value_type z_range_inv = zfar / (zfar - znear);
-            return matrix_t(
-                znear2 / near_right, value_type(0), value_type(0), value_type(0),
-                value_type(0), znear2 / near_top, value_type(0), value_type(0),
-                value_type(0), value_type(0), z_range_inv, -znear * z_range_inv,
-                value_type(0), value_type(0), value_type(1), value_type(0));
-        }
-
-        static inline matrix_t perspective_lh(const radian<value_type>& fov, value_type aspect, const vector2<value_type>& zpair) { perspective_lh(fov, aspect, zpair.x, zpair.y); }
-
-        static inline matrix_t center_ortho_lh(value_type width, value_type height, value_type znear, value_type zfar)
-        {
-            value_type z_range_inv = value_type(1) / (zfar - znear);
-            return matrix_t(
-                value_type(2) / width, value_type(0), value_type(0), value_type(0),
-                value_type(0), -value_type(2) / height, value_type(0), value_type(0),
-                value_type(0), value_type(0), z_range_inv, -znear * z_range_inv,
-                value_type(0), value_type(0), value_type(0), value_type(1)
-            );
-        }
-
-        static inline matrix_t center_ortho_lh(const vector2<value_type>& size, const vector2<value_type>& zpair) { center_ortho_lh(size.x, size.y, zpair.x, zpair.y); }
-
-        static inline matrix_t ortho2d_lh(value_type width, value_type height, value_type znear, value_type zfar)
-        {
-            value_type z_range_inv = value_type(1) / (zfar - znear);
-            return matrix_t(
-                value_type(2) / width, value_type(0), value_type(0), -value_type(1),
-                value_type(0), -value_type(2) / height, value_type(0), value_type(1),
-                value_type(0), value_type(0), z_range_inv, -znear * z_range_inv,
-                value_type(0), value_type(0), value_type(0), value_type(1)
-            );
-        }
-
-        static inline matrix_t ortho2d_lh(const vector2<value_type>& size, const vector2<value_type>& zpair) { ortho2d_lh(size.x, size.y, zpair.x, zpair.y); }
-
         static constexpr translation_matrix_t<value_type, EDim::_4, EDim::_4> translation(value_type tx, value_type ty, value_type tz);
         static constexpr translation_matrix_t<value_type, EDim::_4, EDim::_4> translation(const vector_t<value_type, EDim::_3>& t);
         static constexpr rotation_matrix_t<value_type, EDim::_4, EDim::_4> rotation(const quaternion<value_type>& q);
@@ -736,6 +697,10 @@ namespace math
             const normalized_vector_t<value_type, EDim::_3>& eye,
             const normalized_vector_t<value_type, EDim::_3>& look,
             const normalized_vector_t<value_type, EDim::_3>& up);
+        static inline perspective_lh_matrix_t<value_type, EDim::_4, EDim::_4> perspective_lh(
+            const radian<value_type>& fov, value_type aspect, value_type znear, value_type zfar);
+        static inline ortho_lh_matrix_t<value_type, EDim::_4, EDim::_4> ortho_lh(
+            value_type width, value_type height, value_type znear, value_type zfar);
     };
 
 
@@ -761,7 +726,9 @@ namespace math
         constexpr translation_matrix_t(value_type tx, value_type ty)
             : matrix_t(
                 value_type(1), value_type(0), tx,
-                value_type(0), value_type(1), ty)
+                value_type(0), value_type(1), ty,
+                value_type(0), value_type(0), value_type(1)
+            )
         { }
 
         constexpr translation_matrix_t(const vector_t<value_type, EDim::_2>& translation)
@@ -920,8 +887,8 @@ namespace math
     {
         constexpr scale_matrix_t(value_type sx, value_type sy, value_type sz)
             : matrix_t(
-                sx, value_type(0), value_type(0)
-                value_type(0), sy, value_type(0)
+                sx, value_type(0), value_type(0),
+                value_type(0), sy, value_type(0),
                 value_type(0), value_type(0), sz
             )
         { }
@@ -952,9 +919,9 @@ namespace math
     {
         constexpr scale_matrix_t(value_type sx, value_type sy, value_type sz)
             : matrix_t(
-                sx, value_type(0), value_type(0), value_type(0)
-                value_type(0), sy, value_type(0), value_type(0)
-                value_type(0), value_type(0), sz, value_type(0)
+                sx, value_type(0), value_type(0), value_type(0),
+                value_type(0), sy, value_type(0), value_type(0),
+                value_type(0), value_type(0), sz, value_type(0),
                 value_type(0), value_type(0), value_type(0), value_type(1)
             )
         { }
@@ -998,6 +965,52 @@ namespace math
             rows[2].set(forward, -dot(eye, forward));
             rows[3].set(value_type(0), value_type(0), value_type(0), value_type(1));
         }
+    };
+
+    template<typename value_type>
+    struct perspective_lh_matrix_t<value_type, EDim::_4, EDim::_4>
+        : public matrix_t<value_type, EDim::_4, EDim::_4>
+    {
+        perspective_lh_matrix_t(
+            const radian<value_type>& fov,
+            value_type aspect,
+            value_type znear, value_type zfar)
+        {
+            value_type near_top = tan(fov * value_type(0.5));
+            value_type yscale = value_type(2.0) * znear / near_top;
+            value_type xscale = yscale / aspect;
+            value_type z_range_inv = zfar / (zfar - znear);
+
+            rows[0].set(xscale, value_type(0), value_type(0), value_type(0));
+            rows[1].set(value_type(0), yscale, value_type(0), value_type(0));
+            rows[2].set(value_type(0), value_type(0), z_range_inv, -znear * z_range_inv);
+            rows[3].set(value_type(0), value_type(0), value_type(1), value_type(0));
+        }
+
+        perspective_lh_matrix_t(const radian<value_type>& fov,
+            value_type aspect, const vector_t<value_type, EDim::_2>& z)
+            : perspective_lh_matrix_t(fov, aspect, z.x, z.y)
+        {   }
+    };
+
+    template<typename value_type>
+    struct ortho_lh_matrix_t<value_type, EDim::_4, EDim::_4>
+        : public matrix_t<value_type, EDim::_4, EDim::_4>
+    {
+        ortho_lh_matrix_t(value_type width, value_type height, value_type znear, value_type zfar)
+        {
+            value_type xscale = value_type(2.0) / width;
+            value_type yscale = value_type(2.0) / height;
+            value_type z_range_inv = value_type(1) / (zfar - znear);
+            rows[0].set(xscale, value_type(0), value_type(0), value_type(0));
+            rows[1].set(value_type(0), yscale, value_type(0), value_type(0));
+            rows[2].set(value_type(0), value_type(0), z_range_inv, -znear * z_range_inv);
+            rows[3].set(value_type(0), value_type(0), value_type(0), value_type(1));
+        }
+
+        ortho_lh_matrix_t(value_type width, value_type height, const vector_t<value_type, EDim::_2>& z)
+            : ortho_lh_matrix_t(width, height, z.x, z.y)
+        {   }
     };
 
     namespace math_impl
@@ -1244,6 +1257,21 @@ namespace math
         return view_matrix_t<value_type, EDim::_4, EDim::_4>(eye, look, up);
     }
 
+    template<typename value_type>
+    perspective_lh_matrix_t<value_type, EDim::_4, EDim::_4>
+        matrix_t<value_type, EDim::_4, EDim::_4>::perspective_lh(
+            const radian<value_type>& fov, value_type aspect, value_type znear, value_type zfar)
+    {
+        return perspective_lh_matrix_t<value_type, EDim::_4, EDim::_4>(fov, aspect, znear, zfar);
+    }
+
+    template<typename value_type>
+    ortho_lh_matrix_t<value_type, EDim::_4, EDim::_4>
+        matrix_t<value_type, EDim::_4, EDim::_4>::ortho_lh(
+            value_type width, value_type height, value_type znear, value_type zfar)
+    {
+        return ortho_lh_matrix_t<value_type, EDim::_4, EDim::_4>(width, height, znear, zfar);
+    }
 
     template<typename value_type, EDim Row, EDim Col>
     constexpr bool operator== (const matrix_t<value_type, Row, Col>& l, const matrix_t<value_type, Row, Col>& r)
@@ -2091,6 +2119,8 @@ namespace math
     template<typename value_type> using scale_matrix3x3 = scale_matrix_t<value_type, EDim::_3, EDim::_3>;
     template<typename value_type> using scale_matrix4x4 = scale_matrix_t<value_type, EDim::_4, EDim::_4>;
     template<typename value_type> using view_matrix4x4 = view_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using perspective_lh_matrix4x4 = perspective_lh_matrix_t<value_type, EDim::_4, EDim::_4>;
+    template<typename value_type> using ortho_lh_matrix4x4 = ortho_lh_matrix_t<value_type, EDim::_4, EDim::_4>;
 
     using float2x2 = matrix2x2<float>;
     using float2x3 = matrix2x3<float>;
@@ -2102,9 +2132,10 @@ namespace math
     using double3x3 = matrix3x3<double>;
     using double4x4 = matrix4x4<double>;
 
-
-    using float_translation_matrix4x4 = translation_matrix4x4<float>;
-    using float_rotation_matrix4x4 = rotation_matrix4x4<float>;
-    using float_scale_matrix4x4 = scale_matrix4x4<float>;
-    using float_view_matrix4x4 = view_matrix4x4<float>;
+    using translation_matrix4x4f = translation_matrix4x4<float>;
+    using rotation_matrix4x4f = rotation_matrix4x4<float>;
+    using scale_matrix4x4f = scale_matrix4x4<float>;
+    using view_matrix4x4f = view_matrix4x4<float>;
+    using perspective_lh_matrix4x4f = perspective_lh_matrix4x4<float>;
+    using ortho_lh_matrix4x4f = ortho_lh_matrix4x4<float>;
 }
