@@ -4,13 +4,14 @@
 
 namespace engine
 {
+    class Camera;
     class Scene : public GE::Scene
     {
     public:
         DefineRTTI;
 
-        virtual GE::Camera* CreateAdditionalCameraNode() override { return nullptr; }
-        virtual GE::Camera* GetDefaultCamera()override { return nullptr; }
+        virtual GE::Camera* CreateAdditionalCameraNode() override;
+        virtual GE::Camera* GetDefaultCamera() override;
         virtual GE::Camera* GetCameraByIndex(unsigned int index) override;
         virtual unsigned int GetCameraCount() const override;
         virtual GE::SceneNode* CreateSceneNode() override;
@@ -19,8 +20,14 @@ namespace engine
 
         Scene();
 
+        void UpdateAndRender(unsigned int elapsedMilliseconds);
+
+        Camera* GetDefaultCameraInternal();
+
     private:
+        void InitializeDefaultNodes();
+        Camera* CreateCameraNode();
         InvalidateRootSceneNode mRoot;
-        std::vector<GE::Camera*> mCameras;
+        std::vector<engine::Camera*> mCameras;
     };
 }

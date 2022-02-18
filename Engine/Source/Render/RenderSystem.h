@@ -22,7 +22,9 @@ namespace engine
 
         virtual math::point3d<int> ViewToScreen(const math::point3d<float>& view) const override { return math::point3d<int>::zero(); }
 
+    public:
         RenderSystem(void* hWindow, bool fullscreen, int width, int height);
+        ~RenderSystem();
 
         bool InitializeGfxDevice();
 
@@ -31,6 +33,8 @@ namespace engine
         bool OnResizeWindow(void* hWindow, int width, int height);
 
     private:
+        void RenderSimpleBox(const math::float4x4& viewMatrix);
+
         HWND mMainWindowHandle;
         bool mIsFullScreen = false;
         int mWindowWidth = 0;

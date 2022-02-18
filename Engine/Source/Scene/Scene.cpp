@@ -1,7 +1,18 @@
 #include "Scene.h"
+#include "Components.h"
 
 namespace engine
 {
+    GE::Camera* Scene::CreateAdditionalCameraNode()
+    {
+        return CreateCameraNode();
+    }
+
+    GE::Camera* Scene::GetDefaultCamera()
+    {
+        return GetDefaultCameraInternal();
+    }
+
     GE::Camera* Scene::GetCameraByIndex(unsigned int index)
     {
         if (index < GetCameraCount())
@@ -33,5 +44,40 @@ namespace engine
 
     Scene::Scene()
         : mRoot(this)
-    { }
+    {
+        InitializeDefaultNodes();
+    }
+
+    void Scene::UpdateAndRender(unsigned int elapsedMilliseconds)
+    {
+        mRoot.RecursiveUpdate(elapsedMilliseconds);
+        mRoot.RecursiveRender();
+    }
+
+    Camera* Scene::GetDefaultCameraInternal()
+    {
+        return mCameras[0];
+    }
+
+    void Scene::InitializeDefaultNodes()
+    {
+        CreateCameraNode();
+    }
+
+    Camera* Scene::CreateCameraNode()
+    {
+        auto cameraNode = mRoot.CreateSceneNode();
+        engine::Camera* compCamera = new engine::Camera((uint32_t)mCameras.size());
+        if (!cameraNode->AddComponent(compCamera, GE::AutoReleaseComponent))
+        {
+            delete compCamera;
+            mRoot.DestoryChildSceneNode(cameraNode);
+            return nullptr;
+        }
+        else
+        {
+            mCameras.push_back(compCamera);
+        }
+        return compCamera;
+    }
 }

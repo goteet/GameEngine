@@ -23,8 +23,12 @@ namespace engine
 
         bool InitializeMe(const GE::GameEngine::CreationConfig&);
 
+        Scene* GetDefaultSceneInternal() { return mDefualtScene.get(); }
+
     private:
         std::unique_ptr<engine::RenderSystem> mRenderSystem;
         std::unique_ptr<engine::Scene> mDefualtScene;
     };
+
+    GameEngine* GetEngineInstance();
 }

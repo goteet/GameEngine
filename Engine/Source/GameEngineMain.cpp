@@ -8,6 +8,7 @@ namespace GE
 {
     engine::GameEngine* sGlobalInstance = nullptr;
 
+
     bool GEObject::IsSameType(GEObject* other) const { return GetClassUID() == other->GetClassUID(); }
 
     ClassUID GameEngineAPI GenerateClassUID()
@@ -59,4 +60,9 @@ namespace GE
     {
         return GetInstance() != nullptr;
     }
+}
+
+engine::GameEngine* engine::GetEngineInstance()
+{
+    return GE::sGlobalInstance;
 }

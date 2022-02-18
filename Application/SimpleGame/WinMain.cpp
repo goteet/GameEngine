@@ -56,6 +56,7 @@ bool Uninitialize(HWND)
 void InitializeSimpleScene()
 {
     g_DefaultScene = g_GameEngine->CreateOrGetDefaultScene();
+    
 
     auto nodeSphere = g_DefaultScene->CreateSceneNode();
 
@@ -70,6 +71,10 @@ void InitializeSimpleScene()
     nodeBackWall->SetForwardDirection(math::normalized_float3::unit_y_neg());
     nodeTopWall->SetForwardDirection(math::normalized_float3::unit_z_neg());
     nodeBottomWall->SetForwardDirection(math::normalized_float3::unit_z());
+
+    GE::Camera* mainCamera = g_DefaultScene->GetDefaultCamera();
+    mainCamera->SetEyePosition(math::point3df(2, 3, -5));
+    mainCamera->Lookat(math::point3df(0, 0, 0));
 }
 
 bool NeedUpdate() { return false; }
