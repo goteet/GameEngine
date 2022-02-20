@@ -2,6 +2,7 @@
 #include <Foundation/Base/ScopeHelper.h>
 #include <Foundation/Base/MemoryHelper.h>
 #include <vector>
+#include <string>
 #include <d3dcompiler.h>
 #include "Core/GameEngine.h"
 #include "Scene/Components.h"
@@ -108,7 +109,7 @@ struct GfxBaseBuffer
         mBufferDesc.BindFlags = 0;
 
         //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_cpu_access_flag
-        //0 if no CPU access is necessary. 
+        //0 if no CPU access is necessary.
         mBufferDesc.CPUAccessFlags = 0;
 
         //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_resource_misc_flag
