@@ -5,6 +5,7 @@
 namespace engine
 {
     class Camera;
+    class DirectionalLight;
     class Scene : public GE::Scene
     {
     public:
@@ -14,6 +15,10 @@ namespace engine
         virtual GE::Camera* GetDefaultCamera() override;
         virtual GE::Camera* GetCameraByIndex(unsigned int index) override;
         virtual unsigned int GetCameraCount() const override;
+
+        virtual GE::DirectionalLight* CreateDirectionalLightNode() override;
+        virtual GE::DirectionalLight* GetDirectionalLight(uint32_t index) override;
+
         virtual GE::SceneNode* CreateSceneNode() override;
         virtual GE::SceneNode* GetSceneNodeByIndex(unsigned int index) override;
         virtual unsigned int GetSceneNodeCount() const override;
@@ -29,5 +34,6 @@ namespace engine
         Camera* CreateCameraNode();
         InvalidateRootSceneNode mRoot;
         std::vector<engine::Camera*> mCameras;
+        std::vector<engine::DirectionalLight*> mDirectionalLights;
     };
 }

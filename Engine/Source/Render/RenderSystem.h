@@ -44,8 +44,18 @@ namespace engine
 
         bool OnResizeWindow(void* hWindow, int width, int height);
 
+    public:
+        struct ViewConstantBufferData
+        {
+            math::float4x4 ViewMatrix;
+            math::float4x4 InvViewMatrix;
+            math::float3   CameraPositionWS;
+            math::float3   LightColor;
+            math::float3   LightDirection;
+        };
+
     private:
-        void RenderSimpleBox(const math::float4x4& viewMatrix);
+        void RenderSimpleBox(const ViewConstantBufferData& data);
 
         HWND mMainWindowHandle;
         bool mIsFullScreen = false;

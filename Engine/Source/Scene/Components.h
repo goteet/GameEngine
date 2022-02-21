@@ -32,4 +32,19 @@ namespace engine
         math::float4x4 mMatrixView;
         math::float4x4 mMatrixViewInverse;
     };
+
+    class DirectionalLight : public GE::DirectionalLight
+    {
+    public:
+        DefineRTTI;
+
+        virtual void SetColor(const math::float3& color) override;
+        virtual math::float3 GetColor() const override { return mColor; }
+        virtual void SetIntensity(float intensity) override;
+        virtual float GetIntensity() const override { return mIntensity; }
+
+    private:
+        float mIntensity;
+        math::float3 mColor;
+    };
 }

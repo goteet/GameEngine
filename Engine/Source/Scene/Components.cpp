@@ -49,4 +49,14 @@ namespace engine
             mMatrixViewInverse = math::inversed(mMatrixView);
         }
     }
+
+    void DirectionalLight::SetColor(const math::float3& color)
+    {
+        mColor = color;
+    }
+
+    void DirectionalLight::SetIntensity(float intensity)
+    {
+        mIntensity = intensity;
+    }
 }

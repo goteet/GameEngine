@@ -27,6 +27,36 @@ namespace engine
         return (unsigned int)mCameras.size();
     }
 
+
+    GE::DirectionalLight* Scene::CreateDirectionalLightNode()
+    {
+        auto directionalLightNode = mRoot.CreateSceneNode();
+        engine::DirectionalLight* compDirectionalLight = new engine::DirectionalLight();
+        if (!directionalLightNode->AddComponent(compDirectionalLight, GE::AutoReleaseComponent))
+        {
+            delete compDirectionalLight;
+            mRoot.DestoryChildSceneNode(directionalLightNode);
+            return nullptr;
+        }
+        else
+        {
+            mDirectionalLights.push_back(compDirectionalLight);
+        }
+
+        return compDirectionalLight;
+    }
+
+    GE::DirectionalLight* Scene::GetDirectionalLight(uint32_t index)
+    {
+        if (index < mDirectionalLights.size())
+        {
+            return mDirectionalLights[index];
+        }
+
+        return nullptr;
+    }
+
+
     GE::SceneNode* Scene::CreateSceneNode()
     {
         return mRoot.CreateSceneNode();

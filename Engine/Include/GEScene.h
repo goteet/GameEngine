@@ -162,12 +162,22 @@ namespace GE
         //virtual math::point2d<int> WorldToScreen(const math::point3d<float>& pos) const = 0;
     };
 
+    struct GameEngineAPI DirectionalLight : public Component
+    {
+        virtual void SetColor(const math::float3& color) = 0;
+        virtual math::float3 GetColor() const = 0;
+        virtual void SetIntensity(float intensity) = 0;
+        virtual float GetIntensity() const = 0;
+    };
+
     struct GameEngineAPI Scene : public GEObject
     {
         virtual Camera* CreateAdditionalCameraNode() = 0;
         virtual Camera* GetDefaultCamera() = 0;
         virtual Camera* GetCameraByIndex(unsigned int index) = 0;
         virtual unsigned int GetCameraCount() const = 0;
+        virtual DirectionalLight* CreateDirectionalLightNode() = 0;
+        virtual DirectionalLight* GetDirectionalLight(uint32_t index) = 0;
         virtual SceneNode* CreateSceneNode() = 0;
         virtual SceneNode* GetSceneNodeByIndex(unsigned int index) = 0;
         virtual unsigned int GetSceneNodeCount() const = 0;

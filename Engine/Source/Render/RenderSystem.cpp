@@ -502,6 +502,12 @@ const std::string DefaultVertexShaderSourceCode = R"(
     {
         float4x4 MatrixView;
         float4x4 MatrixProj;
+        float3   CameraPositionWS;
+        float    Padding0;
+        float3   LightColor;
+        float    Padding1;
+        float3   LightDirection;
+        float    Padding2;
     }
     struct VertexLayout
     {
@@ -513,6 +519,8 @@ const std::string DefaultVertexShaderSourceCode = R"(
     {
         float4 Position  : SV_POSITION;
         float3 Color     : TEXCOORD0;
+        float3 Normal    : TEXCOORD1;
+        float3 ViewDirWS : TEXCOORD2;
     };
     VertexOutput VSMain(VertexLayout input)
     {
@@ -520,20 +528,50 @@ const std::string DefaultVertexShaderSourceCode = R"(
         float4 ModelPosition = float4(input.Position.xyz * 0.5, input.Position.w);
         float4 ViewPosition  = mul(ModelPosition, MatrixView);
         output.Position      = mul(ViewPosition, MatrixProj);
-        output.Color = ModelPosition.xyz + 0.5;
+        float4 ModelNormal   = float4(input.Normal, 0.0f);
+        output.Normal        = mul(float4(mul(ModelNormal, MatrixView).xyz, 0.0f), MatrixProj).xyz;
+        output.Color         = ModelPosition.xyz + 0.5;
+        output.ViewDirWS     = CameraPositionWS - ModelPosition.xyz;
         return output;
     }
 )";
 
 const std::string SimpleColorPixelShaderSourceCode = R"(
+    cbuffer scene
+    {
+        float4x4 MatrixView;
+        float4x4 MatrixProj;
+        float3   CameraPositionWS;
+        float    Padding0;
+        float3   LightColor;
+        float    Padding1;
+        float3   LightDirection;
+        float    Padding2;
+    }
+
     struct VertexOutput
     {
-        float4 Position : SV_POSITION;
-        float3 Color    : TEXCOORD0;
+        float4 Position  : SV_POSITION;
+        float3 Color     : TEXCOORD0;
+        float3 Normal    : TEXCOORD1;
+        float3 ViewDirWS : TEXCOORD2;
     };
     float4 PSMain(VertexOutput input) : SV_TARGET
     {
-        return float4(input.Color, 1.0);
+        float3 N = normalize(input.Normal);
+        float3 L = normalize(-LightDirection);
+        float NoL = max(0.0, dot(L, N));
+        float3 Diffuse = float3(1.0, 1.0, 1.0) * NoL;
+        float3 V = input.ViewDirWS;
+        float3 Ambient = float3(0.15, 0.1, 0.1);
+
+        float3 H = normalize(L + V);
+        float NoH = max(0.0, dot(N, H));
+        float3 Specular = pow(NoH, 128);
+
+        float4 Color = float4((Diffuse + Specular) * LightColor + Ambient, 1.0);
+
+        return Color;
     }
 )";
 
@@ -669,7 +707,14 @@ namespace engine
 
     void RenderSystem::RenderFrame()
     {
+        ViewConstantBufferData data;
+
         math::float4x4 viewMatrix = math::scale_matrix4x4f(2,2,2);
+        math::float3 cameraPositionWS = math::float3(0.0f, 0.0f, -10.0f);
+        math::float3 lightColor = math::float3(1.0f, 1.0f, 1.0f);
+        float lightIntensity = 1.0f;
+        math::float3 lightDirection = math::float3(1.0f, 0.0f, 0.0f);
+        
         GameEngine* Engine = GetEngineInstance();
         Scene* defaultScene = Engine->GetDefaultSceneInternal();
         if (defaultScene != nullptr)
@@ -678,13 +723,43 @@ namespace engine
             if (defaultCamera != nullptr)
             {
                 viewMatrix = defaultCamera->GetUpdatedViewMatrix();
+                cameraPositionWS = defaultCamera->GetSceneNode()->GetWorldPosition();
             }
+
+            GE::DirectionalLight* defaultLight = defaultScene->GetDirectionalLight(0);
+
+            lightColor = defaultLight->GetColor();
+            lightIntensity = defaultLight->GetIntensity();
+            lightDirection = defaultLight->GetSceneNode()->GetForwardDirection();
         }
+
+        data.ViewMatrix = viewMatrix;
+        data.InvViewMatrix = math::inversed(viewMatrix);
+        data.CameraPositionWS = cameraPositionWS;
+        data.LightColor = lightColor * lightIntensity;
+        data.LightDirection = lightDirection;
 
         if (CubeRenderingCommandList == nullptr)
         {
             auto RenderTagetView = mBackbufferRTV.Get();
             float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+            D3D11_RASTERIZER_DESC RasterizerDesc;
+            RasterizerDesc.FillMode = D3D11_FILL_MODE::D3D11_FILL_SOLID;
+            RasterizerDesc.CullMode = D3D11_CULL_MODE::D3D11_CULL_BACK;
+            RasterizerDesc.FrontCounterClockwise = TRUE;
+            RasterizerDesc.DepthBias = 0;
+            RasterizerDesc.DepthBiasClamp = 0.0f;
+            RasterizerDesc.SlopeScaledDepthBias = 0.0;
+            RasterizerDesc.DepthClipEnable = TRUE;
+            RasterizerDesc.ScissorEnable = FALSE;
+            RasterizerDesc.MultisampleEnable = TRUE;
+            RasterizerDesc.AntialiasedLineEnable = TRUE;
+
+            ComPtr<ID3D11RasterizerState> pRasterState;
+            mGfxDevice->CreateRasterizerState(&RasterizerDesc, pRasterState.ReleaseAndGetAddressOf());
+            mGfxDeviceDeferredContext->RSSetState(pRasterState.Get());
+
             mGfxDeviceDeferredContext->OMSetRenderTargets(1, &RenderTagetView, nullptr);
             mGfxDeviceDeferredContext->ClearRenderTargetView(RenderTagetView, ClearColor);
 
@@ -698,7 +773,7 @@ namespace engine
 
             mGfxDeviceDeferredContext->RSSetViewports(1, &Viewport);
 
-            RenderSimpleBox(viewMatrix);
+            RenderSimpleBox(data);
             mGfxDeviceDeferredContext->FinishCommandList(false, &CubeRenderingCommandList);
         }
         mGfxDeviceImmediateContext->ExecuteCommandList(CubeRenderingCommandList, false);
@@ -721,7 +796,7 @@ namespace engine
         return false;
     }
 
-    void RenderSystem::RenderSimpleBox(const math::float4x4& viewMatrix)
+    void RenderSystem::RenderSimpleBox(const ViewConstantBufferData& data)
     {
         static bool initialize = false;
         static bool initialize_error = false;
@@ -731,7 +806,7 @@ namespace engine
             CubeIndexBufferPtr = new GfxDefaultIndexBuffer();
             VertexShaderBufferPtr = new GfxDynamicConstBuffer();
             const unsigned int VertexStride = sizeof(VertexLayout);
-            const unsigned int VertexBufferLength = sizeof(math::float4x4) * 2;
+            const unsigned int VertexBufferLength = sizeof(math::float4x4) * 2 + sizeof(math::float4) * 3;
 
             bool vbc = CreateVertexBuffer(mGfxDevice.Get(), *CubeVertexBufferPtr, VertexStride, CubeVertexCount);
             bool ibc = CreateIndexBuffer(mGfxDevice.Get(), *CubeIndexBufferPtr, CubeIndexCount);
@@ -758,7 +833,7 @@ namespace engine
                     safe_delete(CubeIndexBufferPtr);
                     safe_delete(VertexShaderBufferPtr);
                     safe_delete(SimpleShaderProgramPtr);
-                    
+
                 }
             }
             else
@@ -776,9 +851,25 @@ namespace engine
         {
             float aspect = mWindowWidth / (float)mWindowHeight;
             math::float2 zNearFar(1.0f, 50.0f);
-            math::float4x4* pConstBuffer = (math::float4x4*)MapBuffer(mGfxDeviceDeferredContext.Get(), *VertexShaderBufferPtr);
-            pConstBuffer[0] = viewMatrix;
-            pConstBuffer[1] = math::perspective_lh_matrix4x4f(math::degree<float>(45), aspect, zNearFar);
+
+            // TODO: Vertex and pixel use same constant buffer here.
+            math::float4* pConstBuffer = (math::float4*)MapBuffer(mGfxDeviceDeferredContext.Get(), *VertexShaderBufferPtr);
+            {
+                pConstBuffer[0] = data.ViewMatrix.rows[0];
+                pConstBuffer[1] = data.ViewMatrix.rows[1];
+                pConstBuffer[2] = data.ViewMatrix.rows[2];
+                pConstBuffer[3] = data.ViewMatrix.rows[3];
+
+                math::float4x4 projMatrix = math::perspective_lh_matrix4x4f(math::degree<float>(45), aspect, zNearFar);
+                pConstBuffer[4] = projMatrix.rows[0];
+                pConstBuffer[5] = projMatrix.rows[1];
+                pConstBuffer[6] = projMatrix.rows[2];
+                pConstBuffer[7] = projMatrix.rows[3];
+
+                pConstBuffer[8] = math::float4(data.CameraPositionWS, 1.0f);
+                pConstBuffer[9] = math::float4(data.LightColor, 1.0f);
+                pConstBuffer[10] = math::float4(data.LightDirection, 0.0f);
+            }
             UnmapBuffer(mGfxDeviceDeferredContext.Get(), *VertexShaderBufferPtr);
 
             ID3D11Buffer* VertexBuffer = CubeVertexBufferPtr->mBufferPtr.Get();
@@ -791,6 +882,7 @@ namespace engine
             mGfxDeviceDeferredContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
             mGfxDeviceDeferredContext->VSSetConstantBuffers(0, 1, &VertexShaderBuffer);
             mGfxDeviceDeferredContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
+            mGfxDeviceDeferredContext->PSSetConstantBuffers(0, 1, &VertexShaderBuffer);
             mGfxDeviceDeferredContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
             mGfxDeviceDeferredContext->DrawIndexed(CubeIndexCount, 0, 0);
         }
