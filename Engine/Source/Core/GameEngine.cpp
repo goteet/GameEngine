@@ -33,7 +33,7 @@ namespace engine
     bool GameEngine::InitializeMe(const GE::GameEngine::CreationConfig& config)
     {
         mRenderSystem = std::make_unique<RenderSystem>(config.NativeWindow, config.IsFullScreen, config.InitialWidth, config.InitialHeight);
-        return mRenderSystem->InitializeGfxDevice();
+        return EGfxIntializationError::NoError == mRenderSystem->InitializeGfxDevice();
     }
 
 }

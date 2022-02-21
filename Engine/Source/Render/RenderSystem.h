@@ -9,6 +9,18 @@
 namespace engine
 {
     using namespace Microsoft::WRL;
+
+    enum EGfxIntializationError
+    {
+        NoError = 0,
+        DeviceCreationFail,
+        CreateSwapchainFail,
+        CreateBackbufferRTVFail,
+        CreateDeferredContextFail,
+        RetrieveDXGIFactoryFail,
+        RetrieveBackbufferFail,
+    };
+
     class RenderSystem : public GE::RenderSystem
     {
     public:
@@ -26,7 +38,7 @@ namespace engine
         RenderSystem(void* hWindow, bool fullscreen, int width, int height);
         ~RenderSystem();
 
-        bool InitializeGfxDevice();
+        EGfxIntializationError InitializeGfxDevice();
 
         void RenderFrame();
 
@@ -43,7 +55,8 @@ namespace engine
         int mClientHeight = 0;
 
         ComPtr<ID3D11Device> mGfxDevice = nullptr;
-        ComPtr<ID3D11DeviceContext> mGfxDeviceContext = nullptr;
+        ComPtr<ID3D11DeviceContext> mGfxDeviceImmediateContext = nullptr;
+        ComPtr<ID3D11DeviceContext> mGfxDeviceDeferredContext = nullptr;
         ComPtr<IDXGISwapChain1> mGfxSwapChain = nullptr;
         ComPtr<ID3D11Texture2D> mBackbuffer = nullptr;
         ComPtr<ID3D11RenderTargetView> mBackbufferRTV = nullptr;

@@ -543,6 +543,7 @@ namespace engine
     GfxDefaultVertexBuffer* CubeVertexBufferPtr = nullptr;
     GfxDefaultIndexBuffer* CubeIndexBufferPtr = nullptr;
     ShaderProgram* SimpleShaderProgramPtr = nullptr;
+    ID3D11CommandList* CubeRenderingCommandList = nullptr;
 
     RenderSystem::RenderSystem(void* hWindow, bool fullscreen, int width, int height)
         : mMainWindowHandle((HWND)hWindow)
@@ -562,13 +563,15 @@ namespace engine
         safe_delete(CubeIndexBufferPtr);
         safe_delete(VertexShaderBufferPtr);
         safe_delete(SimpleShaderProgramPtr);
+        SafeRelease(CubeRenderingCommandList);
     }
 
-    bool RenderSystem::InitializeGfxDevice()
+    EGfxIntializationError RenderSystem::InitializeGfxDevice()
     {
         //CreateVertexBuffer Device and DeviceContext
         ComPtr<ID3D11Device> outD3DDevice = nullptr;
         ComPtr<ID3D11DeviceContext> outD3DDeviceImmediateContext = nullptr;
+        ComPtr<ID3D11DeviceContext> outD3DDeferredContext = nullptr;
         ComPtr<IDXGISwapChain1> outSwapChain = nullptr;
         ComPtr<ID3D11Texture2D> outBackbuffer = nullptr;
         ComPtr<ID3D11RenderTargetView> outBackbufferRTV = nullptr;
@@ -594,7 +597,7 @@ namespace engine
 
         if (FAILED(resultCreateDevice))
         {
-            return false;
+            return EGfxIntializationError::DeviceCreationFail;
         }
 
         ///* CreateVertexBuffer SwapChain */
@@ -623,7 +626,7 @@ namespace engine
         ComPtr<IDXGIFactory2> DXGIFactory = GetDXGIAdapterFromDevice(outD3DDevice);
         if (DXGIFactory == nullptr)
         {
-            return false;
+            return EGfxIntializationError::RetrieveDXGIFactoryFail;
         }
 
         IDXGIOutput* noneDXGIOutput = nullptr;
@@ -631,30 +634,37 @@ namespace engine
 
         if (FAILED(resultCreateSwapchain))
         {
-            return false;
+            return EGfxIntializationError::CreateSwapchainFail;
         }
 
         //CreateVertexBuffer RenderTargetView
         HRESULT resultGetBackbuffer = outSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &outBackbuffer);
         if (FAILED(resultGetBackbuffer))
         {
-            return false;
+            return EGfxIntializationError::RetrieveBackbufferFail;
         }
 
 
         HRESULT resultCreateBackbufferRT = outD3DDevice->CreateRenderTargetView(outBackbuffer.Get(), nullptr, &outBackbufferRTV);
         if (FAILED(resultCreateBackbufferRT))
         {
-            return false;
+            return EGfxIntializationError::CreateBackbufferRTVFail;
+        }
+
+        HRESULT resultCreateDeferredContext = outD3DDevice->CreateDeferredContext(0, &outD3DDeferredContext);
+        if (FAILED(resultCreateDeferredContext))
+        {
+            return EGfxIntializationError::CreateDeferredContextFail;
         }
 
         mGfxDevice = outD3DDevice;
-        mGfxDeviceContext = outD3DDeviceImmediateContext;
+        mGfxDeviceImmediateContext = outD3DDeviceImmediateContext;
+        mGfxDeviceDeferredContext = outD3DDeferredContext;
         mGfxSwapChain = outSwapChain;
         mBackbuffer = outBackbuffer;
         mBackbufferRTV = outBackbufferRTV;
 
-        return true;
+        return EGfxIntializationError::NoError;
     }
 
     void RenderSystem::RenderFrame()
@@ -671,23 +681,27 @@ namespace engine
             }
         }
 
-        auto RenderTagetView = mBackbufferRTV.Get();
-        float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-        mGfxDeviceContext->OMSetRenderTargets(1, &RenderTagetView, nullptr);
-        mGfxDeviceContext->ClearRenderTargetView(RenderTagetView, ClearColor);
+        if (CubeRenderingCommandList == nullptr)
+        {
+            auto RenderTagetView = mBackbufferRTV.Get();
+            float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+            mGfxDeviceDeferredContext->OMSetRenderTargets(1, &RenderTagetView, nullptr);
+            mGfxDeviceDeferredContext->ClearRenderTargetView(RenderTagetView, ClearColor);
 
-        D3D11_VIEWPORT Viewport;
-        Viewport.TopLeftX = 0.0f;
-        Viewport.TopLeftY = 0.0f;
-        Viewport.Width = (float)mClientWidth;
-        Viewport.Height = (float)mClientHeight;
-        Viewport.MinDepth = 0.0f;
-        Viewport.MaxDepth = 1.0f;
+            D3D11_VIEWPORT Viewport;
+            Viewport.TopLeftX = 0.0f;
+            Viewport.TopLeftY = 0.0f;
+            Viewport.Width = (float)mClientWidth;
+            Viewport.Height = (float)mClientHeight;
+            Viewport.MinDepth = 0.0f;
+            Viewport.MaxDepth = 1.0f;
 
-        mGfxDeviceContext->RSSetViewports(1, &Viewport);
+            mGfxDeviceDeferredContext->RSSetViewports(1, &Viewport);
 
-        RenderSimpleBox(viewMatrix);
-
+            RenderSimpleBox(viewMatrix);
+            mGfxDeviceDeferredContext->FinishCommandList(false, &CubeRenderingCommandList);
+        }
+        mGfxDeviceImmediateContext->ExecuteCommandList(CubeRenderingCommandList, false);
         mGfxSwapChain->Present(0, 0);
     }
 
@@ -706,6 +720,7 @@ namespace engine
         }
         return false;
     }
+
     void RenderSystem::RenderSimpleBox(const math::float4x4& viewMatrix)
     {
         static bool initialize = false;
@@ -722,7 +737,6 @@ namespace engine
             bool ibc = CreateIndexBuffer(mGfxDevice.Get(), *CubeIndexBufferPtr, CubeIndexCount);
             bool cbc = CreateConstBuffer(mGfxDevice.Get(), *VertexShaderBufferPtr, VertexBufferLength);
 
-            ComPtr<ID3DBlob> blob;
 
             // 创建顶点着色器
             const std::string vsEntryName = "VSMain";
@@ -736,14 +750,15 @@ namespace engine
             if (vbc && ibc && cbc && SimpleShaderProgramPtr)
             {
                 //upload cube vertex data to gfx vertex buffer.
-                if (!UploadEntireBuffer(mGfxDevice.Get(), mGfxDeviceContext.Get(), *CubeVertexBufferPtr, CubeVertices)
-                    || !UploadEntireBuffer(mGfxDeviceContext.Get(), *CubeIndexBufferPtr, CubeIndices))
+                if (!UploadEntireBuffer(mGfxDevice.Get(), mGfxDeviceImmediateContext.Get(), *CubeVertexBufferPtr, CubeVertices)
+                    || !UploadEntireBuffer(mGfxDeviceImmediateContext.Get(), *CubeIndexBufferPtr, CubeIndices))
                 {
                     initialize_error = true;
                     safe_delete(CubeVertexBufferPtr);
                     safe_delete(CubeIndexBufferPtr);
                     safe_delete(VertexShaderBufferPtr);
                     safe_delete(SimpleShaderProgramPtr);
+                    
                 }
             }
             else
@@ -761,23 +776,23 @@ namespace engine
         {
             float aspect = mWindowWidth / (float)mWindowHeight;
             math::float2 zNearFar(1.0f, 50.0f);
-            math::float4x4* pConstBuffer = (math::float4x4*)MapBuffer(mGfxDeviceContext.Get(), *VertexShaderBufferPtr);
+            math::float4x4* pConstBuffer = (math::float4x4*)MapBuffer(mGfxDeviceDeferredContext.Get(), *VertexShaderBufferPtr);
             pConstBuffer[0] = viewMatrix;
             pConstBuffer[1] = math::perspective_lh_matrix4x4f(math::degree<float>(45), aspect, zNearFar);
-            UnmapBuffer(mGfxDeviceContext.Get(), *VertexShaderBufferPtr);
+            UnmapBuffer(mGfxDeviceDeferredContext.Get(), *VertexShaderBufferPtr);
 
             ID3D11Buffer* VertexBuffer = CubeVertexBufferPtr->mBufferPtr.Get();
             ID3D11Buffer* VertexShaderBuffer = VertexShaderBufferPtr->mBufferPtr.Get();
             UINT Stride = sizeof(VertexLayout);
             UINT Offset = 0;
-            mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            mGfxDeviceContext->IASetVertexBuffers(0, 1, &VertexBuffer, &Stride, &Offset);
-            mGfxDeviceContext->IASetIndexBuffer(CubeIndexBufferPtr->mBufferPtr.Get(), DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
-            mGfxDeviceContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
-            mGfxDeviceContext->VSSetConstantBuffers(0, 1, &VertexShaderBuffer);
-            mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
-            mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
-            mGfxDeviceContext->DrawIndexed(CubeIndexCount, 0, 0);
+            mGfxDeviceDeferredContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            mGfxDeviceDeferredContext->IASetVertexBuffers(0, 1, &VertexBuffer, &Stride, &Offset);
+            mGfxDeviceDeferredContext->IASetIndexBuffer(CubeIndexBufferPtr->mBufferPtr.Get(), DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
+            mGfxDeviceDeferredContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
+            mGfxDeviceDeferredContext->VSSetConstantBuffers(0, 1, &VertexShaderBuffer);
+            mGfxDeviceDeferredContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
+            mGfxDeviceDeferredContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
+            mGfxDeviceDeferredContext->DrawIndexed(CubeIndexCount, 0, 0);
         }
     }
 }
