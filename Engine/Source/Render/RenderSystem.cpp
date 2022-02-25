@@ -501,13 +501,12 @@ const std::string DefaultVertexShaderSourceCode = R"(
     cbuffer scene
     {
         float4x4 MatrixView;
+        float4x4 InvMatrixView;
         float4x4 MatrixProj;
-        float3   CameraPositionWS;
-        float    Padding0;
         float3   LightColor;
-        float    Padding1;
+        float    Padding0;
         float3   LightDirection;
-        float    Padding2;
+        float    Padding1;
     }
     struct VertexLayout
     {
@@ -531,7 +530,9 @@ const std::string DefaultVertexShaderSourceCode = R"(
         float4 ModelNormal   = float4(input.Normal, 0.0f);
         output.Normal        = mul(float4(mul(ModelNormal, MatrixView).xyz, 0.0f), MatrixProj).xyz;
         output.Color         = ModelPosition.xyz + 0.5;
-        output.ViewDirWS     = CameraPositionWS - ModelPosition.xyz;
+
+        float3 CameraPositionWS = InvMatrixView._m03_m13_m23;
+        output.ViewDirWS        = CameraPositionWS - ModelPosition.xyz;
         return output;
     }
 )";
@@ -540,13 +541,12 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
     cbuffer scene
     {
         float4x4 MatrixView;
+        float4x4 InvMatrixView;
         float4x4 MatrixProj;
-        float3   CameraPositionWS;
-        float    Padding0;
         float3   LightColor;
-        float    Padding1;
+        float    Padding0;
         float3   LightDirection;
-        float    Padding2;
+        float    Padding1;
     }
 
     struct VertexOutput
@@ -714,7 +714,7 @@ namespace engine
         math::float3 lightColor = math::float3(1.0f, 1.0f, 1.0f);
         float lightIntensity = 1.0f;
         math::float3 lightDirection = math::float3(1.0f, 0.0f, 0.0f);
-        
+
         GameEngine* Engine = GetEngineInstance();
         Scene* defaultScene = Engine->GetDefaultSceneInternal();
         if (defaultScene != nullptr)
@@ -806,7 +806,7 @@ namespace engine
             CubeIndexBufferPtr = new GfxDefaultIndexBuffer();
             VertexShaderBufferPtr = new GfxDynamicConstBuffer();
             const unsigned int VertexStride = sizeof(VertexLayout);
-            const unsigned int VertexBufferLength = sizeof(math::float4x4) * 2 + sizeof(math::float4) * 3;
+            const unsigned int VertexBufferLength = sizeof(math::float4x4) * 3 + sizeof(math::float4) * 2;
 
             bool vbc = CreateVertexBuffer(mGfxDevice.Get(), *CubeVertexBufferPtr, VertexStride, CubeVertexCount);
             bool ibc = CreateIndexBuffer(mGfxDevice.Get(), *CubeIndexBufferPtr, CubeIndexCount);
@@ -833,7 +833,6 @@ namespace engine
                     safe_delete(CubeIndexBufferPtr);
                     safe_delete(VertexShaderBufferPtr);
                     safe_delete(SimpleShaderProgramPtr);
-
                 }
             }
             else
@@ -860,15 +859,19 @@ namespace engine
                 pConstBuffer[2] = data.ViewMatrix.rows[2];
                 pConstBuffer[3] = data.ViewMatrix.rows[3];
 
-                math::float4x4 projMatrix = math::perspective_lh_matrix4x4f(math::degree<float>(45), aspect, zNearFar);
-                pConstBuffer[4] = projMatrix.rows[0];
-                pConstBuffer[5] = projMatrix.rows[1];
-                pConstBuffer[6] = projMatrix.rows[2];
-                pConstBuffer[7] = projMatrix.rows[3];
+                pConstBuffer[4] = data.InvViewMatrix.rows[0];
+                pConstBuffer[5] = data.InvViewMatrix.rows[1];
+                pConstBuffer[6] = data.InvViewMatrix.rows[2];
+                pConstBuffer[7] = data.InvViewMatrix.rows[3];
 
-                pConstBuffer[8] = math::float4(data.CameraPositionWS, 1.0f);
-                pConstBuffer[9] = math::float4(data.LightColor, 1.0f);
-                pConstBuffer[10] = math::float4(data.LightDirection, 0.0f);
+                math::float4x4 projMatrix = math::perspective_lh_matrix4x4f(math::degree<float>(45), aspect, zNearFar);
+                pConstBuffer[8] = projMatrix.rows[0];
+                pConstBuffer[9] = projMatrix.rows[1];
+                pConstBuffer[10] = projMatrix.rows[2];
+                pConstBuffer[11] = projMatrix.rows[3];
+
+                pConstBuffer[12] = math::float4(data.LightColor, 1.0f);
+                pConstBuffer[13] = math::float4(data.LightDirection, 0.0f);
             }
             UnmapBuffer(mGfxDeviceDeferredContext.Get(), *VertexShaderBufferPtr);
 
