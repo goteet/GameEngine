@@ -16,6 +16,12 @@ set(GameEngine_HeaderFiles_Interface
     ${GameEngine_IncludeDir}/GEInclude.h
 )
 
+set(GameEngine_HeaderFiles_Root
+    ${GameEngine_SourceDir}/PreIncludeFiles.h
+    ${GameEngine_SourceDir}/PreIncludeFilesWindows.h
+    ${GameEngine_SourceDir}/ErrorReport.h
+)
+
 set(GameEngine_SourceFiles_Root
     ${GameEngine_SourceDir}/GameEngineMain.cpp
 )
@@ -47,10 +53,11 @@ set(GameEngine_SourceFiles_Scene
 )
 
 
-set(GameEngine_SourceFiles 
+set(GameEngine_SourceFiles
     ${GameEngine_HeaderFiles_Interface}
+    ${GameEngine_HeaderFiles_Root}
     ${GameEngine_SourceFiles_Root}
-    
+
     ${FoundationBase_SourceFiles}
     ${FoundationMath_SourceFiles}
 
@@ -65,6 +72,7 @@ set(GameEngine_SourceFiles
 source_group("Foundation/Math"              FILES ${FoundationBase_SourceFiles})
 source_group("Foundation/Base"              FILES ${FoundationMath_SourceFiles})
 source_group("Engine/Include"               FILES ${GameEngine_HeaderFiles_Interface})
+source_group("Engine/Source"                FILES ${GameEngine_HeaderFiles_Root})
 source_group("Engine/Source"                FILES ${GameEngine_SourceFiles_Root})
 source_group("Engine/Source/Core/Include"   FILES ${GameEngine_HeaderFiles_Core})
 source_group("Engine/Source/Core/Source"    FILES ${GameEngine_SourceFiles_Core})

@@ -1,10 +1,5 @@
 #pragma once
-//we are using DX11 directly now, may abstract GfxDevice when we are ready.
-#include <Windows.h>
-#include <d3d11_3.h>
-#include <dxgi1_3.h>
-#include <wrl/client.h>
-#include "GEInclude.h"
+#include "PreIncludeFiles.h"
 
 namespace engine
 {

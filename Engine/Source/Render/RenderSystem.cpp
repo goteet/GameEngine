@@ -363,7 +363,7 @@ bool UploadEntireBuffer(ID3D11Device* GfxDevice, ID3D11DeviceContext* GfxDeviceC
     GfxStagingBuffer StagingBuffer(false);
     if (CreateVertexBuffer<GfxStagingBuffer>(GfxDevice, StagingBuffer, sizeof(VertexLayout), CubeVertexCount))
     {
-        VertexLayout* pDataPtr = (VertexLayout* )MapBuffer(GfxDeviceContext, StagingBuffer);
+        VertexLayout* pDataPtr = (VertexLayout*)MapBuffer(GfxDeviceContext, StagingBuffer);
         memcpy(pDataPtr, CubeVertices, Buffer.mBufferDesc.ByteWidth);
         UnmapBuffer(GfxDeviceContext, StagingBuffer);
         GfxDeviceContext->CopyResource(Buffer.mBufferPtr.Get(), StagingBuffer.mBufferPtr.Get());
@@ -420,10 +420,11 @@ VertexShader* CreateVertexShader(ID3D11Device* GfxDevice,
 {
     using context_private_impl::CompileShaderSource;
     const std::string profile = "vs_5_0";
-    ComPtr<ID3DBlob> vsBlob =  CompileShaderSource(source, entry, profile);
+    ComPtr<ID3DBlob> vsBlob = CompileShaderSource(source, entry, profile);
 
     if (vsBlob == nullptr)
     {
+        ASSERT(vsBlob != nullptr);
         return nullptr;
     }
 
@@ -434,8 +435,10 @@ VertexShader* CreateVertexShader(ID3D11Device* GfxDevice,
         vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(),
         NULL,
         &vertexShader);
+
     if (FAILED(rstCreateVertexShader))
     {
+        ASSERT_SUCCEEDED(rstCreateVertexShader);
         return nullptr;
     }
 
@@ -446,6 +449,7 @@ VertexShader* CreateVertexShader(ID3D11Device* GfxDevice,
 
     if (FAILED(rstCreateInputLayout))
     {
+        ASSERT_SUCCEEDED(rstCreateInputLayout);
         return nullptr;
     }
 
@@ -465,6 +469,7 @@ PixelShader* CreatePixelShader(ID3D11Device* GfxDevice,
 
     if (psBlob == nullptr)
     {
+        ASSERT(psBlob != nullptr);
         return nullptr;
     }
 
@@ -476,6 +481,7 @@ PixelShader* CreatePixelShader(ID3D11Device* GfxDevice,
 
     if (FAILED(rstCreatePixelShader))
     {
+        ASSERT_SUCCEEDED(rstCreatePixelShader);
         return nullptr;
     }
 
@@ -489,7 +495,10 @@ ShaderProgram* LinkShader(VertexShader* vertexShader, PixelShader* pixelShader)
     auto vertexShaderImpl = reinterpret_cast<::VertexShader*>(vertexShader);
     auto pixelShaderImpl = reinterpret_cast<::PixelShader*>(pixelShader);
     if (vertexShaderImpl == nullptr || pixelShaderImpl == nullptr)
+    {
+        ASSERT(vertexShaderImpl != nullptr && pixelShaderImpl != nullptr);
         return nullptr;
+    }
 
     ShaderProgram* program = new ShaderProgram();
     program->VertexShader = vertexShaderImpl;
@@ -635,6 +644,7 @@ namespace engine
 
         if (FAILED(resultCreateDevice))
         {
+            ASSERT_SUCCEEDED(resultCreateDevice, "D3D11CreateDevice failed.");
             return EGfxIntializationError::DeviceCreationFail;
         }
 
@@ -664,6 +674,7 @@ namespace engine
         ComPtr<IDXGIFactory2> DXGIFactory = GetDXGIAdapterFromDevice(outD3DDevice);
         if (DXGIFactory == nullptr)
         {
+            ASSERT(DXGIFactory != nullptr);
             return EGfxIntializationError::RetrieveDXGIFactoryFail;
         }
 
@@ -672,6 +683,7 @@ namespace engine
 
         if (FAILED(resultCreateSwapchain))
         {
+            ASSERT_SUCCEEDED(resultCreateSwapchain, "CreateSwapChainForHwnd failed.");
             return EGfxIntializationError::CreateSwapchainFail;
         }
 
@@ -679,19 +691,21 @@ namespace engine
         HRESULT resultGetBackbuffer = outSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &outBackbuffer);
         if (FAILED(resultGetBackbuffer))
         {
+            ASSERT_SUCCEEDED(resultGetBackbuffer);
             return EGfxIntializationError::RetrieveBackbufferFail;
         }
-
 
         HRESULT resultCreateBackbufferRT = outD3DDevice->CreateRenderTargetView(outBackbuffer.Get(), nullptr, &outBackbufferRTV);
         if (FAILED(resultCreateBackbufferRT))
         {
+            ASSERT_SUCCEEDED(resultCreateBackbufferRT);
             return EGfxIntializationError::CreateBackbufferRTVFail;
         }
 
         HRESULT resultCreateDeferredContext = outD3DDevice->CreateDeferredContext(0, &outD3DDeferredContext);
         if (FAILED(resultCreateDeferredContext))
         {
+            ASSERT_SUCCEEDED(resultCreateDeferredContext);
             return EGfxIntializationError::CreateDeferredContextFail;
         }
 
@@ -709,7 +723,7 @@ namespace engine
     {
         ViewConstantBufferData data;
 
-        math::float4x4 viewMatrix = math::scale_matrix4x4f(2,2,2);
+        math::float4x4 viewMatrix = math::scale_matrix4x4f(2, 2, 2);
         math::float3 cameraPositionWS = math::float3(0.0f, 0.0f, -10.0f);
         math::float3 lightColor = math::float3(1.0f, 1.0f, 1.0f);
         float lightIntensity = 1.0f;
