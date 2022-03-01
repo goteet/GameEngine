@@ -113,7 +113,7 @@ namespace math
 
         void set_position(const point<value_type, EDim::_3>& p) { plane<value_type>::set_position(p); }
         void set_normal(const normalized_vector_t<value_type, EDim::_3>& n) { plane<value_type>::set_normal(n); }
-        void set_tangent(const normalized_vector_t<value_type, EDim::_3>& t) { _tangent = normalized(_tangent - dot(_tangent, normal()) * normal()); }
+        void set_tangent(const normalized_vector_t<value_type, EDim::_3>& t) { _tangent = normalized(t - dot(t, normal()) * normal()); }
         void set_width(value_type w) { _extends.x = max2(w, value_type(0)); }
         void set_height(value_type h) { _extends.y = max2(h, value_type(0)); }
         void set_extends(value_type w, value_type h) { set_width(w); set_height(h); }
