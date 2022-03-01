@@ -8,27 +8,30 @@
 template<typename T>
 struct random
 {
+    random() : generator(randomDevice()), distribution(F(0), F(1)) { }
+    T operator()() { return _value(); }
+    T operator()(T range_value) { return _range(range_value); }
     static random<T>& instance() { static random<T> instance; return instance; }
-
-    static T value() { return instance()._value(); }
-
-    static T range(T range_value) { return value() * T(2) * range_value - range_value; }
+    static T value() { return instance()(); }
+    static T range(T range_value) { return instance()(range_value); }
 
 private:
+    T _value() { return distribution(generator); }
+    T _range(T range_value) { return _value() * T(2) * range_value - range_value; }
+
     std::random_device randomDevice;
     std::mt19937 generator;
     std::uniform_real_distribution<F> distribution;
-    random() : generator(randomDevice()), distribution(F(0), F(1)) { }
-    F _value() { return distribution(generator); }
 };
 
 math::vector3<F> GenerateUnitSphereVector()
 {
+    static random<F> rand;
     while (true)
     {
-        F x = random<F>::range(F(1));
-        F y = random<F>::range(F(1));
-        F z = random<F>::range(F(1));
+        F x = rand(F(1));
+        F y = rand(F(1));
+        F z = rand(F(1));
         math::vector3<F> v = math::vector3<F>(x, y, z);
         if (math::magnitude_sqr(v) < F(1))
         {
@@ -60,9 +63,11 @@ struct UVW
 
 math::normalized_vector3<F> GenerateHemisphereDirection(const math::vector3<F>& normal)
 {
-    F cosTheta = F(1) - F(2) * random<F>::value();
+    static random<F> rand_theta;
+    static random<F> rand_phi;
+    F cosTheta = F(1) - F(2) * rand_theta();
     F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
-    math::radian<F> phi(math::TWO_PI<F> *random<F>::value());
+    math::radian<F> phi(math::TWO_PI<F> * rand_phi());
     F cosPhi = math::cos(phi);
     F sinPhi = math::sin(phi);
 
@@ -76,13 +81,15 @@ math::normalized_vector3<F> GenerateHemisphereDirection(const math::vector3<F>& 
 
 math::normalized_vector3<F> GenUniformHemisphereDirection(const math::vector3<F>& normal)
 {
+    static random<F> rand_theta;
+    static random<F> rand_phi;
     // pdf = 1/2PI
     // => cdf = 1/2PI*phi*(1-cos_theta)
     // => f_phi = 1/2PI*phi       --> phi(x) = 2*PI*x
     // => f_theta = 1-cos_theta   --> cos_theta(x) = 1-x = x'
-    F cosTheta = random<F>::value(); //replace 1-e to e'
+    F cosTheta = rand_theta(); //replace 1-e to e'
     F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
-    math::radian<F> phi(math::TWO_PI<F> * random<F>::value());
+    math::radian<F> phi(math::TWO_PI<F> * rand_phi());
     F cosPhi = math::cos(phi);
     F sinPhi = math::sin(phi);
 
@@ -96,11 +103,13 @@ math::normalized_vector3<F> GenUniformHemisphereDirection(const math::vector3<F>
 
 math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F>& normal)
 {
+    static random<F> rand_theta;
+    static random<F> rand_phi;
     // pdf = cos(theta) / Pi.
-    F cosTheta_sqr = random<F>::value(); //replace 1-e to e'
+    F cosTheta_sqr = rand_theta(); //replace 1-e to e'
     F cosTheta = sqrt(cosTheta_sqr);
     F sinTheta = sqrt(F(1) - cosTheta_sqr);
-    math::radian<F> phi(F(2) * math::PI<F> *random<F>::value());
+    math::radian<F> phi(F(2) * math::PI<F> * rand_phi());
     F cosPhi = math::cos(phi);
     F sinPhi = math::sin(phi);
 
