@@ -66,3 +66,8 @@ engine::GameEngine* engine::GetEngineInstance()
 {
     return GE::sGlobalInstance;
 }
+
+engine::RenderSystem* engine::GetRenderSystem()
+{
+    return GetEngineInstance()->GetRenderSystemImpl();
+}

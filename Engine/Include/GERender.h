@@ -122,6 +122,8 @@ namespace GE
         virtual void SetVertexBuffer(GfxVertexBuffer*, unsigned int offset) = 0;
         virtual void SetIndexBuffer(GfxIndexBuffer*, unsigned int offset) = 0;
         virtual void DrawIndexed(unsigned int indexCount, unsigned int startLocation, int indexOffset) = 0;
+
+        virtual void SetRenderingWorldMatrixForTest(const math::float4x4&) = 0;
     };
 
     struct GameEngineAPI GfxDeviceImmediateContext : public GEObject

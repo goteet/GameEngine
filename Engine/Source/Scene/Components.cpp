@@ -116,10 +116,10 @@ namespace engine
         const unsigned int PlaneVertexCount = 4;
         VertexLayout PlaneVertices[PlaneVertexCount] =
         {
-            { math::float4(-2.0f, -0.5f, -2.0f, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
-            { math::float4(-2.0f, -0.5f, +2.0f, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
-            { math::float4(+2.0f, -0.5f, +2.0f, 1), math::normalized_float3::unit_y(),  math::float2(1, 1) },
-            { math::float4(+2.0f, -0.5f, -2.0f, 1), math::normalized_float3::unit_y(),  math::float2(1, 0) },
+            { math::float4(-0.5f, 0.0f, -0.5f, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
+            { math::float4(-0.5f, 0.0f, +0.5f, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
+            { math::float4(+0.5f, 0.0f, +0.5f, 1), math::normalized_float3::unit_y(),  math::float2(1, 1) },
+            { math::float4(+0.5f, 0.0f, -0.5f, 1), math::normalized_float3::unit_y(),  math::float2(1, 0) },
         };
 
         const unsigned int PlaneIndexCount = 6;
@@ -134,6 +134,8 @@ namespace engine
 
     void MeshRenderer::OnRender(GE::GfxDeferredContext* context)
     {
+        const math::float4x4& matrix = GetSceneNode()->GetWorldMatrix();
+        context->SetRenderingWorldMatrixForTest(matrix);
         context->SetVertexBuffer(CubeVertexBufferPtr, 0);
         context->SetIndexBuffer(CubeIndexBufferPtr, 0);
         context->DrawIndexed(cube_geometry_desc::CubeIndexCount, 0, 0);
@@ -156,10 +158,10 @@ namespace engine
             indices = cube_geometry_desc::CubeIndices;
             break;
         case GE::MeshRenderer::EMeshType::Plane:
-            vertexCount = cube_geometry_desc::CubeVertexCount;
-            indexCount = cube_geometry_desc::CubeIndexCount;
-            vertices = cube_geometry_desc::CubeVertices;
-            indices = cube_geometry_desc::CubeIndices;
+            vertexCount = plane_geomoetry_desc::PlaneVertexCount;
+            indexCount = plane_geomoetry_desc::PlaneIndexCount;
+            vertices = plane_geomoetry_desc::PlaneVertices;
+            indices = plane_geomoetry_desc::PlaneIndices;
             break;
         }
 

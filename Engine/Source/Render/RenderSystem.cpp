@@ -191,7 +191,18 @@ ShaderProgram* LinkShader(VertexShader* vertexShader, PixelShader* pixelShader)
     return program;
 }
 
+struct ObjectConstantDesc
+{
+    math::float4x4 MatrixObjectToWorld;
+    math::float4x4 MatrixWorldToObject;
+};
+
 const std::string DefaultVertexShaderSourceCode = R"(
+    cbuffer object
+    {
+        float4x4 MatrixObjectToWorld;
+        float4x4 MatrixWorldToObject;
+    }
     cbuffer scene
     {
         float4x4 MatrixView;
@@ -218,7 +229,7 @@ const std::string DefaultVertexShaderSourceCode = R"(
     VertexOutput VSMain(VertexLayout input)
     {
         VertexOutput output;
-        float4 ModelPosition = float4(input.Position.xyz * 0.5, input.Position.w);
+        float4 ModelPosition = mul(input.Position, MatrixObjectToWorld);
         float4 ViewPosition  = mul(ModelPosition, MatrixView);
         output.Position      = mul(ViewPosition, MatrixProj);
         float4 ModelNormal   = float4(input.Normal, 0.0f);
@@ -271,7 +282,8 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
 
 namespace engine
 {
-    GfxDynamicConstantBuffer* VertexShaderBufferPtr = nullptr;
+    GfxDynamicConstantBuffer* ObjectConstantBufferPtr = nullptr;
+    GfxDynamicConstantBuffer* SceneConstantBufferPtr = nullptr;
     ShaderProgram* SimpleShaderProgramPtr = nullptr;
     ID3D11CommandList* CubeRenderingCommandList = nullptr;
 
@@ -292,7 +304,8 @@ namespace engine
     void safe_release(std::unique_ptr<T>& ptr) { ptr.release(); }
     RenderSystem::~RenderSystem()
     {
-        safe_delete(VertexShaderBufferPtr);
+        safe_delete(ObjectConstantBufferPtr);
+        safe_delete(SceneConstantBufferPtr);
         safe_delete(SimpleShaderProgramPtr);
         SafeRelease(CubeRenderingCommandList);
 
@@ -532,8 +545,11 @@ namespace engine
         static bool initialize_error = false;
         if (!initialize)
         {
-            const unsigned int VertexBufferLength = sizeof(math::float4x4) * 3 + sizeof(math::float4) * 2;
-            VertexShaderBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(VertexBufferLength);
+            const unsigned int SceneConstBufferLength = sizeof(math::float4x4) * 3 + sizeof(math::float4) * 2;
+            SceneConstantBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(SceneConstBufferLength);
+
+            const unsigned int ObjectConstBufferLength = sizeof(ObjectConstantDesc);
+            ObjectConstantBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(ObjectConstBufferLength);
 
             // 创建顶点着色器
             const std::string vsEntryName = "VSMain";
@@ -544,10 +560,11 @@ namespace engine
             auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, SimpleColorPixelShaderSourceCode, psEntryName);
             SimpleShaderProgramPtr = LinkShader(VertexShader, PixelShader);
 
-            if (VertexShaderBufferPtr == nullptr || SimpleShaderProgramPtr == nullptr)
+            if (SceneConstantBufferPtr == nullptr || ObjectConstantBufferPtr == nullptr || SimpleShaderProgramPtr == nullptr)
             {
                 initialize_error = true;
-                safe_delete(VertexShaderBufferPtr);
+                safe_delete(SceneConstantBufferPtr);
+                safe_delete(ObjectConstantBufferPtr);
                 safe_delete(SimpleShaderProgramPtr);
             }
             initialize = true;
@@ -559,7 +576,7 @@ namespace engine
             math::float2 zNearFar(1.0f, 50.0f);
 
             // TODO: Vertex and pixel use same constant buffer here.
-            math::float4* pConstBuffer = mGfxDeviceDeferredContext->MapBuffer<math::float4>(*VertexShaderBufferPtr);
+            math::float4* pConstBuffer = mGfxDeviceDeferredContext->MapBuffer<math::float4>(*SceneConstantBufferPtr);
             {
                 pConstBuffer[0] = data.ViewMatrix.rows[0];
                 pConstBuffer[1] = data.ViewMatrix.rows[1];
@@ -580,18 +597,30 @@ namespace engine
                 pConstBuffer[12] = math::float4(data.LightColor, 1.0f);
                 pConstBuffer[13] = math::float4(data.LightDirection, 0.0f);
             }
-            mGfxDeviceDeferredContext->UnmapBuffer(*VertexShaderBufferPtr);
+            mGfxDeviceDeferredContext->UnmapBuffer(*SceneConstantBufferPtr);
 
             mGfxDeviceDeferredContext->mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             mGfxDeviceDeferredContext->mGfxDeviceContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
             mGfxDeviceDeferredContext->mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
-            mGfxDeviceDeferredContext->SetVSConstantBufferImpl(0, VertexShaderBufferPtr);
+
+            mGfxDeviceDeferredContext->SetVSConstantBufferImpl(1, SceneConstantBufferPtr);
             mGfxDeviceDeferredContext->mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
-            mGfxDeviceDeferredContext->SetPSConstantBufferImpl(0, VertexShaderBufferPtr);
-
-
+            mGfxDeviceDeferredContext->SetPSConstantBufferImpl(0, SceneConstantBufferPtr);
             scene.RecursiveRender(mGfxDeviceDeferredContext.get());
         }
+
+    }
+
+
+    void RenderSystem::SetObjectToWorldMatrixForTest(const math::float4x4& matrix)
+    {
+        ObjectConstantDesc* pConstBuffer = mGfxDeviceDeferredContext->MapBuffer<ObjectConstantDesc>(*ObjectConstantBufferPtr);
+        {
+            pConstBuffer->MatrixObjectToWorld = matrix;
+            pConstBuffer->MatrixWorldToObject = inversed(matrix);
+        }
+        mGfxDeviceDeferredContext->UnmapBuffer(*ObjectConstantBufferPtr);
+        mGfxDeviceDeferredContext->SetVSConstantBufferImpl(0, ObjectConstantBufferPtr);
     }
 }

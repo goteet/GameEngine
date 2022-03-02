@@ -188,7 +188,7 @@ namespace engine
 
     void SceneNode::SetRightDirection(const math::normalized_float3& rightDirection)
     {
-        math::float3 loalScale = GetLocalScale();
+        math::float3 localScale = GetLocalScale();
         math::normalized_float3 forwardDirection = mLocalTransform.column3(2);
         math::normalized_float3 upDirection = mLocalTransform.column3(1);
 
@@ -205,9 +205,9 @@ namespace engine
             upDirection = math::cross(forwardDirection, rightDirection);
         }
 
-        mLocalTransform.set_column3(0, rightDirection * loalScale.x);
-        mLocalTransform.set_column3(1, upDirection * loalScale.y);
-        mLocalTransform.set_column3(2, forwardDirection * loalScale.z);
+        mLocalTransform.set_column3(0, rightDirection * localScale.x);
+        mLocalTransform.set_column3(1, upDirection * localScale.y);
+        mLocalTransform.set_column3(2, forwardDirection * localScale.z);
     }
 
     const math::normalized_float3 SceneNode::GetRightDirection()
@@ -217,7 +217,7 @@ namespace engine
 
     void SceneNode::SetUpDirection(const math::normalized_float3& upDirection)
     {
-        math::float3 loalScale = GetLocalScale();
+        math::float3 localScale = GetLocalScale();
         math::normalized_float3 rightDirection = mLocalTransform.column3(0);
         math::normalized_float3 forwardDirection = mLocalTransform.column3(2);
 
@@ -234,9 +234,9 @@ namespace engine
             rightDirection = math::cross(upDirection, forwardDirection);
         }
 
-        mLocalTransform.set_column3(0, rightDirection * loalScale.x);
-        mLocalTransform.set_column3(1, upDirection * loalScale.y);
-        mLocalTransform.set_column3(2, forwardDirection * loalScale.z);
+        mLocalTransform.set_column3(0, rightDirection * localScale.x);
+        mLocalTransform.set_column3(1, upDirection * localScale.y);
+        mLocalTransform.set_column3(2, forwardDirection * localScale.z);
     }
 
     const math::normalized_float3 SceneNode::GetUpDirection()
@@ -246,7 +246,7 @@ namespace engine
 
     void SceneNode::SetForwardDirection(const math::normalized_float3& forwardDirection)
     {
-        math::float3 loalScale = GetLocalScale();
+        math::float3 localScale = GetLocalScale();
         math::normalized_float3 rightDirection = mLocalTransform.column3(0);
         math::normalized_float3 upDirection = mLocalTransform.column3(1);
 
@@ -263,9 +263,9 @@ namespace engine
             rightDirection = math::cross(upDirection, forwardDirection);
         }
 
-        mLocalTransform.set_column3(0, rightDirection * loalScale.x);
-        mLocalTransform.set_column3(1, upDirection * loalScale.y);
-        mLocalTransform.set_column3(2, forwardDirection * loalScale.z);
+        mLocalTransform.set_column3(0, rightDirection * localScale.x);
+        mLocalTransform.set_column3(1, upDirection * localScale.y);
+        mLocalTransform.set_column3(2, forwardDirection * localScale.z);
     }
 
     const math::normalized_float3 SceneNode::GetForwardDirection()

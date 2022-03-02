@@ -25,10 +25,13 @@ namespace engine
 
         Scene* GetDefaultSceneInternal() { return mDefualtScene.get(); }
 
+        RenderSystem* GetRenderSystemImpl() { return mRenderSystem.get(); }
+
     private:
         std::unique_ptr<engine::RenderSystem> mRenderSystem;
         std::unique_ptr<engine::Scene> mDefualtScene;
     };
 
     GameEngine* GetEngineInstance();
+    RenderSystem* GetRenderSystem();
 }

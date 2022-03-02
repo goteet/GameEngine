@@ -57,30 +57,49 @@ void InitializeSimpleScene()
 {
     g_DefaultScene = g_GameEngine->CreateOrGetDefaultScene();
 
-
     auto nodeCube = g_DefaultScene->CreateSceneNode();
-    GE::MeshRenderer* mesh = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Box);
-    nodeCube->AddComponent(mesh,GE::AutoReleaseComponent);
+    nodeCube->SetLocalScale(math::float3(1.2f, 2, 1.2f));
+    nodeCube->SetRightDirection(math::float3(1, 0, 0.2f));
+    nodeCube->SetLocalPosition(math::point3df(1.0f, -1.2f, 1.25f));
+    GE::MeshRenderer* boxMesh = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Box); nodeCube->AddComponent(boxMesh, GE::AutoReleaseComponent);
 
-    auto nodeLeftWall = g_DefaultScene->CreateSceneNode();
-    auto nodeRightWall = g_DefaultScene->CreateSceneNode();
-    auto nodeBackWall = g_DefaultScene->CreateSceneNode();
-    auto nodeTopWall = g_DefaultScene->CreateSceneNode();
-    auto nodeBottomWall = g_DefaultScene->CreateSceneNode();
+    auto nodeLWall = g_DefaultScene->CreateSceneNode();
+    auto nodeRWall = g_DefaultScene->CreateSceneNode();
+    auto nodeFWall = g_DefaultScene->CreateSceneNode();
+    auto nodeTWall = g_DefaultScene->CreateSceneNode();
+    auto nodeBWall = g_DefaultScene->CreateSceneNode();
 
-    nodeLeftWall->SetForwardDirection(math::normalized_float3::unit_x());
-    nodeRightWall->SetForwardDirection(math::normalized_float3::unit_x_neg());
-    nodeBackWall->SetForwardDirection(math::normalized_float3::unit_y_neg());
-    nodeTopWall->SetForwardDirection(math::normalized_float3::unit_z_neg());
-    nodeBottomWall->SetForwardDirection(math::normalized_float3::unit_z());
+    GE::MeshRenderer* planeMeshL = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeLWall->AddComponent(planeMeshL, GE::AutoReleaseComponent);
+    GE::MeshRenderer* planeMeshR = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeRWall->AddComponent(planeMeshR, GE::AutoReleaseComponent);
+    GE::MeshRenderer* planeMeshF = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeFWall->AddComponent(planeMeshF, GE::AutoReleaseComponent);
+    GE::MeshRenderer* planeMeshT = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeTWall->AddComponent(planeMeshT, GE::AutoReleaseComponent);
+    GE::MeshRenderer* planeMeshB = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeBWall->AddComponent(planeMeshB, GE::AutoReleaseComponent);
+
+    nodeLWall->SetUpDirection(math::normalized_float3::unit_x());
+    nodeRWall->SetUpDirection(math::normalized_float3::unit_x_neg());
+    nodeFWall->SetUpDirection(math::normalized_float3::unit_z_neg());
+    nodeTWall->SetUpDirection(math::normalized_float3::unit_y_neg());
+    nodeBWall->SetUpDirection(math::normalized_float3::unit_y());
+
+    nodeLWall->SetLocalScale(math::float3(5.0f, 5.0f, 5.0f));
+    nodeRWall->SetLocalScale(math::float3(5.0f, 5.0f, 5.0f));
+    nodeFWall->SetLocalScale(math::float3(5.0f, 5.0f, 5.0f));
+    nodeTWall->SetLocalScale(math::float3(5.0f, 5.0f, 5.0f));
+    nodeBWall->SetLocalScale(math::float3(5.0f, 5.0f, 5.0f));
+
+    nodeLWall->SetLocalPosition(math::point3df(-2.5, 0, 0));
+    nodeRWall->SetLocalPosition(math::point3df(+2.5, 0, 0));
+    nodeFWall->SetLocalPosition(math::point3df(0, 0, +2.5));
+    nodeTWall->SetLocalPosition(math::point3df(0, +2.5, 0));
+    nodeBWall->SetLocalPosition(math::point3df(0, -2.5, 0));
 
     GE::Camera* mainCamera = g_DefaultScene->GetDefaultCamera();
-    mainCamera->SetEyePosition(math::point3df(0, 1, -5));
+    mainCamera->SetEyePosition(math::point3df(0, 5, -20));
     mainCamera->Lookat(math::point3df(0, 0, 0));
 
     GE::DirectionalLight* mainLight = g_DefaultScene->CreateDirectionalLightNode();
     mainLight->GetSceneNode()->SetWorldPosition(math::point3df(5.0f, 5.0f, -5.0f));
-    math::normalized_float3 lightDirection(1.0f, -0.8f, 1.0f);
+    math::normalized_float3 lightDirection(0.7f, -0.8f, 1.0f);
     mainLight->GetSceneNode()->SetForwardDirection(lightDirection);
     mainLight->SetIntensity(1.2f);
     mainLight->SetColor(math::float3(0.98f, 0.98f, 0.9f));
@@ -97,7 +116,7 @@ LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE  hPrevInstance,
-    _In_ wchar_t*       lpCmdLine,
+    _In_ wchar_t* lpCmdLine,
     _In_ int            nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);

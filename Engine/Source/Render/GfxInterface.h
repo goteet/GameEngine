@@ -224,5 +224,6 @@ namespace engine
         virtual void SetVertexBuffer(GE::GfxVertexBuffer*, unsigned int offset) override;
         virtual void SetIndexBuffer(GE::GfxIndexBuffer*, unsigned int offset) override;
         virtual void DrawIndexed(unsigned int indexCount, unsigned int startLocation, int indexOffset) override;
+        virtual void SetRenderingWorldMatrixForTest(const math::float4x4&) override;
     };
 }

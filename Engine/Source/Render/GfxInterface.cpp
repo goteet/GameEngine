@@ -1,5 +1,5 @@
 #include "GfxInterface.h"
-
+#include "Core/GameEngine.h"
 
 namespace engine_gfx_impl
 {
@@ -262,6 +262,11 @@ namespace engine
     void GfxDeferredContext::DrawIndexed(unsigned int indexCount, unsigned int startLocation, int indexOffset)
     {
         mGfxDeviceContext->DrawIndexed(indexCount, startLocation, indexOffset);
+    }
+
+    void GfxDeferredContext::SetRenderingWorldMatrixForTest(const math::float4x4& matrix)
+    {
+        GetEngineInstance()->GetRenderSystemImpl()->SetObjectToWorldMatrixForTest(matrix);
     }
 
 }

@@ -39,6 +39,7 @@ namespace engine
         EGfxIntializationError InitializeGfxDevice();
         void RenderFrame(Scene& scene);
         bool OnResizeWindow(void* hWindow, int width, int height);
+        void SetObjectToWorldMatrixForTest(const math::float4x4& matrix);
 
     public:
         struct ViewConstantBufferData
