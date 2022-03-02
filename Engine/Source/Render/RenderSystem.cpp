@@ -41,52 +41,6 @@ D3D11_INPUT_ELEMENT_DESC InputLayout[InputLayoutCount]
     D3D11_INPUT_ELEMENT_DESC{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0}
 };
 
-const unsigned int CubeVertexCount = 24;
-engine::VertexLayout CubeVertices[CubeVertexCount] =
-{
-    { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
-    { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
-    { math::float4(+1, +1, +1, 1), math::normalized_float3::unit_y(),  math::float2(1, 1) },
-    { math::float4(+1, +1, -1, 1), math::normalized_float3::unit_y(),  math::float2(1, 0) },
-
-    { math::float4(-1, -1, +1, 1), math::normalized_float3::unit_y_neg(),  math::float2(0, 0) },
-    { math::float4(-1, -1, -1, 1), math::normalized_float3::unit_y_neg(),  math::float2(0, 1) },
-    { math::float4(+1, -1, -1, 1), math::normalized_float3::unit_y_neg(),  math::float2(1, 1) },
-    { math::float4(+1, -1, +1, 1), math::normalized_float3::unit_y_neg(),  math::float2(1, 0) },
-
-
-    { math::float4(+1, -1, -1, 1), math::normalized_float3::unit_x(),  math::float2(0, 0) },
-    { math::float4(+1, +1, -1, 1), math::normalized_float3::unit_x(),  math::float2(0, 1) },
-    { math::float4(+1, +1, +1, 1), math::normalized_float3::unit_x(),  math::float2(1, 1) },
-    { math::float4(+1, -1, +1, 1), math::normalized_float3::unit_x(),  math::float2(1, 0) },
-
-    { math::float4(-1, -1, +1, 1), math::normalized_float3::unit_x_neg(),  math::float2(0, 0) },
-    { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_x_neg(),  math::float2(0, 1) },
-    { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_x_neg(),  math::float2(1, 1) },
-    { math::float4(-1, -1, -1, 1), math::normalized_float3::unit_x_neg(),  math::float2(1, 0) },
-
-    { math::float4(+1, -1, +1, 1), math::normalized_float3::unit_z(),  math::float2(0, 0) },
-    { math::float4(+1, +1, +1, 1), math::normalized_float3::unit_z(),  math::float2(0, 1) },
-    { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_z(),  math::float2(1, 1) },
-    { math::float4(-1, -1, +1, 1), math::normalized_float3::unit_z(),  math::float2(1, 0) },
-
-    { math::float4(-1, -1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 0) },
-    { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 1) },
-    { math::float4(+1, +1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 1) },
-    { math::float4(+1, -1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 0) }
-};
-
-const unsigned int CubeIndexCount = 36;
-unsigned int CubeIndices[CubeIndexCount] =
-{
-    0, 3, 2, 2, 1, 0,
-    4, 7, 6, 6, 5, 4,
-    8, 11, 10, 10, 9, 8,
-    12, 15, 14, 14, 13, 12,
-    16, 19, 18, 18, 17, 16,
-    20, 23, 22, 22, 21, 20,
-};
-
 namespace context_private_impl
 {
     ComPtr<ID3DBlob> CompileShaderSource(
@@ -355,7 +309,9 @@ namespace engine
         ComPtr<ID3D11DeviceContext> outD3DDeferredContext = nullptr;
         ComPtr<IDXGISwapChain1> outSwapChain = nullptr;
         ComPtr<ID3D11Texture2D> outBackbuffer = nullptr;
+        ComPtr<ID3D11Texture2D> outBackbufferDS = nullptr;
         ComPtr<ID3D11RenderTargetView> outBackbufferRTV = nullptr;
+        ComPtr<ID3D11DepthStencilView> outBackbufferDSV = nullptr;
         D3D_FEATURE_LEVEL outFeatureLevel;
 
         IDXGIAdapter* defualtAdpater = nullptr;
@@ -436,6 +392,33 @@ namespace engine
             return EGfxIntializationError::CreateBackbufferRTVFail;
         }
 
+        D3D11_TEXTURE2D_DESC depthStencilDesc;
+        depthStencilDesc.Width = mClientWidth;
+        depthStencilDesc.Height = mClientHeight;
+        depthStencilDesc.MipLevels = 1;
+        depthStencilDesc.ArraySize = 1;
+        depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        depthStencilDesc.SampleDesc.Count = 1;
+        depthStencilDesc.SampleDesc.Quality = 0;
+        depthStencilDesc.Usage = D3D11_USAGE_DEFAULT;
+        depthStencilDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        depthStencilDesc.CPUAccessFlags = 0;
+        depthStencilDesc.MiscFlags = 0;
+        HRESULT resultCreateDSBuffer = outD3DDevice->CreateTexture2D(&depthStencilDesc, nullptr, &outBackbufferDS);
+        if (FAILED(resultCreateDSBuffer))
+        {
+            ASSERT_SUCCEEDED(resultCreateDSBuffer);
+            return EGfxIntializationError::CreateBackbufferDSFail;
+        }
+
+        HRESULT resultCreateDSV = outD3DDevice->CreateDepthStencilView(outBackbufferDS.Get(), nullptr, &outBackbufferDSV);
+        ASSERT_SUCCEEDED(resultCreateDSV);
+        if (FAILED(resultCreateDSV))
+        {
+            ASSERT_SUCCEEDED(resultCreateDSV);
+            return EGfxIntializationError::CreateBackbufferDSVFail;
+        }
+
         HRESULT resultCreateDeferredContext = outD3DDevice->CreateDeferredContext(0, &outD3DDeferredContext);
         if (FAILED(resultCreateDeferredContext))
         {
@@ -443,12 +426,15 @@ namespace engine
             return EGfxIntializationError::CreateDeferredContextFail;
         }
 
+
         mGfxDevice = std::make_unique<GfxDevice>(outD3DDevice.Detach());
         mGfxDeviceImmediateContext = std::make_unique<GfxImmediateContext>(mGfxDevice.get(), outD3DDeviceImmediateContext.Detach());
         mGfxDeviceDeferredContext = std::make_unique<GfxDeferredContext>(mGfxDevice.get(), outD3DDeferredContext.Detach());
         mGfxSwapChain = outSwapChain;
         mBackbuffer = outBackbuffer;
+        mBackbufferDS = outBackbufferDS;
         mBackbufferRTV = outBackbufferRTV;
+        mBackbufferDSV = outBackbufferDSV;
         return EGfxIntializationError::NoError;
     }
 
@@ -503,8 +489,9 @@ namespace engine
             mGfxDevice->mGfxDevice->CreateRasterizerState(&RasterizerDesc, pRasterState.ReleaseAndGetAddressOf());
             mGfxDeviceDeferredContext->mGfxDeviceContext->RSSetState(pRasterState.Get());
 
-            mGfxDeviceDeferredContext->mGfxDeviceContext->OMSetRenderTargets(1, &RenderTagetView, nullptr);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->OMSetRenderTargets(1, &RenderTagetView, mBackbufferDSV.Get());
             mGfxDeviceDeferredContext->mGfxDeviceContext->ClearRenderTargetView(RenderTagetView, ClearColor);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->ClearDepthStencilView(mBackbufferDSV.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
             D3D11_VIEWPORT Viewport;
             Viewport.TopLeftX = 0.0f;
@@ -516,7 +503,7 @@ namespace engine
 
             mGfxDeviceDeferredContext->mGfxDeviceContext->RSSetViewports(1, &Viewport);
 
-            RenderSimpleBox(scene, data);
+            RenderScene(scene, data);
             mGfxDeviceDeferredContext->mGfxDeviceContext->FinishCommandList(false, &CubeRenderingCommandList);
         }
         mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(CubeRenderingCommandList, false);
@@ -539,7 +526,7 @@ namespace engine
         return false;
     }
 
-    void RenderSystem::RenderSimpleBox(Scene& scene, const ViewConstantBufferData& data)
+    void RenderSystem::RenderScene(Scene& scene, const ViewConstantBufferData& data)
     {
         static bool initialize = false;
         static bool initialize_error = false;

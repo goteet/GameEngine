@@ -41,6 +41,26 @@ namespace GE
     //
     //    virtual void Release() = 0;
     //};
+
+
+    struct GameEngineAPI Mesh : public GEObject
+    {
+        static Mesh* CreateMesh();
+        virtual void SetVertices(math::float3* vertices, uint32_t count) = 0;
+        virtual const math::float3* GetVertices() const = 0;
+        virtual size_t GetVerticesCount() const = 0;
+        virtual void SetIndices(uint32_t* indices, uint32_t count) = 0;
+        virtual const uint32_t* GetIndices() const = 0;
+        virtual size_t GetIndicesCount() const = 0;
+        virtual void SetNormals(math::float3* normals, uint32_t count) = 0;
+        virtual const math::float3* GetNormals() const = 0;
+        virtual size_t GetNormalsCount() const = 0;
+        virtual void SetUVs(uint32_t uvindex, math::float2* uvs, uint32_t count) = 0;
+        virtual const math::float2* GetUVs(uint32_t uvindex) const = 0;
+        virtual size_t GetUVsCount(uint32_t uvindex) const = 0;
+        virtual void Release() = 0;
+    };
+
     //
     //struct GameEngineAPI Texture : public GEObject
     //{

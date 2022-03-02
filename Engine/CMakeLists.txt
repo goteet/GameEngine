@@ -36,10 +36,12 @@ set(GameEngine_SourceFiles_Core
 
 set(GameEngine_HeaderFiles_Render
     ${GameEngine_SourceDir_Render}/GfxInterface.h
+    ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.h
 )
 set(GameEngine_SourceFiles_Render
     ${GameEngine_SourceDir_Render}/GfxInterface.cpp
+    ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.cpp
 )
 

@@ -66,38 +66,37 @@ namespace engine
     namespace cube_geometry_desc
     {
         const unsigned int CubeVertexCount = 24;
-        engine::VertexLayout CubeVertices[CubeVertexCount] =
+        VertexLayout CubeVertices[CubeVertexCount] =
         {
-            { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
-            { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
-            { math::float4(+1, +1, +1, 1), math::normalized_float3::unit_y(),  math::float2(1, 1) },
-            { math::float4(+1, +1, -1, 1), math::normalized_float3::unit_y(),  math::float2(1, 0) },
+            { math::float4(-0.5f, +0.5f, -0.5f, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
+            { math::float4(-0.5f, +0.5f, +0.5f, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
+            { math::float4(+0.5f, +0.5f, +0.5f, 1), math::normalized_float3::unit_y(),  math::float2(1, 1) },
+            { math::float4(+0.5f, +0.5f, -0.5f, 1), math::normalized_float3::unit_y(),  math::float2(1, 0) },
 
-            { math::float4(-1, -1, +1, 1), math::normalized_float3::unit_y_neg(),  math::float2(0, 0) },
-            { math::float4(-1, -1, -1, 1), math::normalized_float3::unit_y_neg(),  math::float2(0, 1) },
-            { math::float4(+1, -1, -1, 1), math::normalized_float3::unit_y_neg(),  math::float2(1, 1) },
-            { math::float4(+1, -1, +1, 1), math::normalized_float3::unit_y_neg(),  math::float2(1, 0) },
+            { math::float4(-0.5f, -0.5f, +0.5f, 1), math::normalized_float3::unit_y_neg(),  math::float2(0, 0) },
+            { math::float4(-0.5f, -0.5f, -0.5f, 1), math::normalized_float3::unit_y_neg(),  math::float2(0, 1) },
+            { math::float4(+0.5f, -0.5f, -0.5f, 1), math::normalized_float3::unit_y_neg(),  math::float2(1, 1) },
+            { math::float4(+0.5f, -0.5f, +0.5f, 1), math::normalized_float3::unit_y_neg(),  math::float2(1, 0) },
 
+            { math::float4(+0.5f, -0.5f, -0.5f, 1), math::normalized_float3::unit_x(),  math::float2(0, 0) },
+            { math::float4(+0.5f, +0.5f, -0.5f, 1), math::normalized_float3::unit_x(),  math::float2(0, 1) },
+            { math::float4(+0.5f, +0.5f, +0.5f, 1), math::normalized_float3::unit_x(),  math::float2(1, 1) },
+            { math::float4(+0.5f, -0.5f, +0.5f, 1), math::normalized_float3::unit_x(),  math::float2(1, 0) },
 
-            { math::float4(+1, -1, -1, 1), math::normalized_float3::unit_x(),  math::float2(0, 0) },
-            { math::float4(+1, +1, -1, 1), math::normalized_float3::unit_x(),  math::float2(0, 1) },
-            { math::float4(+1, +1, +1, 1), math::normalized_float3::unit_x(),  math::float2(1, 1) },
-            { math::float4(+1, -1, +1, 1), math::normalized_float3::unit_x(),  math::float2(1, 0) },
+            { math::float4(-0.5f, -0.5f, +0.5f, 1), math::normalized_float3::unit_x_neg(),  math::float2(0, 0) },
+            { math::float4(-0.5f, +0.5f, +0.5f, 1), math::normalized_float3::unit_x_neg(),  math::float2(0, 1) },
+            { math::float4(-0.5f, +0.5f, -0.5f, 1), math::normalized_float3::unit_x_neg(),  math::float2(1, 1) },
+            { math::float4(-0.5f, -0.5f, -0.5f, 1), math::normalized_float3::unit_x_neg(),  math::float2(1, 0) },
 
-            { math::float4(-1, -1, +1, 1), math::normalized_float3::unit_x_neg(),  math::float2(0, 0) },
-            { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_x_neg(),  math::float2(0, 1) },
-            { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_x_neg(),  math::float2(1, 1) },
-            { math::float4(-1, -1, -1, 1), math::normalized_float3::unit_x_neg(),  math::float2(1, 0) },
+            { math::float4(+0.5f, -0.5f, +0.5f, 1), math::normalized_float3::unit_z(),  math::float2(0, 0) },
+            { math::float4(+0.5f, +0.5f, +0.5f, 1), math::normalized_float3::unit_z(),  math::float2(0, 1) },
+            { math::float4(-0.5f, +0.5f, +0.5f, 1), math::normalized_float3::unit_z(),  math::float2(1, 1) },
+            { math::float4(-0.5f, -0.5f, +0.5f, 1), math::normalized_float3::unit_z(),  math::float2(1, 0) },
 
-            { math::float4(+1, -1, +1, 1), math::normalized_float3::unit_z(),  math::float2(0, 0) },
-            { math::float4(+1, +1, +1, 1), math::normalized_float3::unit_z(),  math::float2(0, 1) },
-            { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_z(),  math::float2(1, 1) },
-            { math::float4(-1, -1, +1, 1), math::normalized_float3::unit_z(),  math::float2(1, 0) },
-
-            { math::float4(-1, -1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 0) },
-            { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 1) },
-            { math::float4(+1, +1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 1) },
-            { math::float4(+1, -1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 0) }
+            { math::float4(-0.5f, -0.5f, -0.5f, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 0) },
+            { math::float4(-0.5f, +0.5f, -0.5f, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 1) },
+            { math::float4(+0.5f, +0.5f, -0.5f, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 1) },
+            { math::float4(+0.5f, -0.5f, -0.5f, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 0) }
         };
 
         const unsigned int CubeIndexCount = 36;
@@ -110,6 +109,21 @@ namespace engine
             16, 19, 18, 18, 17, 16,
             20, 23, 22, 22, 21, 20,
         };
+    }
+
+    namespace plane_geomoetry_desc
+    {
+        const unsigned int PlaneVertexCount = 4;
+        VertexLayout PlaneVertices[PlaneVertexCount] =
+        {
+            { math::float4(-2.0f, -0.5f, -2.0f, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
+            { math::float4(-2.0f, -0.5f, +2.0f, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
+            { math::float4(+2.0f, -0.5f, +2.0f, 1), math::normalized_float3::unit_y(),  math::float2(1, 1) },
+            { math::float4(+2.0f, -0.5f, -2.0f, 1), math::normalized_float3::unit_y(),  math::float2(1, 0) },
+        };
+
+        const unsigned int PlaneIndexCount = 6;
+        unsigned int PlaneIndices[PlaneIndexCount] = { 0, 3, 2, 2, 1, 0 };
     }
 
     MeshRenderer::~MeshRenderer()
@@ -127,11 +141,34 @@ namespace engine
 
     bool MeshRenderer::IntializeGeometryHWResource(GE::MeshRenderer::EMeshType type)
     {
+        int vertexCount = 0;
+        int indexCount = 0;
+        VertexLayout* vertices = nullptr;
+        unsigned int* indices = nullptr;
+        switch (type)
+        {
+        default:
+            return false;
+        case GE::MeshRenderer::EMeshType::Box:
+            vertexCount = cube_geometry_desc::CubeVertexCount;
+            indexCount = cube_geometry_desc::CubeIndexCount;
+            vertices = cube_geometry_desc::CubeVertices;
+            indices = cube_geometry_desc::CubeIndices;
+            break;
+        case GE::MeshRenderer::EMeshType::Plane:
+            vertexCount = cube_geometry_desc::CubeVertexCount;
+            indexCount = cube_geometry_desc::CubeIndexCount;
+            vertices = cube_geometry_desc::CubeVertices;
+            indices = cube_geometry_desc::CubeIndices;
+            break;
+        }
+
+
         GE::RenderSystem* renderSystem = GetEngineInstance()->GetRenderSystem();
         GE::GfxDevice* devicePtr = renderSystem->GetGfxDevice();
         GE::GfxDeviceImmediateContext* contextPtr = renderSystem->GetGfxDeviceImmediateContext();
-        CubeVertexBufferPtr = devicePtr->CreateDefaultVertexBuffer(cube_geometry_desc::CubeVertexCount);
-        CubeIndexBufferPtr = devicePtr->CreateDefaultIndexBuffer(cube_geometry_desc::CubeIndexCount);
+        CubeVertexBufferPtr = devicePtr->CreateDefaultVertexBuffer(vertexCount);
+        CubeIndexBufferPtr = devicePtr->CreateDefaultIndexBuffer(indexCount);
         if (CubeVertexBufferPtr == nullptr || CubeIndexBufferPtr == nullptr)
         {
             SafeRelease(CubeVertexBufferPtr);
@@ -139,8 +176,8 @@ namespace engine
             return false;
         }
         //upload cube vertex data to gfx vertex buffer.
-        contextPtr->UploadEntireBufferFromStagingMemory(CubeVertexBufferPtr, cube_geometry_desc::CubeVertices);
-        contextPtr->UploadEntireBufferFromMemory(CubeIndexBufferPtr, cube_geometry_desc::CubeIndices);
+        contextPtr->UploadEntireBufferFromStagingMemory(CubeVertexBufferPtr, vertices);
+        contextPtr->UploadEntireBufferFromMemory(CubeIndexBufferPtr, indices);
         return true;
     }
 }

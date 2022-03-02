@@ -13,7 +13,9 @@ namespace engine
         NoError = 0,
         DeviceCreationFail,
         CreateSwapchainFail,
+        CreateBackbufferDSFail,
         CreateBackbufferRTVFail,
+        CreateBackbufferDSVFail,
         CreateDeferredContextFail,
         RetrieveDXGIFactoryFail,
         RetrieveBackbufferFail,
@@ -49,7 +51,7 @@ namespace engine
         };
 
     private:
-        void RenderSimpleBox(Scene& scene, const ViewConstantBufferData& data);
+        void RenderScene(Scene& scene, const ViewConstantBufferData& data);
 
         HWND mMainWindowHandle;
         bool mIsFullScreen = false;
@@ -62,6 +64,8 @@ namespace engine
         std::unique_ptr<GfxDeferredContext> mGfxDeviceDeferredContext = nullptr;
         ComPtr<IDXGISwapChain1> mGfxSwapChain = nullptr;
         ComPtr<ID3D11Texture2D> mBackbuffer = nullptr;
+        ComPtr<ID3D11Texture2D> mBackbufferDS = nullptr;
         ComPtr<ID3D11RenderTargetView> mBackbufferRTV = nullptr;
+        ComPtr<ID3D11DepthStencilView> mBackbufferDSV = nullptr;
     };
 }
