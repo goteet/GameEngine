@@ -6,6 +6,8 @@ namespace engine
 {
     class Camera;
     class DirectionalLight;
+    class GfxDeferredContext;
+
     class Scene : public GE::Scene
     {
     public:
@@ -25,7 +27,8 @@ namespace engine
 
         Scene();
 
-        void UpdateAndRender(unsigned int elapsedMilliseconds);
+        void RecursiveUpdate(unsigned int elapsedMilliseconds);
+        void RecursiveRender(GfxDeferredContext* context);
 
         Camera* GetDefaultCameraInternal();
 

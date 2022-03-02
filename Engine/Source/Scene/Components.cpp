@@ -1,4 +1,6 @@
 #include "Components.h"
+#include "Render/GfxInterface.h"
+#include "Core/GameEngine.h"
 
 namespace engine
 {
@@ -59,4 +61,97 @@ namespace engine
     {
         mIntensity = intensity;
     }
+
+
+    namespace cube_geometry_desc
+    {
+        const unsigned int CubeVertexCount = 24;
+        engine::VertexLayout CubeVertices[CubeVertexCount] =
+        {
+            { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
+            { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
+            { math::float4(+1, +1, +1, 1), math::normalized_float3::unit_y(),  math::float2(1, 1) },
+            { math::float4(+1, +1, -1, 1), math::normalized_float3::unit_y(),  math::float2(1, 0) },
+
+            { math::float4(-1, -1, +1, 1), math::normalized_float3::unit_y_neg(),  math::float2(0, 0) },
+            { math::float4(-1, -1, -1, 1), math::normalized_float3::unit_y_neg(),  math::float2(0, 1) },
+            { math::float4(+1, -1, -1, 1), math::normalized_float3::unit_y_neg(),  math::float2(1, 1) },
+            { math::float4(+1, -1, +1, 1), math::normalized_float3::unit_y_neg(),  math::float2(1, 0) },
+
+
+            { math::float4(+1, -1, -1, 1), math::normalized_float3::unit_x(),  math::float2(0, 0) },
+            { math::float4(+1, +1, -1, 1), math::normalized_float3::unit_x(),  math::float2(0, 1) },
+            { math::float4(+1, +1, +1, 1), math::normalized_float3::unit_x(),  math::float2(1, 1) },
+            { math::float4(+1, -1, +1, 1), math::normalized_float3::unit_x(),  math::float2(1, 0) },
+
+            { math::float4(-1, -1, +1, 1), math::normalized_float3::unit_x_neg(),  math::float2(0, 0) },
+            { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_x_neg(),  math::float2(0, 1) },
+            { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_x_neg(),  math::float2(1, 1) },
+            { math::float4(-1, -1, -1, 1), math::normalized_float3::unit_x_neg(),  math::float2(1, 0) },
+
+            { math::float4(+1, -1, +1, 1), math::normalized_float3::unit_z(),  math::float2(0, 0) },
+            { math::float4(+1, +1, +1, 1), math::normalized_float3::unit_z(),  math::float2(0, 1) },
+            { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_z(),  math::float2(1, 1) },
+            { math::float4(-1, -1, +1, 1), math::normalized_float3::unit_z(),  math::float2(1, 0) },
+
+            { math::float4(-1, -1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 0) },
+            { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 1) },
+            { math::float4(+1, +1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 1) },
+            { math::float4(+1, -1, -1, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 0) }
+        };
+
+        const unsigned int CubeIndexCount = 36;
+        unsigned int CubeIndices[CubeIndexCount] =
+        {
+            0, 3, 2, 2, 1, 0,
+            4, 7, 6, 6, 5, 4,
+            8, 11, 10, 10, 9, 8,
+            12, 15, 14, 14, 13, 12,
+            16, 19, 18, 18, 17, 16,
+            20, 23, 22, 22, 21, 20,
+        };
+    }
+
+    MeshRenderer::~MeshRenderer()
+    {
+        SafeRelease(CubeVertexBufferPtr);
+        SafeRelease(CubeIndexBufferPtr);
+    }
+
+    void MeshRenderer::OnRender(GE::GfxDeferredContext* context)
+    {
+        context->SetVertexBuffer(CubeVertexBufferPtr, 0);
+        context->SetIndexBuffer(CubeIndexBufferPtr, 0);
+        context->DrawIndexed(cube_geometry_desc::CubeIndexCount, 0, 0);
+    }
+
+    bool MeshRenderer::IntializeGeometryHWResource(GE::MeshRenderer::EMeshType type)
+    {
+        GE::RenderSystem* renderSystem = GetEngineInstance()->GetRenderSystem();
+        GE::GfxDevice* devicePtr = renderSystem->GetGfxDevice();
+        GE::GfxDeviceImmediateContext* contextPtr = renderSystem->GetGfxDeviceImmediateContext();
+        CubeVertexBufferPtr = devicePtr->CreateDefaultVertexBuffer(cube_geometry_desc::CubeVertexCount);
+        CubeIndexBufferPtr = devicePtr->CreateDefaultIndexBuffer(cube_geometry_desc::CubeIndexCount);
+        if (CubeVertexBufferPtr == nullptr || CubeIndexBufferPtr == nullptr)
+        {
+            SafeRelease(CubeVertexBufferPtr);
+            SafeRelease(CubeIndexBufferPtr);
+            return false;
+        }
+        //upload cube vertex data to gfx vertex buffer.
+        contextPtr->UploadEntireBufferFromStagingMemory(CubeVertexBufferPtr, cube_geometry_desc::CubeVertices);
+        contextPtr->UploadEntireBufferFromMemory(CubeIndexBufferPtr, cube_geometry_desc::CubeIndices);
+        return true;
+    }
+}
+
+
+GE::MeshRenderer* GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType type)
+{
+    engine::MeshRenderer* renderer = new engine::MeshRenderer();
+    if (!renderer->IntializeGeometryHWResource(type))
+    {
+        safe_delete(renderer);
+    }
+    return renderer;
 }

@@ -24,6 +24,8 @@ namespace engine
     public:
         DefineRTTI;
 
+        virtual GE::GfxDevice* GetGfxDevice() override { return mGfxDevice.get(); }
+        virtual GE::GfxDeviceImmediateContext* GetGfxDeviceImmediateContext() override { return mGfxDeviceImmediateContext.get(); }
         virtual unsigned int GetWindowWidth() const override { return mWindowWidth; }
         virtual unsigned int GetWindowHeight() const override { return mWindowHeight; }
         virtual math::point3d<float> ScreenToView(const math::point3d<int>& screen) const override { return math::point3d<float>::zero(); }
@@ -47,7 +49,7 @@ namespace engine
         };
 
     private:
-        void RenderSimpleBox(const ViewConstantBufferData& data);
+        void RenderSimpleBox(Scene& scene, const ViewConstantBufferData& data);
 
         HWND mMainWindowHandle;
         bool mIsFullScreen = false;
@@ -57,7 +59,7 @@ namespace engine
         int mClientHeight = 0;
         std::unique_ptr<GfxDevice> mGfxDevice = nullptr;
         std::unique_ptr<GfxImmediateContext> mGfxDeviceImmediateContext = nullptr;
-        std::unique_ptr<GfxDeviceContext> mGfxDeviceDeferredContext = nullptr;
+        std::unique_ptr<GfxDeferredContext> mGfxDeviceDeferredContext = nullptr;
         ComPtr<IDXGISwapChain1> mGfxSwapChain = nullptr;
         ComPtr<ID3D11Texture2D> mBackbuffer = nullptr;
         ComPtr<ID3D11RenderTargetView> mBackbufferRTV = nullptr;

@@ -317,10 +317,7 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
 
 namespace engine
 {
-
     GfxDynamicConstantBuffer* VertexShaderBufferPtr = nullptr;
-    GfxDefaultVertexBuffer* CubeVertexBufferPtr = nullptr;
-    GfxDefaultIndexBuffer* CubeIndexBufferPtr = nullptr;
     ShaderProgram* SimpleShaderProgramPtr = nullptr;
     ID3D11CommandList* CubeRenderingCommandList = nullptr;
 
@@ -338,11 +335,9 @@ namespace engine
 
 
     template<typename T>
-    void safe_release(std::unique_ptr<T>& ptr){ ptr.release(); }
+    void safe_release(std::unique_ptr<T>& ptr) { ptr.release(); }
     RenderSystem::~RenderSystem()
     {
-        safe_delete(CubeVertexBufferPtr);
-        safe_delete(CubeIndexBufferPtr);
         safe_delete(VertexShaderBufferPtr);
         safe_delete(SimpleShaderProgramPtr);
         SafeRelease(CubeRenderingCommandList);
@@ -450,7 +445,7 @@ namespace engine
 
         mGfxDevice = std::make_unique<GfxDevice>(outD3DDevice.Detach());
         mGfxDeviceImmediateContext = std::make_unique<GfxImmediateContext>(mGfxDevice.get(), outD3DDeviceImmediateContext.Detach());
-        mGfxDeviceDeferredContext = std::make_unique<GfxDeviceContext>(mGfxDevice.get(), outD3DDeferredContext.Detach());
+        mGfxDeviceDeferredContext = std::make_unique<GfxDeferredContext>(mGfxDevice.get(), outD3DDeferredContext.Detach());
         mGfxSwapChain = outSwapChain;
         mBackbuffer = outBackbuffer;
         mBackbufferRTV = outBackbufferRTV;
@@ -521,7 +516,7 @@ namespace engine
 
             mGfxDeviceDeferredContext->mGfxDeviceContext->RSSetViewports(1, &Viewport);
 
-            RenderSimpleBox(data);
+            RenderSimpleBox(scene, data);
             mGfxDeviceDeferredContext->mGfxDeviceContext->FinishCommandList(false, &CubeRenderingCommandList);
         }
         mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(CubeRenderingCommandList, false);
@@ -544,16 +539,13 @@ namespace engine
         return false;
     }
 
-    void RenderSystem::RenderSimpleBox(const ViewConstantBufferData& data)
+    void RenderSystem::RenderSimpleBox(Scene& scene, const ViewConstantBufferData& data)
     {
         static bool initialize = false;
         static bool initialize_error = false;
         if (!initialize)
         {
             const unsigned int VertexBufferLength = sizeof(math::float4x4) * 3 + sizeof(math::float4) * 2;
-
-            CubeVertexBufferPtr = mGfxDevice->CreateDefaultVertexBuffer(CubeVertexCount);
-            CubeIndexBufferPtr = mGfxDevice->CreateDefaultIndexBuffer(CubeIndexCount);
             VertexShaderBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(VertexBufferLength);
 
             // 创建顶点着色器
@@ -565,24 +557,9 @@ namespace engine
             auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, SimpleColorPixelShaderSourceCode, psEntryName);
             SimpleShaderProgramPtr = LinkShader(VertexShader, PixelShader);
 
-            if (CubeVertexBufferPtr != nullptr && CubeIndexBufferPtr != nullptr && VertexShaderBufferPtr != nullptr && SimpleShaderProgramPtr)
-            {
-                //upload cube vertex data to gfx vertex buffer.
-                if (!mGfxDeviceImmediateContext->UploadBufferFromStagingMemory(CubeVertexBufferPtr, CubeVertices, sizeof(VertexLayout) * CubeVertexCount)
-                    || !mGfxDeviceImmediateContext->UploadEntireBufferFromMemory(CubeIndexBufferPtr, CubeIndices, sizeof(int) * CubeIndexCount))
-                {
-                    initialize_error = true;
-                    safe_delete(CubeVertexBufferPtr);
-                    safe_delete(CubeIndexBufferPtr);
-                    safe_delete(VertexShaderBufferPtr);
-                    safe_delete(SimpleShaderProgramPtr);
-                }
-            }
-            else
+            if (VertexShaderBufferPtr == nullptr || SimpleShaderProgramPtr == nullptr)
             {
                 initialize_error = true;
-                safe_delete(CubeVertexBufferPtr);
-                safe_delete(CubeIndexBufferPtr);
                 safe_delete(VertexShaderBufferPtr);
                 safe_delete(SimpleShaderProgramPtr);
             }
@@ -619,14 +596,15 @@ namespace engine
             mGfxDeviceDeferredContext->UnmapBuffer(*VertexShaderBufferPtr);
 
             mGfxDeviceDeferredContext->mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            mGfxDeviceDeferredContext->SetVertexBuffer(CubeVertexBufferPtr, 0);
-            mGfxDeviceDeferredContext->SetIndexBuffer(CubeIndexBufferPtr, 0);
+
             mGfxDeviceDeferredContext->mGfxDeviceContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
             mGfxDeviceDeferredContext->mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
             mGfxDeviceDeferredContext->SetVSConstantBufferImpl(0, VertexShaderBufferPtr);
             mGfxDeviceDeferredContext->mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
             mGfxDeviceDeferredContext->SetPSConstantBufferImpl(0, VertexShaderBufferPtr);
-            mGfxDeviceDeferredContext->mGfxDeviceContext->DrawIndexed(CubeIndexCount, 0, 0);
+
+
+            scene.RecursiveRender(mGfxDeviceDeferredContext.get());
         }
     }
 }

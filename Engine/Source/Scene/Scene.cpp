@@ -78,10 +78,14 @@ namespace engine
         InitializeDefaultNodes();
     }
 
-    void Scene::UpdateAndRender(unsigned int elapsedMilliseconds)
+    void Scene::RecursiveUpdate(unsigned int elapsedMilliseconds)
     {
         mRoot.RecursiveUpdate(elapsedMilliseconds);
-        mRoot.RecursiveRender();
+    }
+
+    void Scene::RecursiveRender(GfxDeferredContext* context)
+    {
+        mRoot.RecursiveRender(context);
     }
 
     Camera* Scene::GetDefaultCameraInternal()

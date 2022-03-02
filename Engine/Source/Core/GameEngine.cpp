@@ -21,7 +21,7 @@ namespace engine
 
     void GameEngine::Update(unsigned int deltaMillisec)
     {
-        mDefualtScene->UpdateAndRender(deltaMillisec);
+        mDefualtScene->RecursiveUpdate(deltaMillisec);
         mRenderSystem->RenderFrame(*mDefualtScene);
     }
 

@@ -81,32 +81,39 @@ namespace GE
     //    //virtual Material* Clone() const = 0;
     //};
 
-    struct GfxBaseBuffer : public GEObject
+    struct GfxBuffer : public GEObject
     {
+        virtual void Release() = 0;
+    };
+    struct GfxVertexBuffer : public GfxBuffer {};
+    struct GfxIndexBuffer : public GfxBuffer {};
 
+    struct GfxDefaultVertexBuffer : public GfxVertexBuffer{};
+    struct GfxDefaultIndexBuffer : public GfxIndexBuffer{};
+
+    struct GameEngineAPI GfxDevice : public GEObject
+    {
+        virtual GfxDefaultVertexBuffer* CreateDefaultVertexBuffer(unsigned int vertexCount) = 0;
+        virtual GfxDefaultIndexBuffer* CreateDefaultIndexBuffer(unsigned int indexCount) = 0;
     };
 
-    struct GfxVertexBuffer : public GfxBaseBuffer
-    {
-
-    };
-
-    struct GfxIndexBuffer : public GfxBaseBuffer
-    {
-
-    };
-
-    struct GameEngineAPI GfxDeviceContext : public GEObject
+    struct GameEngineAPI GfxDeferredContext : public GEObject
     {
         virtual void SetVertexBuffer(GfxVertexBuffer*, unsigned int offset) = 0;
         virtual void SetIndexBuffer(GfxIndexBuffer*, unsigned int offset) = 0;
+        virtual void DrawIndexed(unsigned int indexCount, unsigned int startLocation, int indexOffset) = 0;
+    };
+
+    struct GameEngineAPI GfxDeviceImmediateContext : public GEObject
+    {
+        virtual void UploadEntireBufferFromStagingMemory(GfxBuffer*, const void* data) = 0;
+        virtual void UploadEntireBufferFromMemory(GfxBuffer*, const void* data) = 0;
     };
 
     struct GameEngineAPI RenderSystem : public GEObject
     {
-        //virtual void BeginRender() = 0;
-        //virtual void EndRender() = 0;
-        //virtual void RenderMesh(Mesh* mesh, Material* material, const math::float4x4& worldMatrix) = 0;
+        virtual GfxDevice* GetGfxDevice() = 0;
+        virtual GfxDeviceImmediateContext* GetGfxDeviceImmediateContext() = 0;
         virtual unsigned int GetWindowWidth() const = 0;
         virtual unsigned int GetWindowHeight() const = 0;
         virtual math::point3d<float> ScreenToView(const math::point3d<int>& screen) const = 0;

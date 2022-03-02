@@ -13,11 +13,11 @@ namespace engine
         math::float2 Texcoord;
     };
 
-    struct GfxBaseBuffer
+    struct GfxBuffer
     {
-        virtual ~GfxBaseBuffer() = default;
+        virtual ~GfxBuffer() = default;
 
-        GfxBaseBuffer()
+        GfxBuffer()
         {
             //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_usage
             // Use Default/Immutable/Dynamic,
@@ -45,7 +45,7 @@ namespace engine
         unsigned int GetBufferLength() const { return mBufferDesc.ByteWidth; }
     };
 
-    struct GfxImmutableBuffer : public GfxBaseBuffer
+    struct GfxImmutableBuffer : public GfxBuffer
     {
         GfxImmutableBuffer()
         {
@@ -54,7 +54,7 @@ namespace engine
         }
     };
 
-    struct GfxDynamicBuffer : public GfxBaseBuffer
+    struct GfxDynamicBuffer : public GfxBuffer
     {
         GfxDynamicBuffer()
         {
@@ -64,7 +64,7 @@ namespace engine
         }
     };
 
-    struct GfxStagingBuffer : GfxBaseBuffer
+    struct GfxStagingBuffer : GfxBuffer
     {
         GfxStagingBuffer(bool CPURead, bool CPUWrite = true)
         {
@@ -78,13 +78,13 @@ namespace engine
         }
     };
 
-    struct GfxBaseVertexBuffer : public GE::GfxVertexBuffer
+    struct GfxBaseVertexBuffer
     {
         virtual ID3D11Buffer* GetBufferPtr() = 0;
         virtual unsigned int GetVertexStride() { return sizeof(VertexLayout); }
     };
 
-    struct GfxDefaultVertexBuffer : public GfxBaseBuffer, public GfxBaseVertexBuffer
+    struct GfxDefaultVertexBuffer : public GfxBuffer, public GfxBaseVertexBuffer, public GE::GfxDefaultVertexBuffer
     {
         DefineRTTI;
 
@@ -93,12 +93,11 @@ namespace engine
             mBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
         }
         virtual ID3D11Buffer* GetBufferPtr() override { return mBufferPtr.Get(); }
+        virtual void Release() override { delete this; }
     };
 
     struct GfxImmutableVertexBuffer : public GfxImmutableBuffer, GfxBaseVertexBuffer
     {
-        DefineRTTI;
-
         GfxImmutableVertexBuffer()
         {
             mBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
@@ -108,8 +107,6 @@ namespace engine
 
     struct GfxDynamicVertexBuffer : public GfxDynamicBuffer, public GfxBaseVertexBuffer
     {
-        DefineRTTI;
-
         GfxDynamicVertexBuffer()
         {
             mBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
@@ -117,14 +114,14 @@ namespace engine
         virtual ID3D11Buffer* GetBufferPtr() override { return mBufferPtr.Get(); }
     };
 
-    struct GfxBaseIndexBuffer : public GE::GfxIndexBuffer
+    struct GfxBaseIndexBuffer
     {
         virtual ID3D11Buffer* GetBufferPtr() = 0;
         DXGI_FORMAT GetFormat() const { return Format; }
         DXGI_FORMAT Format = DXGI_FORMAT::DXGI_FORMAT_R32_UINT;
     };
 
-    struct GfxDefaultIndexBuffer : public GfxBaseBuffer, public GfxBaseIndexBuffer
+    struct GfxDefaultIndexBuffer : public GfxBuffer, public GfxBaseIndexBuffer, public GE::GfxDefaultIndexBuffer
     {
         DefineRTTI;
 
@@ -133,6 +130,7 @@ namespace engine
             mBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
         }
         virtual ID3D11Buffer* GetBufferPtr() override { return mBufferPtr.Get(); }
+        virtual void Release() override { delete this; }
     };
 
     struct GfxBaseConstantBuffer
@@ -149,13 +147,17 @@ namespace engine
         virtual ID3D11Buffer* GetBufferPtr() override { return mBufferPtr.Get(); }
     };
 
-    class GfxDevice
+    class GfxDevice : public GE::GfxDevice
     {
     public:
+        DefineRTTI;
+
         GfxDevice(ID3D11Device* device);
         ~GfxDevice();
-        GfxDefaultVertexBuffer* CreateDefaultVertexBuffer(unsigned int vertexCount);
-        GfxDefaultIndexBuffer* CreateDefaultIndexBuffer(unsigned int indexCount);
+        virtual GE::GfxDefaultVertexBuffer* CreateDefaultVertexBuffer(unsigned int vertexCount) override;
+        virtual GE::GfxDefaultIndexBuffer* CreateDefaultIndexBuffer(unsigned int indexCount) override;
+        GfxDefaultVertexBuffer* CreateDefaultVertexBufferImpl(unsigned int vertexCount);
+        GfxDefaultIndexBuffer* CreateDefaultIndexBufferImpl(unsigned int indexCount);
         GfxDynamicConstantBuffer* CreateDynamicConstantBuffer(unsigned int bufferLength);
         bool InitializeTemporaryStagingBuffer(GfxStagingBuffer& outBuffer, unsigned int length);
 
@@ -163,11 +165,9 @@ namespace engine
         ID3D11Device* mGfxDevice;
     };
 
-    class GfxDeviceContext : public GE::GfxDeviceContext
+    class GfxDeviceContext
     {
     public:
-        DefineRTTI;
-
         enum EMapMethod
         {
             Default, Discard, NoOverwrite
@@ -175,8 +175,6 @@ namespace engine
 
         GfxDeviceContext(GfxDevice*, ID3D11DeviceContext*);
         ~GfxDeviceContext();
-        virtual void SetVertexBuffer(GE::GfxVertexBuffer*, unsigned int offset) override;
-        virtual void SetIndexBuffer(GE::GfxIndexBuffer*, unsigned int offset) override;
         template<typename ReturnType = void>
         ReturnType* MapBuffer(GfxStagingBuffer& buffer, UINT subresource = 0)
         {
@@ -190,28 +188,41 @@ namespace engine
         void UnmapBuffer(GfxStagingBuffer& buffer, UINT subresource = 0);
         void UnmapBuffer(GfxDynamicBuffer& buffer, UINT subresource = 0);
 
-    //TODO:temp
-    //protected:
+    public://TODO:temporary
         void SetVertexBufferImpl(GfxBaseVertexBuffer*, unsigned int);
         void SetIndexBufferImpl(GfxBaseIndexBuffer*, unsigned int);
         void SetVSConstantBufferImpl(unsigned int startIndex, GfxBaseConstantBuffer*);
         void SetPSConstantBufferImpl(unsigned int startIndex, GfxBaseConstantBuffer*);
 
-
         GfxDevice* mGfxDevice;
         ID3D11DeviceContext* mGfxDeviceContext;
 
     private:
-        void* MapBufferImpl(GfxBaseBuffer& buffer, UINT subresource, EMapMethod method);
-        void UnmapBufferImpl(GfxBaseBuffer& buffer, UINT subresource);
+        void* MapBufferImpl(GfxBuffer& buffer, UINT subresource, EMapMethod method);
+        void UnmapBufferImpl(GfxBuffer& buffer, UINT subresource);
     };
 
-    class GfxImmediateContext : public GfxDeviceContext
+
+    class GfxImmediateContext : public GfxDeviceContext, public GE::GfxDeviceImmediateContext
     {
+    public:
         DefineRTTI;
 
         GfxImmediateContext(GfxDevice*, ID3D11DeviceContext*);
-        bool UploadBufferFromStagingMemory(GfxBaseBuffer*, const void* data, unsigned int length);
-        bool UploadEntireBufferFromMemory(GfxBaseBuffer*, const void* data, unsigned int length);
+        virtual void UploadEntireBufferFromStagingMemory(GE::GfxBuffer*, const void* data) override;
+        virtual void UploadEntireBufferFromMemory(GE::GfxBuffer*, const void* data) override;
+        void UploadEntireBufferFromStagingMemoryImpl(GfxBuffer*, const void* data);
+        void UploadEntireBufferFromMemoryImpl(GfxBuffer*, const void* data);
+    };
+
+    class GfxDeferredContext : public GfxDeviceContext, public GE::GfxDeferredContext
+    {
+    public:
+        DefineRTTI;
+
+        GfxDeferredContext(GfxDevice*, ID3D11DeviceContext*);
+        virtual void SetVertexBuffer(GE::GfxVertexBuffer*, unsigned int offset) override;
+        virtual void SetIndexBuffer(GE::GfxIndexBuffer*, unsigned int offset) override;
+        virtual void DrawIndexed(unsigned int indexCount, unsigned int startLocation, int indexOffset) override;
     };
 }

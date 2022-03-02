@@ -1,5 +1,6 @@
 #include "Scene.h"
 #include "SceneNode.h"
+#include "Render/GfxInterface.h"
 
 namespace GE
 {
@@ -36,6 +37,9 @@ namespace engine
 
     bool SceneNode::AddComponent(GE::Component* component, bool autoRelease)
     {
+        if (component == nullptr)
+            return false;
+
         int index = FindComponentIndex(component);
         if (index != -1)
         {
@@ -382,15 +386,15 @@ namespace engine
         }
     }
 
-    void SceneNode::RecursiveRender()
+    void SceneNode::RecursiveRender(GfxDeferredContext* context)
     {
         for (const ComponentWrap& compWrap : mComponents)
         {
-            compWrap.Component->OnRender();
+            compWrap.Component->OnRender(context);
         }
         for (SceneNode* child : mChildren)
         {
-            child->RecursiveRender();
+            child->RecursiveRender(context);
         }
     }
 

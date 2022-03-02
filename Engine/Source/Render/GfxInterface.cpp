@@ -4,7 +4,7 @@
 namespace engine_gfx_impl
 {
     bool InitializeD3D11Buffer(ID3D11Device* GfxDevice,
-        engine::GfxBaseBuffer& OutBuffer,
+        engine::GfxBuffer& OutBuffer,
         unsigned int InBufferLength,
         D3D11_SUBRESOURCE_DATA* SubResourceDataPtr = nullptr)
     {
@@ -95,17 +95,27 @@ namespace engine
         SafeRelease(mGfxDevice);
     }
 
-    GfxDefaultVertexBuffer* GfxDevice::CreateDefaultVertexBuffer(unsigned int vertexCount)
+    GE::GfxDefaultVertexBuffer* GfxDevice::CreateDefaultVertexBuffer(unsigned int vertexCount)
+    {
+        return CreateDefaultVertexBufferImpl(vertexCount);
+    }
+
+    GfxDefaultVertexBuffer* GfxDevice::CreateDefaultVertexBufferImpl(unsigned int vertexCount)
     {
         using namespace engine_gfx_impl;
         return CreateVertexBuffer<GfxDefaultVertexBuffer>(mGfxDevice, sizeof(VertexLayout), vertexCount);
     }
 
-    GfxDefaultIndexBuffer* GfxDevice::CreateDefaultIndexBuffer(unsigned int indexCount)
+    GE::GfxDefaultIndexBuffer* GfxDevice::CreateDefaultIndexBuffer(unsigned int indexCount)
+    {
+        return CreateDefaultIndexBufferImpl(indexCount);
+    }
+    GfxDefaultIndexBuffer* GfxDevice::CreateDefaultIndexBufferImpl(unsigned int indexCount)
     {
         using namespace engine_gfx_impl;
         return CreateIndexBuffer<GfxDefaultIndexBuffer>(mGfxDevice, sizeof(int), indexCount);
     }
+
 
     GfxDynamicConstantBuffer* GfxDevice::CreateDynamicConstantBuffer(unsigned int bufferLength)
     {
@@ -155,17 +165,6 @@ namespace engine
         mGfxDeviceContext->PSSetConstantBuffers(startIndex, 1, &VertexShaderBuffer);
     }
 
-
-    void GfxDeviceContext::SetVertexBuffer(GE::GfxVertexBuffer* vb, unsigned int offset)
-    {
-        SetVertexBufferImpl((GfxBaseVertexBuffer*)vb, offset);
-    }
-
-    void GfxDeviceContext::SetIndexBuffer(GE::GfxIndexBuffer* ib, unsigned int offset)
-    {
-        SetIndexBufferImpl((GfxBaseIndexBuffer*)ib, offset);
-    }
-
     void GfxDeviceContext::UnmapBuffer(GfxStagingBuffer& buffer, UINT subresource)
     {
         UnmapBufferImpl(buffer, subresource);
@@ -176,7 +175,7 @@ namespace engine
         UnmapBufferImpl(buffer, subresource);
     }
 
-    void* GfxDeviceContext::MapBufferImpl(GfxBaseBuffer& buffer, UINT subresource, GfxDeviceContext::EMapMethod method)
+    void* GfxDeviceContext::MapBufferImpl(GfxBuffer& buffer, UINT subresource, GfxDeviceContext::EMapMethod method)
     {
         D3D11_MAP mapType = method == Default
             ? D3D11_MAP_WRITE
@@ -196,43 +195,47 @@ namespace engine
         return nullptr;
     }
 
-    void GfxDeviceContext::UnmapBufferImpl(GfxBaseBuffer& buffer, UINT subresource)
+    void GfxDeviceContext::UnmapBufferImpl(GfxBuffer& buffer, UINT subresource)
     {
         mGfxDeviceContext->Unmap(buffer.mBufferPtr.Get(), subresource);
     }
-
 
     GfxImmediateContext::GfxImmediateContext(GfxDevice* device, ID3D11DeviceContext* context)
         : GfxDeviceContext(device, context)
     { }
 
-    bool GfxImmediateContext::UploadBufferFromStagingMemory(GfxBaseBuffer* buffer, const void* data, unsigned int length)
+    void GfxImmediateContext::UploadEntireBufferFromStagingMemory(GE::GfxBuffer* buffer, const void* data)
+    {
+        GfxBuffer* bufferImpl = dynamic_cast<GfxBuffer*>(buffer);
+        UploadEntireBufferFromStagingMemoryImpl(bufferImpl, data);
+    }
+
+    void GfxImmediateContext::UploadEntireBufferFromMemory(GE::GfxBuffer* buffer, const void* data)
+    {
+        GfxBuffer* bufferImpl = dynamic_cast<GfxBuffer*>(buffer);
+        UploadEntireBufferFromMemoryImpl(bufferImpl, data);
+    }
+
+    void GfxImmediateContext::UploadEntireBufferFromStagingMemoryImpl(GfxBuffer* buffer, const void* data)
     {
         /*
         1. CreateVertexBuffer a 2nd buffer with D3D11_USAGE_STAGING;
         -fill the second buffer using ID3D11DeviceContext::Map, ID3D11DeviceContext::Unmap;
         -use ID3D11DeviceContext::CopyResource to copy from the staging buffer to the default buffer.
         */
-
-        int copyLength = buffer->GetBufferLength() > length ? length : buffer->GetBufferLength();
         GfxStagingBuffer staging(false);
-        if (mGfxDevice->InitializeTemporaryStagingBuffer(staging, length))
+        if (mGfxDevice->InitializeTemporaryStagingBuffer(staging, buffer->GetBufferLength()))
         {
             void* pDataPtr = MapBuffer(staging);
-            memcpy(pDataPtr, data, copyLength);
+            memcpy(pDataPtr, data, buffer->GetBufferLength());
             UnmapBuffer(staging);
 
             mGfxDeviceContext->CopyResource(buffer->mBufferPtr.Get(), staging.mBufferPtr.Get());
-            return true;
         }
-        return false;
     }
 
-    bool GfxImmediateContext::UploadEntireBufferFromMemory(GfxBaseBuffer* defaultBuffer, const void* data, unsigned int length)
+    void GfxImmediateContext::UploadEntireBufferFromMemoryImpl(GfxBuffer* defaultBuffer, const void* data)
     {
-        if (defaultBuffer->GetBufferLength() > length)
-            return false;
-
         //2. Use ID3D11DeviceContext::UpdateSubresource to copy data from memory.
         //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-d3d11calcsubresource
         UINT subresource = 0;
@@ -240,7 +243,25 @@ namespace engine
         UINT sourceDepthPitch = 0;
         mGfxDeviceContext->UpdateSubresource(defaultBuffer->mBufferPtr.Get(), subresource, nullptr,
             data, sourceRowPitch, sourceDepthPitch);
-
-        return true;
     }
+
+    GfxDeferredContext::GfxDeferredContext(GfxDevice* device, ID3D11DeviceContext* context)
+        : GfxDeviceContext(device, context)
+    { }
+
+    void GfxDeferredContext::SetVertexBuffer(GE::GfxVertexBuffer* vb, unsigned int offset)
+    {
+        SetVertexBufferImpl(dynamic_cast<GfxBaseVertexBuffer*>(vb), offset);
+    }
+
+    void GfxDeferredContext::SetIndexBuffer(GE::GfxIndexBuffer* ib, unsigned int offset)
+    {
+        SetIndexBufferImpl(dynamic_cast<GfxBaseIndexBuffer*>(ib), offset);
+    }
+
+    void GfxDeferredContext::DrawIndexed(unsigned int indexCount, unsigned int startLocation, int indexOffset)
+    {
+        mGfxDeviceContext->DrawIndexed(indexCount, startLocation, indexOffset);
+    }
+
 }

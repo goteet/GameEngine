@@ -58,7 +58,9 @@ void InitializeSimpleScene()
     g_DefaultScene = g_GameEngine->CreateOrGetDefaultScene();
 
 
-    auto nodeSphere = g_DefaultScene->CreateSceneNode();
+    auto nodeCube = g_DefaultScene->CreateSceneNode();
+    GE::MeshRenderer* mesh = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Box);
+    nodeCube->AddComponent(mesh,GE::AutoReleaseComponent);
 
     auto nodeLeftWall = g_DefaultScene->CreateSceneNode();
     auto nodeRightWall = g_DefaultScene->CreateSceneNode();
@@ -73,7 +75,7 @@ void InitializeSimpleScene()
     nodeBottomWall->SetForwardDirection(math::normalized_float3::unit_z());
 
     GE::Camera* mainCamera = g_DefaultScene->GetDefaultCamera();
-    mainCamera->SetEyePosition(math::point3df(2, 3, -5));
+    mainCamera->SetEyePosition(math::point3df(0, 1, -5));
     mainCamera->Lookat(math::point3df(0, 0, 0));
 
     GE::DirectionalLight* mainLight = g_DefaultScene->CreateDirectionalLightNode();

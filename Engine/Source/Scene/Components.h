@@ -47,4 +47,19 @@ namespace engine
         float mIntensity;
         math::float3 mColor;
     };
+
+    class MeshRenderer : public GE::MeshRenderer
+    {
+    public:
+        DefineRTTI;
+
+        ~MeshRenderer();
+        virtual void OnRender(GE::GfxDeferredContext* context) override;
+
+        bool IntializeGeometryHWResource(GE::MeshRenderer::EMeshType type);
+
+    private:
+        GE::GfxDefaultVertexBuffer* CubeVertexBufferPtr = nullptr;
+        GE::GfxDefaultIndexBuffer* CubeIndexBufferPtr = nullptr;
+    };
 }

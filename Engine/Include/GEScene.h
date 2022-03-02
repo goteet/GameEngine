@@ -12,6 +12,7 @@ namespace GE
     struct SceneNode;
     struct Component;
     struct Scene;
+    struct GfxDeferredContext;
 
     constexpr CameraVisibleMask DefaultCameraVisibkeMask = 0xFFFFFFFF;
     constexpr ComponentExecutionOrder DefaultComponentExecutionOrder = 0x5000;
@@ -95,7 +96,7 @@ namespace GE
         *********************************************************************/
         virtual void OnInitial() { }
         virtual void OnUpdate(unsigned int deltaTime) { }
-        virtual void OnRender() { }
+        virtual void OnRender(GfxDeferredContext*) { }
         virtual void OnRemove() { }
         //virtual void OnPositionChanging(const math::point3d<float>& newPos) { }
         //virtual void OnPositionChanged(const math::point3d<float>& newPos) { }
@@ -170,6 +171,12 @@ namespace GE
         virtual float GetIntensity() const = 0;
     };
 
+    struct GameEngineAPI MeshRenderer : public Component
+    {
+        enum EMeshType { Box, Plane, Sphere, Disk };
+        static MeshRenderer* CreateMeshRenderer(EMeshType type);
+    };
+
     struct GameEngineAPI Scene : public GEObject
     {
         virtual Camera* CreateAdditionalCameraNode() = 0;
@@ -182,6 +189,4 @@ namespace GE
         virtual SceneNode* GetSceneNodeByIndex(unsigned int index) = 0;
         virtual unsigned int GetSceneNodeCount() const = 0;
     };
-
-
-    }
+}
