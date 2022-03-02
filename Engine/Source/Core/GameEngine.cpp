@@ -22,7 +22,7 @@ namespace engine
     void GameEngine::Update(unsigned int deltaMillisec)
     {
         mDefualtScene->UpdateAndRender(deltaMillisec);
-        mRenderSystem->RenderFrame();
+        mRenderSystem->RenderFrame(*mDefualtScene);
     }
 
     bool GameEngine::OnResizeWindow(void* hWndinw, unsigned int width, unsigned int height)

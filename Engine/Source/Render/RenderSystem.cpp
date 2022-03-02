@@ -6,6 +6,7 @@
 #include <d3dcompiler.h>
 #include "Core/GameEngine.h"
 #include "Scene/Components.h"
+#include "Scene/Scene.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -31,12 +32,6 @@ Microsoft::WRL::ComPtr<IDXGIFactory2> GetDXGIAdapterFromDevice(Microsoft::WRL::C
     return nullptr;
 }
 
-struct VertexLayout
-{
-    math::float4 Position;
-    math::float3 Normal;
-    math::float2 Texcoord;
-};
 
 const unsigned int InputLayoutCount = 3;
 D3D11_INPUT_ELEMENT_DESC InputLayout[InputLayoutCount]
@@ -47,7 +42,7 @@ D3D11_INPUT_ELEMENT_DESC InputLayout[InputLayoutCount]
 };
 
 const unsigned int CubeVertexCount = 24;
-VertexLayout CubeVertices[CubeVertexCount] =
+engine::VertexLayout CubeVertices[CubeVertexCount] =
 {
     { math::float4(-1, +1, -1, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
     { math::float4(-1, +1, +1, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
@@ -92,177 +87,8 @@ unsigned int CubeIndices[CubeIndexCount] =
     20, 23, 22, 22, 21, 20,
 };
 
-
-
-struct GfxBaseBuffer
-{
-    virtual ~GfxBaseBuffer() = default;
-
-    GfxBaseBuffer()
-    {
-        //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_usage
-        // Use Default/Immutable/Dynamic,
-        //  For any default buffer, use UpdateSubresource with Staging Buffer to Upload data.
-        mBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-
-        //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_bind_flag
-        mBufferDesc.BindFlags = 0;
-
-        //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_cpu_access_flag
-        //0 if no CPU access is necessary.
-        mBufferDesc.CPUAccessFlags = 0;
-
-        //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_resource_misc_flag
-        mBufferDesc.MiscFlags = 0;
-
-        //https://docs.microsoft.com/en-us/windows/win32/direct3d11/direct3d-11-advanced-stages-cs-resources#structured-buffer
-        //Structure Buffer :
-        mBufferDesc.StructureByteStride = 0;
-    }
-
-    ID3D11Device* mGfxDevicePtr = nullptr;
-    D3D11_BUFFER_DESC mBufferDesc = { 0 };
-    ComPtr<ID3D11Buffer> mBufferPtr = nullptr;
-};
-
-struct GfxImmutableBuffer : public GfxBaseBuffer
-{
-    GfxImmutableBuffer()
-    {
-        mBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-        mBufferDesc.CPUAccessFlags = 0;
-    }
-};
-
-struct GfxDynamicBuffer : public GfxBaseBuffer
-{
-    GfxDynamicBuffer()
-    {
-        mBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        mBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-    }
-};
-
-struct GfxStagingBuffer : GfxBaseBuffer
-{
-    GfxStagingBuffer(bool CPURead, bool CPUWrite = true)
-    {
-        mBufferDesc.Usage = D3D11_USAGE_STAGING;
-        mBufferDesc.BindFlags = 0;
-        mBufferDesc.MiscFlags = 0;
-        UINT WriteFlag = CPUWrite ? D3D11_CPU_ACCESS_WRITE : 0;
-        UINT ReadFlag = CPURead ? D3D11_CPU_ACCESS_READ : 0;
-        mBufferDesc.CPUAccessFlags = ReadFlag | WriteFlag;
-        mBufferDesc.StructureByteStride = 0;
-    }
-};
-
-struct GfxBaseVertexBuffer
-{
-    virtual ~GfxBaseVertexBuffer() = default;
-};
-
-struct GfxDefaultVertexBuffer : public GfxBaseBuffer, public GfxBaseVertexBuffer
-{
-    GfxDefaultVertexBuffer()
-    {
-        mBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    }
-};
-
-struct GfxImmutableVertexBuffer : public GfxImmutableBuffer, public GfxBaseVertexBuffer
-{
-    GfxImmutableVertexBuffer()
-    {
-        mBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    }
-};
-
-struct GfxDynamicVertexBuffer : public GfxDynamicBuffer, public GfxBaseVertexBuffer
-{
-    GfxDynamicVertexBuffer()
-    {
-        mBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    }
-};
-
-struct GfxBaseIndexBuffer
-{
-    virtual ~GfxBaseIndexBuffer() = default;
-};
-
-
-struct GfxDefaultIndexBuffer : GfxBaseBuffer, GfxBaseIndexBuffer
-{
-    GfxDefaultIndexBuffer()
-    {
-        mBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    }
-};
-
-struct GfxDynamicConstBuffer : public GfxDynamicBuffer
-{
-    GfxDynamicConstBuffer()
-    {
-        mBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    }
-};
-
-enum EMapMethod
-{
-    Default, Discard, NoOverwrite
-};
-
 namespace context_private_impl
 {
-    bool CreateBuffer(ID3D11Device* GfxDevice,
-        GfxBaseBuffer& OutBuffer,
-        unsigned int BufferLength,
-        D3D11_SUBRESOURCE_DATA* SubResourceDataPtr = nullptr)
-    {
-        OutBuffer.mBufferDesc.ByteWidth = BufferLength;
-        HRESULT resultBufferCreation = GfxDevice->CreateBuffer(
-            &OutBuffer.mBufferDesc,
-            SubResourceDataPtr,
-            &OutBuffer.mBufferPtr);
-
-        if (SUCCEEDED(resultBufferCreation))
-        {
-            OutBuffer.mGfxDevicePtr = GfxDevice;
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    void* MapBufferWrite(ID3D11DeviceContext* GfxDeviceContext, GfxBaseBuffer& buffer, UINT subresource, EMapMethod method)
-    {
-        D3D11_MAP mapType = method == Default
-            ? D3D11_MAP_WRITE
-            : (method == Discard
-                ? D3D11_MAP_WRITE_DISCARD
-                : D3D11_MAP_WRITE_NO_OVERWRITE);
-        //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_map_flag
-        //do-not-wait-when-gpu-busy
-        UINT mapFlags = 0;
-        D3D11_MAPPED_SUBRESOURCE outMappedSubresource;
-
-        HRESULT result = GfxDeviceContext->Map(buffer.mBufferPtr.Get(), subresource, mapType, mapFlags, &outMappedSubresource);
-        if (SUCCEEDED(result))
-        {
-            return outMappedSubresource.pData;
-        }
-        return nullptr;
-    }
-
-    void UnmapBufferWrite(ID3D11DeviceContext* GfxDeviceContext, GfxBaseBuffer& buffer, UINT subresource)
-    {
-        GfxDeviceContext->Unmap(buffer.mBufferPtr.Get(), subresource);
-    }
-
     ComPtr<ID3DBlob> CompileShaderSource(
         const std::string& sourceCodes,
         const std::string& entryPoint,
@@ -293,101 +119,6 @@ namespace context_private_impl
             return nullptr;
         }
     }
-}
-
-
-template<typename VertexBufferType>
-bool CreateVertexBuffer(ID3D11Device* GfxDevice,
-    VertexBufferType& OutVertexBuffer,
-    unsigned int VertexStride, unsigned int VertexCount,
-    D3D11_SUBRESOURCE_DATA* SubResourceDataPtr = nullptr)
-{
-    using context_private_impl::CreateBuffer;
-    return CreateBuffer(GfxDevice, OutVertexBuffer, VertexStride * VertexCount, SubResourceDataPtr);
-}
-
-bool CreateIndexBuffer(ID3D11Device* GfxDevice,
-    GfxDefaultIndexBuffer& OutIndexBuffer,
-    unsigned int IndexCount,
-    D3D11_SUBRESOURCE_DATA* SubResourceDataPtr = nullptr)
-{
-    using context_private_impl::CreateBuffer;
-    unsigned int IndexStride = sizeof(int);
-    return CreateBuffer(GfxDevice, OutIndexBuffer, IndexStride * IndexCount, SubResourceDataPtr);
-}
-
-template<typename GfxBufferType>
-bool CreateConstBuffer(ID3D11Device* GfxDevice,
-    GfxBufferType& OutIndexBuffer,
-    unsigned int BufferLength,
-    D3D11_SUBRESOURCE_DATA* SubResourceDataPtr = nullptr)
-{
-    using context_private_impl::CreateBuffer;
-    return CreateBuffer(GfxDevice, OutIndexBuffer, BufferLength, SubResourceDataPtr);
-}
-
-void* MapBuffer(ID3D11DeviceContext* GfxDeviceContext, GfxStagingBuffer& buffer, UINT subresource = 0)
-{
-    using context_private_impl::MapBufferWrite;
-    return MapBufferWrite(GfxDeviceContext, buffer, subresource, EMapMethod::Default);
-}
-
-void* MapBuffer(ID3D11DeviceContext* GfxDeviceContext, GfxDynamicBuffer& buffer, UINT subresource = 0)
-{
-    using context_private_impl::MapBufferWrite;
-    return MapBufferWrite(GfxDeviceContext, buffer, subresource, EMapMethod::Discard);
-}
-
-void UnmapBuffer(ID3D11DeviceContext* GfxDeviceContext, GfxStagingBuffer& buffer, UINT subresource = 0)
-{
-    using context_private_impl::UnmapBufferWrite;
-    UnmapBufferWrite(GfxDeviceContext, buffer, subresource);
-}
-
-void UnmapBuffer(ID3D11DeviceContext* GfxDeviceContext, GfxDynamicBuffer& buffer, UINT subresource = 0)
-{
-    using context_private_impl::UnmapBufferWrite;
-    UnmapBufferWrite(GfxDeviceContext, buffer, subresource);
-}
-
-bool UploadEntireBuffer(ID3D11Device* GfxDevice, ID3D11DeviceContext* GfxDeviceContext,
-    GfxDefaultVertexBuffer& Buffer, const VertexLayout* vertices)
-{
-    /*
-    1. CreateVertexBuffer a 2nd buffer with D3D11_USAGE_STAGING;
-    -fill the second buffer using ID3D11DeviceContext::Map, ID3D11DeviceContext::Unmap;
-    -use ID3D11DeviceContext::CopyResource to copy from the staging buffer to the default buffer.
-
-    2. Use ID3D11DeviceContext::UpdateSubresource to copy data from memory.
-    */
-    GfxStagingBuffer StagingBuffer(false);
-    if (CreateVertexBuffer<GfxStagingBuffer>(GfxDevice, StagingBuffer, sizeof(VertexLayout), CubeVertexCount))
-    {
-        VertexLayout* pDataPtr = (VertexLayout*)MapBuffer(GfxDeviceContext, StagingBuffer);
-        memcpy(pDataPtr, CubeVertices, Buffer.mBufferDesc.ByteWidth);
-        UnmapBuffer(GfxDeviceContext, StagingBuffer);
-        GfxDeviceContext->CopyResource(Buffer.mBufferPtr.Get(), StagingBuffer.mBufferPtr.Get());
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-bool UploadEntireBuffer(ID3D11DeviceContext* GfxDeviceContext,
-    GfxDefaultIndexBuffer& Buffer, const unsigned int* indices)
-{
-    //2. Use ID3D11DeviceContext::UpdateSubresource to copy data from memory.
-    //https://docs.microsoft.com/en-us/windows/win32/api/d3d11/nf-d3d11-d3d11calcsubresource
-    UINT subresource = 0;
-    UINT sourceRowPitch = 0;
-    UINT sourceDepthPitch = 0;
-    GfxDeviceContext->UpdateSubresource(Buffer.mBufferPtr.Get(),
-        subresource, nullptr,
-        indices, sourceRowPitch, sourceDepthPitch);
-
-    return true;
 }
 
 struct VertexShader
@@ -586,7 +317,8 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
 
 namespace engine
 {
-    GfxDynamicBuffer* VertexShaderBufferPtr = nullptr;
+
+    GfxDynamicConstantBuffer* VertexShaderBufferPtr = nullptr;
     GfxDefaultVertexBuffer* CubeVertexBufferPtr = nullptr;
     GfxDefaultIndexBuffer* CubeIndexBufferPtr = nullptr;
     ShaderProgram* SimpleShaderProgramPtr = nullptr;
@@ -604,6 +336,9 @@ namespace engine
         mClientHeight = clientRect.bottom - clientRect.top;
     }
 
+
+    template<typename T>
+    void safe_release(std::unique_ptr<T>& ptr){ ptr.release(); }
     RenderSystem::~RenderSystem()
     {
         safe_delete(CubeVertexBufferPtr);
@@ -611,6 +346,10 @@ namespace engine
         safe_delete(VertexShaderBufferPtr);
         safe_delete(SimpleShaderProgramPtr);
         SafeRelease(CubeRenderingCommandList);
+
+        safe_release(mGfxDeviceDeferredContext);
+        safe_release(mGfxDeviceImmediateContext);
+        safe_release(mGfxDevice);
     }
 
     EGfxIntializationError RenderSystem::InitializeGfxDevice()
@@ -709,17 +448,16 @@ namespace engine
             return EGfxIntializationError::CreateDeferredContextFail;
         }
 
-        mGfxDevice = outD3DDevice;
-        mGfxDeviceImmediateContext = outD3DDeviceImmediateContext;
-        mGfxDeviceDeferredContext = outD3DDeferredContext;
+        mGfxDevice = std::make_unique<GfxDevice>(outD3DDevice.Detach());
+        mGfxDeviceImmediateContext = std::make_unique<GfxImmediateContext>(mGfxDevice.get(), outD3DDeviceImmediateContext.Detach());
+        mGfxDeviceDeferredContext = std::make_unique<GfxDeviceContext>(mGfxDevice.get(), outD3DDeferredContext.Detach());
         mGfxSwapChain = outSwapChain;
         mBackbuffer = outBackbuffer;
         mBackbufferRTV = outBackbufferRTV;
-
         return EGfxIntializationError::NoError;
     }
 
-    void RenderSystem::RenderFrame()
+    void RenderSystem::RenderFrame(Scene& scene)
     {
         ViewConstantBufferData data;
 
@@ -729,23 +467,19 @@ namespace engine
         float lightIntensity = 1.0f;
         math::float3 lightDirection = math::float3(1.0f, 0.0f, 0.0f);
 
-        GameEngine* Engine = GetEngineInstance();
-        Scene* defaultScene = Engine->GetDefaultSceneInternal();
-        if (defaultScene != nullptr)
+
+        Camera* defaultCamera = scene.GetDefaultCameraInternal();
+        if (defaultCamera != nullptr)
         {
-            Camera* defaultCamera = defaultScene->GetDefaultCameraInternal();
-            if (defaultCamera != nullptr)
-            {
-                viewMatrix = defaultCamera->GetUpdatedViewMatrix();
-                cameraPositionWS = defaultCamera->GetSceneNode()->GetWorldPosition();
-            }
-
-            GE::DirectionalLight* defaultLight = defaultScene->GetDirectionalLight(0);
-
-            lightColor = defaultLight->GetColor();
-            lightIntensity = defaultLight->GetIntensity();
-            lightDirection = defaultLight->GetSceneNode()->GetForwardDirection();
+            viewMatrix = defaultCamera->GetUpdatedViewMatrix();
+            cameraPositionWS = defaultCamera->GetSceneNode()->GetWorldPosition();
         }
+
+        GE::DirectionalLight* defaultLight = scene.GetDirectionalLight(0);
+
+        lightColor = defaultLight->GetColor();
+        lightIntensity = defaultLight->GetIntensity();
+        lightDirection = defaultLight->GetSceneNode()->GetForwardDirection();
 
         data.ViewMatrix = viewMatrix;
         data.InvViewMatrix = math::inversed(viewMatrix);
@@ -771,11 +505,11 @@ namespace engine
             RasterizerDesc.AntialiasedLineEnable = TRUE;
 
             ComPtr<ID3D11RasterizerState> pRasterState;
-            mGfxDevice->CreateRasterizerState(&RasterizerDesc, pRasterState.ReleaseAndGetAddressOf());
-            mGfxDeviceDeferredContext->RSSetState(pRasterState.Get());
+            mGfxDevice->mGfxDevice->CreateRasterizerState(&RasterizerDesc, pRasterState.ReleaseAndGetAddressOf());
+            mGfxDeviceDeferredContext->mGfxDeviceContext->RSSetState(pRasterState.Get());
 
-            mGfxDeviceDeferredContext->OMSetRenderTargets(1, &RenderTagetView, nullptr);
-            mGfxDeviceDeferredContext->ClearRenderTargetView(RenderTagetView, ClearColor);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->OMSetRenderTargets(1, &RenderTagetView, nullptr);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->ClearRenderTargetView(RenderTagetView, ClearColor);
 
             D3D11_VIEWPORT Viewport;
             Viewport.TopLeftX = 0.0f;
@@ -785,12 +519,12 @@ namespace engine
             Viewport.MinDepth = 0.0f;
             Viewport.MaxDepth = 1.0f;
 
-            mGfxDeviceDeferredContext->RSSetViewports(1, &Viewport);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->RSSetViewports(1, &Viewport);
 
             RenderSimpleBox(data);
-            mGfxDeviceDeferredContext->FinishCommandList(false, &CubeRenderingCommandList);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->FinishCommandList(false, &CubeRenderingCommandList);
         }
-        mGfxDeviceImmediateContext->ExecuteCommandList(CubeRenderingCommandList, false);
+        mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(CubeRenderingCommandList, false);
         mGfxSwapChain->Present(0, 0);
     }
 
@@ -816,31 +550,26 @@ namespace engine
         static bool initialize_error = false;
         if (!initialize)
         {
-            CubeVertexBufferPtr = new GfxDefaultVertexBuffer();
-            CubeIndexBufferPtr = new GfxDefaultIndexBuffer();
-            VertexShaderBufferPtr = new GfxDynamicConstBuffer();
-            const unsigned int VertexStride = sizeof(VertexLayout);
             const unsigned int VertexBufferLength = sizeof(math::float4x4) * 3 + sizeof(math::float4) * 2;
 
-            bool vbc = CreateVertexBuffer(mGfxDevice.Get(), *CubeVertexBufferPtr, VertexStride, CubeVertexCount);
-            bool ibc = CreateIndexBuffer(mGfxDevice.Get(), *CubeIndexBufferPtr, CubeIndexCount);
-            bool cbc = CreateConstBuffer(mGfxDevice.Get(), *VertexShaderBufferPtr, VertexBufferLength);
-
+            CubeVertexBufferPtr = mGfxDevice->CreateDefaultVertexBuffer(CubeVertexCount);
+            CubeIndexBufferPtr = mGfxDevice->CreateDefaultIndexBuffer(CubeIndexCount);
+            VertexShaderBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(VertexBufferLength);
 
             // 创建顶点着色器
             const std::string vsEntryName = "VSMain";
             const std::vector<D3D11_INPUT_ELEMENT_DESC> InputLayoutArray(InputLayout, InputLayout + InputLayoutCount);
-            auto VertexShader = CreateVertexShader(mGfxDevice.Get(), DefaultVertexShaderSourceCode, vsEntryName, InputLayoutArray);
+            auto VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, DefaultVertexShaderSourceCode, vsEntryName, InputLayoutArray);
 
             const std::string psEntryName = "PSMain";
-            auto PixelShader = CreatePixelShader(mGfxDevice.Get(), SimpleColorPixelShaderSourceCode, psEntryName);
+            auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, SimpleColorPixelShaderSourceCode, psEntryName);
             SimpleShaderProgramPtr = LinkShader(VertexShader, PixelShader);
 
-            if (vbc && ibc && cbc && SimpleShaderProgramPtr)
+            if (CubeVertexBufferPtr != nullptr && CubeIndexBufferPtr != nullptr && VertexShaderBufferPtr != nullptr && SimpleShaderProgramPtr)
             {
                 //upload cube vertex data to gfx vertex buffer.
-                if (!UploadEntireBuffer(mGfxDevice.Get(), mGfxDeviceImmediateContext.Get(), *CubeVertexBufferPtr, CubeVertices)
-                    || !UploadEntireBuffer(mGfxDeviceImmediateContext.Get(), *CubeIndexBufferPtr, CubeIndices))
+                if (!mGfxDeviceImmediateContext->UploadBufferFromStagingMemory(CubeVertexBufferPtr, CubeVertices, sizeof(VertexLayout) * CubeVertexCount)
+                    || !mGfxDeviceImmediateContext->UploadEntireBufferFromMemory(CubeIndexBufferPtr, CubeIndices, sizeof(int) * CubeIndexCount))
                 {
                     initialize_error = true;
                     safe_delete(CubeVertexBufferPtr);
@@ -866,7 +595,7 @@ namespace engine
             math::float2 zNearFar(1.0f, 50.0f);
 
             // TODO: Vertex and pixel use same constant buffer here.
-            math::float4* pConstBuffer = (math::float4*)MapBuffer(mGfxDeviceDeferredContext.Get(), *VertexShaderBufferPtr);
+            math::float4* pConstBuffer = mGfxDeviceDeferredContext->MapBuffer<math::float4>(*VertexShaderBufferPtr);
             {
                 pConstBuffer[0] = data.ViewMatrix.rows[0];
                 pConstBuffer[1] = data.ViewMatrix.rows[1];
@@ -887,21 +616,17 @@ namespace engine
                 pConstBuffer[12] = math::float4(data.LightColor, 1.0f);
                 pConstBuffer[13] = math::float4(data.LightDirection, 0.0f);
             }
-            UnmapBuffer(mGfxDeviceDeferredContext.Get(), *VertexShaderBufferPtr);
+            mGfxDeviceDeferredContext->UnmapBuffer(*VertexShaderBufferPtr);
 
-            ID3D11Buffer* VertexBuffer = CubeVertexBufferPtr->mBufferPtr.Get();
-            ID3D11Buffer* VertexShaderBuffer = VertexShaderBufferPtr->mBufferPtr.Get();
-            UINT Stride = sizeof(VertexLayout);
-            UINT Offset = 0;
-            mGfxDeviceDeferredContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            mGfxDeviceDeferredContext->IASetVertexBuffers(0, 1, &VertexBuffer, &Stride, &Offset);
-            mGfxDeviceDeferredContext->IASetIndexBuffer(CubeIndexBufferPtr->mBufferPtr.Get(), DXGI_FORMAT::DXGI_FORMAT_R32_UINT, 0);
-            mGfxDeviceDeferredContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
-            mGfxDeviceDeferredContext->VSSetConstantBuffers(0, 1, &VertexShaderBuffer);
-            mGfxDeviceDeferredContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
-            mGfxDeviceDeferredContext->PSSetConstantBuffers(0, 1, &VertexShaderBuffer);
-            mGfxDeviceDeferredContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
-            mGfxDeviceDeferredContext->DrawIndexed(CubeIndexCount, 0, 0);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            mGfxDeviceDeferredContext->SetVertexBuffer(CubeVertexBufferPtr, 0);
+            mGfxDeviceDeferredContext->SetIndexBuffer(CubeIndexBufferPtr, 0);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
+            mGfxDeviceDeferredContext->mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
+            mGfxDeviceDeferredContext->SetVSConstantBufferImpl(0, VertexShaderBufferPtr);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
+            mGfxDeviceDeferredContext->SetPSConstantBufferImpl(0, VertexShaderBufferPtr);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->DrawIndexed(CubeIndexCount, 0, 0);
         }
     }
 }
