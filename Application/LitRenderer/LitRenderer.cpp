@@ -79,7 +79,7 @@ math::normalized_vector3<F> GenerateHemisphereDirection(const math::vector3<F>& 
     return uvw.local(x, y, z);
 }
 
-math::normalized_vector3<F> GenUniformHemisphereDirection(const math::vector3<F>& normal)
+math::normalized_vector3<F> GenerateUniformHemisphereDirection(const math::vector3<F>& normal)
 {
     static random<F> rand_theta;
     static random<F> rand_phi;
@@ -124,7 +124,7 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F
 bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering) const
 {
-    math::normalized_vector3<F> Direction = GenUniformHemisphereDirection(N);
+    math::normalized_vector3<F> Direction = GenerateCosineWeightedHemisphereDirection(N);
     outScattering.set_origin(P);
     outScattering.set_direction(Direction);
     return true;
@@ -133,7 +133,7 @@ bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N
 F Lambertian::ScatteringPDF(const math::vector3<F>& N, const math::vector3<F>& Scattering) const
 {
     F cosTheta = math::dot(N, Scattering);
-    return cosTheta < F(0) ? F(0) : F(1) / math::constant_value<F>::two_pi;
+    return cosTheta < F(0) ? F(0) : cosTheta / math::constant_value<F>::pi;
 }
 
 math::vector3<F> Reflect(const math::vector3<F>& In, const math::vector3<F>& N)
@@ -215,7 +215,7 @@ math::vector3<F> PureLight_ForTest::Emitting() const
 
 struct TerminalRecord
 {
-    static const int MaxRecursiveDepth = 100;
+    static const int MaxRecursiveDepth = 10;
 
     math::vector3<F> OuterReflectance = math::vector3<F>::one();
     int CurrentRecursiveDepth = MaxRecursiveDepth;
@@ -267,6 +267,7 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
         {
             math::vector3<F> LightNormal;
             math::point3d<F> LightSamplePos = LightObject->SampleRandomPoint(LightNormal, pdf);
+            pdf *= Ln;
             math::vector3<F> lightDirectoin = LightSamplePos - shadingPoint;
             scattering.set_direction(lightDirectoin);
             F cosThetaPrime = math::dot(-LightNormal, scattering.direction());
@@ -292,6 +293,7 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
         if (material.Scattering(shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering))
         {
             pdf = material.ScatteringPDF(normal, scattering.direction());
+            pdf *= F(1) - Ln;
             F cosTheta = math::dot(normal, scattering.direction());
             math::vector3<F> reflectance = material.BRDF() * cosTheta / pdf;
             Li = Trace(scene, scattering, TerminalRecord.Next(reflectance));
@@ -309,8 +311,8 @@ math::point3d<F> SceneRect::SampleRandomPoint(math::vector3<F>& outN, F& outPDF)
     outN = mWorldNormal;
     outPDF = F(1) / (Rect.width() * Rect.height());
 
-    F e1 = random<F>::value() * Rect.extends().x;
-    F e2 = random<F>::value() * Rect.extends().y;
+    F e1 = random<F>::value() * Rect.width();
+    F e2 = random<F>::value() * Rect.height();
 
     math::vector3<F> Bitangent = math::cross(mWorldNormal, mWorldTagent);
     return math::point3d<F>(mWorldPosition + e1 * mWorldTagent + e2 * Bitangent);
@@ -425,9 +427,12 @@ void LitRenderer::InitialSceneTransforms()
 
 void LitRenderer::GenerateImageProgressive()
 {
-    GenerateSamples();
-    ResolveSamples();
-    mCanvas.NeedFlushBackbuffer = true;
+    if (mCanvas.GetmSampleCount() <= mMaxSampleCount || mMaxSampleCount <= 0)
+    {
+        GenerateSamples();
+        ResolveSamples();
+        mCanvas.NeedFlushBackbuffer = true;
+    }
 }
 
 bool LitRenderer::NeedUpdate()
@@ -722,7 +727,7 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneCenterX,
         SceneCenterY,
         SceneCenterZ + 10);
-    metalSphere->Material = std::make_unique<Metal>(F(1.0), F(0.85), F(0.45), F(0.08));
+    metalSphere->Material = std::make_unique<Metal>(F(0.08));
 
     SceneSphere* dielectricSphereFloat = new SceneSphere(); OutSceneObjects.push_back(dielectricSphereFloat);
     dielectricSphereFloat->SetRadius(15);

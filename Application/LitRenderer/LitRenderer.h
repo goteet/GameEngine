@@ -22,6 +22,7 @@ public:
     const int CanvasHeight;
     const int CanvasLinePitch;
     void IncreaseSampleCount() { mSampleCount++; }
+    int GetmSampleCount() const { return mSampleCount; }
 
 private:
     void FlushLinearColorToGammaCorrectedCanvasData();
@@ -73,14 +74,13 @@ struct Lambertian : public IMaterial
 
 struct Metal : public IMaterial
 {
-    math::vector3<F> Albedo = math::vector3<F>::one();
     F Fuzzy = F(0);
 
     Metal() = default;
-    Metal(F r, F g, F b, F f) : Albedo(r, g, b), Fuzzy(f) { }
+    Metal(F f) : Fuzzy(f) { }
     virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
         math::ray3d<F>& outScattering) const override;
-    virtual math::vector3<F> BRDF() const override { return Albedo / math::PI<F>; }
+    virtual math::vector3<F> BRDF() const override { return math::vector3<F>::one(); }
 };
 
 struct Dielectric : public IMaterial
@@ -244,6 +244,7 @@ private:
         int pixelRow, pixelCol;
     };
 
+    const int mMaxSampleCount = 4096;
     const int mSampleArrayCount;
     math::vector3<F> mClearColor;
     RenderCanvas mCanvas;
