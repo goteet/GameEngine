@@ -222,9 +222,8 @@ const std::string DefaultVertexShaderSourceCode = R"(
     struct VertexOutput
     {
         float4 Position  : SV_POSITION;
-        float3 Color     : TEXCOORD0;
-        float3 Normal    : TEXCOORD1;
-        float3 ViewDirWS : TEXCOORD2;
+        float3 Normal    : TEXCOORD0;
+        float3 ViewDirWS : TEXCOORD1;
     };
     VertexOutput VSMain(VertexLayout input)
     {
@@ -233,9 +232,7 @@ const std::string DefaultVertexShaderSourceCode = R"(
         float4 ViewPosition  = mul(ModelPosition, MatrixView);
         output.Position      = mul(ViewPosition, MatrixProj);
         float4 ModelNormal   = float4(input.Normal, 0.0f);
-        output.Normal        = mul(float4(mul(ModelNormal, MatrixView).xyz, 0.0f), MatrixProj).xyz;
-        output.Color         = ModelPosition.xyz + 0.5;
-
+        output.Normal        = normalize(mul(ModelNormal, transpose(MatrixWorldToObject)).xyz);
         float3 CameraPositionWS = InvMatrixView._m03_m13_m23;
         output.ViewDirWS        = CameraPositionWS - ModelPosition.xyz;
         return output;
@@ -257,25 +254,21 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
     struct VertexOutput
     {
         float4 Position  : SV_POSITION;
-        float3 Color     : TEXCOORD0;
-        float3 Normal    : TEXCOORD1;
-        float3 ViewDirWS : TEXCOORD2;
+        float3 Normal    : TEXCOORD0;
+        float3 ViewDirWS : TEXCOORD1;
     };
     float4 PSMain(VertexOutput input) : SV_TARGET
     {
         float3 N = normalize(input.Normal);
-        float3 L = normalize(-LightDirection);
-        float NoL = max(0.0, dot(L, N));
-        float3 Diffuse = float3(1.0, 1.0, 1.0) * NoL;
-        float3 V = input.ViewDirWS;
-        float3 Ambient = float3(0.15, 0.1, 0.1);
-
+        float3 L = -LightDirection;
+        float3 V = normalize(input.ViewDirWS);
         float3 H = normalize(L + V);
+        float NoL = max(0.0, dot(L, N));
         float NoH = max(0.0, dot(N, H));
+        float3 Ambient = float3(0.15, 0.1, 0.1);
+        float3 Diffuse = float3(1.0, 1.0, 1.0) * NoL;
         float3 Specular = pow(NoH, 128);
-
         float4 Color = float4((Diffuse + Specular) * LightColor + Ambient, 1.0);
-
         return Color;
     }
 )";

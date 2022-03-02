@@ -99,7 +99,7 @@ void InitializeSimpleScene()
 
     GE::DirectionalLight* mainLight = g_DefaultScene->CreateDirectionalLightNode();
     mainLight->GetSceneNode()->SetWorldPosition(math::point3df(5.0f, 5.0f, -5.0f));
-    math::normalized_float3 lightDirection(0.7f, -0.8f, 1.0f);
+    math::normalized_float3 lightDirection(-0.55f, -0.55f, 1.0f);
     mainLight->GetSceneNode()->SetForwardDirection(lightDirection);
     mainLight->SetIntensity(1.2f);
     mainLight->SetColor(math::float3(0.98f, 0.98f, 0.9f));
