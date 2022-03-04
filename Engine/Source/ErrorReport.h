@@ -132,7 +132,7 @@ namespace engine
     engine::PrintSubMessage(__VA_ARGS__);                                                           \
     engine::Print("\n");
 
-#define DEBUGPRINT(msg, ...) GE::Printf(msg "\n", ##__VA_ARGS__);
+#define DEBUGPRINT(msg, ...) engine::Printf(msg "\n", ##__VA_ARGS__);
 
 #endif
 
