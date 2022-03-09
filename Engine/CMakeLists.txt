@@ -35,12 +35,14 @@ set(GameEngine_SourceFiles_Core
 )
 
 set(GameEngine_HeaderFiles_Render
+    ${GameEngine_SourceDir_Render}/FrameGraph.h
     ${GameEngine_SourceDir_Render}/GfxInterface.h
     ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.h
     ${GameEngine_SourceDir_Render}/TransientBufferRegistry.h
 )
 set(GameEngine_SourceFiles_Render
+    ${GameEngine_SourceDir_Render}/FrameGraph.cpp
     ${GameEngine_SourceDir_Render}/GfxInterface.cpp
     ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.cpp

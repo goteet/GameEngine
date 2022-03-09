@@ -7,6 +7,7 @@
 #include "Core/GameEngine.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
+#include "Render/FrameGraph.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -279,6 +280,7 @@ namespace engine
     GfxDynamicConstantBuffer* SceneConstantBufferPtr = nullptr;
     ShaderProgram* SimpleShaderProgramPtr = nullptr;
     ID3D11CommandList* CubeRenderingCommandList = nullptr;
+    ID3D11RasterizerState* DefaultRasterState = nullptr;
 
     RenderSystem::RenderSystem(void* hWindow, bool fullscreen, int width, int height)
         : mMainWindowHandle((HWND)hWindow)
@@ -300,6 +302,7 @@ namespace engine
         safe_delete(ObjectConstantBufferPtr);
         safe_delete(SceneConstantBufferPtr);
         safe_delete(SimpleShaderProgramPtr);
+        SafeRelease(DefaultRasterState);
         SafeRelease(CubeRenderingCommandList);
 
         safe_release(mBackbufferDepthStencil);
@@ -438,72 +441,95 @@ namespace engine
     void RenderSystem::RenderFrame(Scene& scene)
     {
         ViewConstantBufferData data;
-
-        math::float4x4 viewMatrix = math::scale_matrix4x4f(2, 2, 2);
-        math::float3 cameraPositionWS = math::float3(0.0f, 0.0f, -10.0f);
-        math::float3 lightColor = math::float3(1.0f, 1.0f, 1.0f);
-        float lightIntensity = 1.0f;
-        math::float3 lightDirection = math::float3(1.0f, 0.0f, 0.0f);
-
-
-        Camera* defaultCamera = scene.GetDefaultCameraInternal();
-        if (defaultCamera != nullptr)
+        //Update ConstantBufferData
         {
-            viewMatrix = defaultCamera->GetUpdatedViewMatrix();
-            cameraPositionWS = defaultCamera->GetSceneNode()->GetWorldPosition();
+            math::float4x4 viewMatrix = math::scale_matrix4x4f(2, 2, 2);
+            math::float3 cameraPositionWS = math::float3(0.0f, 0.0f, -10.0f);
+            math::float3 lightColor = math::float3(1.0f, 1.0f, 1.0f);
+            float lightIntensity = 1.0f;
+            math::float3 lightDirection = math::float3(1.0f, 0.0f, 0.0f);
+
+
+            Camera* defaultCamera = scene.GetDefaultCameraInternal();
+            if (defaultCamera != nullptr)
+            {
+                viewMatrix = defaultCamera->GetUpdatedViewMatrix();
+                cameraPositionWS = defaultCamera->GetSceneNode()->GetWorldPosition();
+            }
+
+            GE::DirectionalLight* defaultLight = scene.GetDirectionalLight(0);
+
+            lightColor = defaultLight->GetColor();
+            lightIntensity = defaultLight->GetIntensity();
+            lightDirection = defaultLight->GetSceneNode()->GetForwardDirection();
+
+            data.ViewMatrix = viewMatrix;
+            data.InvViewMatrix = math::inversed(viewMatrix);
+            data.CameraPositionWS = cameraPositionWS;
+            data.LightColor = lightColor * lightIntensity;
+            data.LightDirection = lightDirection;
         }
 
-        GE::DirectionalLight* defaultLight = scene.GetDirectionalLight(0);
-
-        lightColor = defaultLight->GetColor();
-        lightIntensity = defaultLight->GetIntensity();
-        lightDirection = defaultLight->GetSceneNode()->GetForwardDirection();
-
-        data.ViewMatrix = viewMatrix;
-        data.InvViewMatrix = math::inversed(viewMatrix);
-        data.CameraPositionWS = cameraPositionWS;
-        data.LightColor = lightColor * lightIntensity;
-        data.LightDirection = lightDirection;
-
-        if (CubeRenderingCommandList == nullptr)
+        //Do Rendering.
         {
-            auto RenderTagetView = mBackbufferRenderTarget->mRenderTargetView.Get();
-            float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+            RenderFrameGraph MainGraph;
+            RFGRenderPass forwardPass = MainGraph.AddRenderPass("test.forward");
+            RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget");
+            RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil");
 
-            D3D11_RASTERIZER_DESC RasterizerDesc;
-            RasterizerDesc.FillMode = D3D11_FILL_MODE::D3D11_FILL_SOLID;
-            RasterizerDesc.CullMode = D3D11_CULL_MODE::D3D11_CULL_BACK;
-            RasterizerDesc.FrontCounterClockwise = TRUE;
-            RasterizerDesc.DepthBias = 0;
-            RasterizerDesc.DepthBiasClamp = 0.0f;
-            RasterizerDesc.SlopeScaledDepthBias = 0.0;
-            RasterizerDesc.DepthClipEnable = TRUE;
-            RasterizerDesc.ScissorEnable = FALSE;
-            RasterizerDesc.MultisampleEnable = TRUE;
-            RasterizerDesc.AntialiasedLineEnable = TRUE;
+            ClearState state;
+            state.ClearColor = true;
+            state.ClearDepth = true;
+            state.ClearStencil = true;
+            forwardPass.BindWriting(renderTarget, state);
+            forwardPass.BindWriting(depthStencil, state);
+            forwardPass.AttachJob([&](GfxDeferredContext& context)
+                {
+                    math::float4 ClearColor{ 0.0f, 0.0f, 0.0f, 1.0f };
+                    if (DefaultRasterState == nullptr)
+                    {
+                        D3D11_RASTERIZER_DESC RasterizerDesc;
+                        RasterizerDesc.FillMode = D3D11_FILL_MODE::D3D11_FILL_SOLID;
+                        RasterizerDesc.CullMode = D3D11_CULL_MODE::D3D11_CULL_BACK;
+                        RasterizerDesc.FrontCounterClockwise = TRUE;
+                        RasterizerDesc.DepthBias = 0;
+                        RasterizerDesc.DepthBiasClamp = 0.0f;
+                        RasterizerDesc.SlopeScaledDepthBias = 0.0;
+                        RasterizerDesc.DepthClipEnable = TRUE;
+                        RasterizerDesc.ScissorEnable = FALSE;
+                        RasterizerDesc.MultisampleEnable = TRUE;
+                        RasterizerDesc.AntialiasedLineEnable = TRUE;
+                        mGfxDevice->mGfxDevice->CreateRasterizerState(&RasterizerDesc, &DefaultRasterState);
+                    }
+                    context.mGfxDeviceContext->RSSetState(DefaultRasterState);
+                    GfxRenderTarget* rt = mBackbufferRenderTarget.get();
+                    context.SetRenderTargets(&rt, 1, mBackbufferDepthStencil.get());
+                    context.ClearRenderTarget(mBackbufferRenderTarget.get(), ClearColor);
+                    context.ClearDepthStencil(mBackbufferDepthStencil.get(), 1.0f, 0);
 
-            ComPtr<ID3D11RasterizerState> pRasterState;
-            mGfxDevice->mGfxDevice->CreateRasterizerState(&RasterizerDesc, pRasterState.ReleaseAndGetAddressOf());
-            mGfxDeviceDeferredContext->mGfxDeviceContext->RSSetState(pRasterState.Get());
+                    D3D11_VIEWPORT Viewport;
+                    Viewport.TopLeftX = 0.0f;
+                    Viewport.TopLeftY = 0.0f;
+                    Viewport.Width = (float)mClientWidth;
+                    Viewport.Height = (float)mClientHeight;
+                    Viewport.MinDepth = 0.0f;
+                    Viewport.MaxDepth = 1.0f;
 
-            mGfxDeviceDeferredContext->mGfxDeviceContext->OMSetRenderTargets(1, &RenderTagetView, mBackbufferDepthStencil->mDepthStencilView.Get());
-            mGfxDeviceDeferredContext->mGfxDeviceContext->ClearRenderTargetView(RenderTagetView, ClearColor);
-            mGfxDeviceDeferredContext->mGfxDeviceContext->ClearDepthStencilView(mBackbufferDepthStencil->mDepthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+                    context.mGfxDeviceContext->RSSetViewports(1, &Viewport);
 
-            D3D11_VIEWPORT Viewport;
-            Viewport.TopLeftX = 0.0f;
-            Viewport.TopLeftY = 0.0f;
-            Viewport.Width = (float)mClientWidth;
-            Viewport.Height = (float)mClientHeight;
-            Viewport.MinDepth = 0.0f;
-            Viewport.MaxDepth = 1.0f;
+                    RenderScene(scene, context, data);
 
-            mGfxDeviceDeferredContext->mGfxDeviceContext->RSSetViewports(1, &Viewport);
-
-            RenderScene(scene, data);
-            mGfxDeviceDeferredContext->mGfxDeviceContext->FinishCommandList(false, &CubeRenderingCommandList);
+                    const bool DontRestoreContextState = false;
+                    context.mGfxDeviceContext->FinishCommandList(DontRestoreContextState, &CubeRenderingCommandList);
+                    mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(CubeRenderingCommandList, DontRestoreContextState);
+                }
+            );
+            MainGraph.BindOutput(renderTarget);
+            MainGraph.BindOutput(depthStencil);
+            MainGraph.Compile();
+            MainGraph.Execute(*mGfxDeviceDeferredContext);
         }
-        mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(CubeRenderingCommandList, false);
+
         mGfxSwapChain->Present(0, 0);
     }
 
@@ -523,7 +549,7 @@ namespace engine
         return false;
     }
 
-    void RenderSystem::RenderScene(Scene& scene, const ViewConstantBufferData& data)
+    void RenderSystem::RenderScene(Scene& scene, GfxDeferredContext& context, const ViewConstantBufferData& data)
     {
         static bool initialize = false;
         static bool initialize_error = false;
@@ -560,7 +586,7 @@ namespace engine
             math::float2 zNearFar(1.0f, 50.0f);
 
             // TODO: Vertex and pixel use same constant buffer here.
-            math::float4* pConstBuffer = mGfxDeviceDeferredContext->MapBuffer<math::float4>(*SceneConstantBufferPtr);
+            math::float4* pConstBuffer = context.MapBuffer<math::float4>(*SceneConstantBufferPtr);
             {
                 pConstBuffer[0] = data.ViewMatrix.rows[0];
                 pConstBuffer[1] = data.ViewMatrix.rows[1];
@@ -581,16 +607,16 @@ namespace engine
                 pConstBuffer[12] = math::float4(data.LightColor, 1.0f);
                 pConstBuffer[13] = math::float4(data.LightDirection, 0.0f);
             }
-            mGfxDeviceDeferredContext->UnmapBuffer(*SceneConstantBufferPtr);
+            context.UnmapBuffer(*SceneConstantBufferPtr);
 
-            mGfxDeviceDeferredContext->mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            context.mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-            mGfxDeviceDeferredContext->mGfxDeviceContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
-            mGfxDeviceDeferredContext->mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
+            context.mGfxDeviceContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
+            context.mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
 
-            mGfxDeviceDeferredContext->SetVSConstantBufferImpl(1, SceneConstantBufferPtr);
-            mGfxDeviceDeferredContext->mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
-            mGfxDeviceDeferredContext->SetPSConstantBufferImpl(0, SceneConstantBufferPtr);
+            context.SetVSConstantBufferImpl(1, SceneConstantBufferPtr);
+            context.mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
+            context.SetPSConstantBufferImpl(0, SceneConstantBufferPtr);
             scene.RecursiveRender(mGfxDeviceDeferredContext.get());
         }
 
