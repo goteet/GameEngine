@@ -38,11 +38,13 @@ set(GameEngine_HeaderFiles_Render
     ${GameEngine_SourceDir_Render}/GfxInterface.h
     ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.h
+    ${GameEngine_SourceDir_Render}/TransientBufferRegistry.h
 )
 set(GameEngine_SourceFiles_Render
     ${GameEngine_SourceDir_Render}/GfxInterface.cpp
     ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.cpp
+    ${GameEngine_SourceDir_Render}/TransientBufferRegistry.cpp
 )
 
 set(GameEngine_HeaderFiles_Scene
@@ -82,10 +84,8 @@ source_group("Engine/Source/Core/Include"   FILES ${GameEngine_HeaderFiles_Core}
 source_group("Engine/Source/Core/Source"    FILES ${GameEngine_SourceFiles_Core})
 source_group("Engine/Source/Render/Include" FILES ${GameEngine_HeaderFiles_Render})
 source_group("Engine/Source/Render/Source"  FILES ${GameEngine_SourceFiles_Render})
-source_group("Engine/Source/Scene/Include" FILES ${GameEngine_HeaderFiles_Scene})
-source_group("Engine/Source/Scene/Source"  FILES ${GameEngine_SourceFiles_Scene})
-
-
+source_group("Engine/Source/Scene/Include"  FILES ${GameEngine_HeaderFiles_Scene})
+source_group("Engine/Source/Scene/Source"   FILES ${GameEngine_SourceFiles_Scene})
 
 add_library(GameEngine SHARED ${GameEngine_SourceFiles})
 target_include_directories(GameEngine PUBLIC "${GameEngine_IncludeDir}" "${CMAKE_SOURCE_DIR}")
