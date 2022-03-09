@@ -1,15 +1,17 @@
 #include "FrameGraph.h"
 #include <stack>
 #include <queue>
+#include "GfxInterface.h"
 
 namespace engine
 {
-    RenderFrameGraph::RenderFrameGraph()
+    RenderFrameGraph::RenderFrameGraph(TransientBufferRegistry* registry)
+        : mTransientBufferRegistry(registry)
     {
-        RFGResource& BackbufferRT = CreateNewResource("backbuffer.rendertarget");
+        RFGResource& BackbufferRT = CreateNewResource("backbuffer.rendertarget", true);
         mBackbufferRTIndex = BackbufferRT.Index;
 
-        RFGResource& BackbufferDS = CreateNewResource("backbuffer.depthstencil");
+        RFGResource& BackbufferDS = CreateNewResource("backbuffer.depthstencil", false);
         mBackbufferDSIndex = BackbufferDS.Index;
     }
 
@@ -22,16 +24,16 @@ namespace engine
         return RFGRenderPass{ this, node.Index };
     }
 
-    RFGResourceHandle RenderFrameGraph::RequestResource(const std::string& name)
+    RFGResourceHandle RenderFrameGraph::RequestResource(const std::string& name, bool rendertarget)
     {
         auto it = std::find_if(mResources.begin(),
             mResources.end(),
-            [&name](const RFGResource& resource) {
-                return resource.DebugName == name;
+            [&name, &rendertarget](const RFGResource& resource) {
+                return resource.DebugName == name && resource.RenderTarget == (rendertarget ? 1 : 0);
             });
 
         return (mResources.end() == it)
-            ? RFGResourceHandle{ this, CreateNewResource(name).Index }
+            ? RFGResourceHandle{ this, CreateNewResource(name, rendertarget).Index }
         : RFGResourceHandle{ this, it->Index };
     }
 
@@ -126,8 +128,7 @@ namespace engine
             return false;
 
         RFGNode& node = mNodes[pass.Index];
-        //TODO:fix this.
-        bool isRenderTarget = true;
+        bool isRenderTarget = mResources[resource.Index].RenderTarget == 1;
         if (isRenderTarget)
         {
             node.WritingRenderTargets.emplace_back(resource.Index);
@@ -173,10 +174,10 @@ namespace engine
 
     void RenderFrameGraph::CreateTestFrameGraph()
     {
-        RFGResourceHandle resShadowmap = RequestResource("shadow.depthmap");
-        RFGResourceHandle resForwardColor = RequestResource("render.forward.color");
-        RFGResourceHandle resDepthColor = RequestResource("render.depth.color");
-        RFGResourceHandle resFinal = RequestResource("render.final");
+        RFGResourceHandle resShadowmap = RequestResource("shadow.depthmap", false);
+        RFGResourceHandle resForwardColor = RequestResource("render.forward.color", true);
+        RFGResourceHandle resDepthColor = RequestResource("render.depth.color", false); //TODO: fix this.
+        RFGResourceHandle resFinal = RequestResource("render.final", false);
         RFGRenderPass nodeShadowMapDepth = AddRenderPass("render.shadowmap");
         RFGRenderPass nodeForward = AddRenderPass("render.forward");
         RFGRenderPass nodeDepthToRT = AddRenderPass("render.depth2rt");
@@ -211,19 +212,64 @@ namespace engine
         }
     }
 
-    RenderFrameGraph::RFGResource& RenderFrameGraph::CreateNewResource(const std::string& name)
+    RenderFrameGraph::RFGResource& RenderFrameGraph::CreateNewResource(const std::string& name, bool rendertarget)
     {
         RFGResource resource;
         resource.DebugName = name;
         resource.Index = (int)mResources.size();
+        resource.RenderTarget = rendertarget ? 1 : 0;
         mResources.emplace_back(resource);
         return mResources.back();
+    }
+
+    void RenderFrameGraph::BindWritingResources(GfxDeferredContext& context, RenderFrameGraph::RFGNode& node)
+    {
+        TransientBufferRegistry* registry = mTransientBufferRegistry;
+        GfxRenderTarget* renderTargets[100];
+        int rtCount = 0;
+        for (int renderTargetIndex : node.WritingRenderTargets)
+        {
+            renderTargetIndex = GetAliasingResourceIndex(renderTargetIndex);
+            renderTargets[rtCount] = renderTargetIndex == mBackbufferRTIndex
+                ? registry->GetDefaultBackbufferRT()
+                : nullptr;                //: registry->AllocateRenderTarget();
+            rtCount++;
+        }
+
+        int depthStencilIndex = -1;
+        GfxDepthStencil* depthStencil = nullptr;
+        if (node.WritingDepthStencil != -1)
+        {
+            depthStencilIndex = GetAliasingResourceIndex(node.WritingDepthStencil);
+            renderTargets[rtCount] = depthStencilIndex == mBackbufferDSIndex
+                ? registry->GetDefaultBackbufferRT()
+                : nullptr;                //: registry->AllocateDepthStencil();
+        }
+
+        context.SetRenderTargets(renderTargets, rtCount, depthStencil);
+        rtCount = 0;
+        for (auto& state : node.RenderTargetBindStates)
+        {
+            if (state.ClearColor)
+                context.ClearRenderTarget(renderTargets[rtCount], state.ClearColorValue);
+            rtCount++;
+        }
+        if (depthStencil != nullptr)
+        {
+            context.ClearDepthStencil(depthStencil,
+                node.DepthStencilBindState.ClearStencil,
+                node.DepthStencilBindState.ClearDepth,
+                node.DepthStencilBindState.ClearDepthValue,
+                node.DepthStencilBindState.ClearStencilValue);
+        }
+
     }
 
     void RenderFrameGraph::ExecuteNode(GfxDeferredContext& context, RenderFrameGraph::RFGNode& node)
     {
         if (node.mExecuteJob)
         {
+            BindWritingResources(context, node);
             node.mExecuteJob(context);
         }
 
@@ -232,14 +278,11 @@ namespace engine
         {
             if (index == -1)
                 continue;
-            for (int aliasingIndex = mResources[index].AliasingTo;
-                aliasingIndex != -1; aliasingIndex = mResources[index].AliasingTo)
-            {
-                PrintSubMessage("Map Input Resource From{%s} to {%s}",
-                    mResources[index].DebugName.c_str(),
-                    mResources[aliasingIndex].DebugName.c_str());
-                index = aliasingIndex;
-            }
+            int aliasingIndex = GetAliasingResourceIndex(index);
+            PrintSubMessage("Map Input Resource From{%s} to {%s}",
+                mResources[index].DebugName.c_str(),
+                mResources[aliasingIndex].DebugName.c_str());
+            index = aliasingIndex;
             RFGResource& resource = mResources[index];
             PrintSubMessage("Reading Resource{%s}", resource.DebugName.c_str());
         }
@@ -248,18 +291,25 @@ namespace engine
         {
             if (index == -1)
                 continue;
-            for (int aliasingIndex = mResources[index].AliasingTo;
-                aliasingIndex != -1; aliasingIndex = mResources[index].AliasingTo)
-            {
-                PrintSubMessage("Map Output Resource From{%s} to {%s}",
-                    mResources[index].DebugName.c_str(),
-                    mResources[aliasingIndex].DebugName.c_str());
-                index = aliasingIndex;
-            }
+            int aliasingIndex = GetAliasingResourceIndex(index);
+            PrintSubMessage("Map Output Resource From{%s} to {%s}",
+                mResources[index].DebugName.c_str(),
+                mResources[aliasingIndex].DebugName.c_str());
+            index = aliasingIndex;
             RFGResource& resource = mResources[index];
             PrintSubMessage("Writing Resource{%s}", resource.DebugName.c_str());
         }
     }
+    int RenderFrameGraph::GetAliasingResourceIndex(int index)
+    {
+        for (int aliasingIndex = mResources[index].AliasingTo;
+            aliasingIndex != -1; aliasingIndex = mResources[index].AliasingTo)
+        {
+            index = aliasingIndex;
+        }
+        return index;
+    }
+
     bool RFGRenderPass::BindReading(RFGResourceHandle resource)
     {
         if (Graph != resource.Graph)

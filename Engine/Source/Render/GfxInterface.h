@@ -350,6 +350,7 @@ namespace engine
         void ClearDepthOnly(GfxDepthStencil* ds, float depth);
         void ClearStencilOnly(GfxDepthStencil* ds, unsigned char stencil);
         void ClearDepthStencil(GfxDepthStencil* ds, float depth, unsigned char stencil);
+        void ClearDepthStencil(GfxDepthStencil* ds, bool depth, bool stencil, float dv, unsigned char sv);
 
         GfxDevice* mGfxDevice;
         ID3D11DeviceContext* mGfxDeviceContext;

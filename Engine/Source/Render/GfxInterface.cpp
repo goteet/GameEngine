@@ -297,6 +297,12 @@ namespace engine
         ClearDeptnStencil(mGfxDeviceContext, ds->mDepthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, depth, stencil);
     }
 
+    void GfxDeviceContext::ClearDepthStencil(GfxDepthStencil* ds, bool depth, bool stencil, float dv, unsigned char sv)
+    {
+        UINT flags = (depth ? D3D11_CLEAR_DEPTH : 0) | (stencil ? D3D11_CLEAR_STENCIL : 0);
+        ClearDeptnStencil(mGfxDeviceContext, ds->mDepthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, depth, stencil);
+    }
+
     GfxImmediateContext::GfxImmediateContext(GfxDevice* device, ID3D11DeviceContext* context)
         : GfxDeviceContext(device, context)
     { }

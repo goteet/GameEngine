@@ -472,20 +472,20 @@ namespace engine
 
         //Do Rendering.
         {
-            RenderFrameGraph MainGraph;
+            RenderFrameGraph MainGraph(mTransientBufferRegistry.get());
             RFGRenderPass forwardPass = MainGraph.AddRenderPass("test.forward");
-            RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget");
-            RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil");
+            RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget", true);
+            RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil", false);
 
             ClearState state;
             state.ClearColor = true;
             state.ClearDepth = true;
             state.ClearStencil = true;
+            state.ClearColorValue = math::float4{ 0.15f, 0.0f, 0.0f, 1.0f };
             forwardPass.BindWriting(renderTarget, state);
             forwardPass.BindWriting(depthStencil, state);
             forwardPass.AttachJob([&](GfxDeferredContext& context)
                 {
-                    math::float4 ClearColor{ 0.0f, 0.0f, 0.0f, 1.0f };
                     if (DefaultRasterState == nullptr)
                     {
                         D3D11_RASTERIZER_DESC RasterizerDesc;
@@ -502,10 +502,6 @@ namespace engine
                         mGfxDevice->mGfxDevice->CreateRasterizerState(&RasterizerDesc, &DefaultRasterState);
                     }
                     context.mGfxDeviceContext->RSSetState(DefaultRasterState);
-                    GfxRenderTarget* rt = mBackbufferRenderTarget.get();
-                    context.SetRenderTargets(&rt, 1, mBackbufferDepthStencil.get());
-                    context.ClearRenderTarget(mBackbufferRenderTarget.get(), ClearColor);
-                    context.ClearDepthStencil(mBackbufferDepthStencil.get(), 1.0f, 0);
 
                     D3D11_VIEWPORT Viewport;
                     Viewport.TopLeftX = 0.0f;

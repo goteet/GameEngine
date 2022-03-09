@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <functional>
+#include "TransientBufferRegistry.h"
 namespace engine
 {
     class GfxDeferredContext;
@@ -39,9 +40,9 @@ namespace engine
     class RenderFrameGraph
     {
     public:
-        RenderFrameGraph();
+        RenderFrameGraph(TransientBufferRegistry* registry);
         RFGRenderPass AddRenderPass(const std::string& name);
-        RFGResourceHandle RequestResource(const std::string& name);
+        RFGResourceHandle RequestResource(const std::string& name, bool rendertarget);
         void Compile();
         void Execute(GfxDeferredContext&);
         bool BindReading(RFGRenderPass, RFGResourceHandle&);
@@ -81,11 +82,15 @@ namespace engine
             std::vector<int> AliasingResources;
         };
         void MoveResource(RFGResource& from, RFGResource& to);
-        RFGResource& CreateNewResource(const std::string& name);
+        RFGResource& CreateNewResource(const std::string& name, bool rendertarget);
+        void BindWritingResources(GfxDeferredContext& context, RFGNode& node);
         void ExecuteNode(GfxDeferredContext& context, RFGNode& node);
+        int GetAliasingResourceIndex(int);
+
         std::vector<RFGNode> mNodes;
         std::vector<RFGResource> mResources;
         std::vector<int> mCompiledNodeExecuteOrder;
+        TransientBufferRegistry* mTransientBufferRegistry;
         int mBackbufferRTIndex;
         int mBackbufferDSIndex;
     };
