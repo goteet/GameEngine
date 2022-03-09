@@ -149,7 +149,11 @@ namespace engine
 
     struct GfxTexture2D
     {
-        D3D11_TEXTURE2D_DESC mBufferDesc;
+        unsigned int GetWidth() const { return mTexture2DDesc.Width; }
+        unsigned int GetHeight() const { return mTexture2DDesc.Height; }
+        DXGI_FORMAT GetTextureFormat() const { return mTexture2DDesc.Format; }
+
+        D3D11_TEXTURE2D_DESC mTexture2DDesc;
         ComPtr<ID3D11Texture2D> mTexturePtr = nullptr;
 
         //D3D11_BIND_SHADER_RESOURCE
@@ -157,6 +161,68 @@ namespace engine
         //  this flag cannot be used with the D3D11_MAP_WRITE_NO_OVERWRITE flag.
         D3D11_SHADER_RESOURCE_VIEW_DESC mShaderResourceDesc;
         ComPtr<ID3D11ShaderResourceView> mShaderResourceView = nullptr;
+    };
+
+    enum ERenderTargetFormat
+    {
+        UNormRGB10A2,
+        UNormRGBA8
+    };
+
+    struct GfxRenderTarget : public GfxTexture2D
+    {
+        GfxRenderTarget(ERenderTargetFormat format, bool usedByShader)
+            : mRenderTargetFormat(format)
+        {
+            switch (format)
+            {
+            default:
+            case ERenderTargetFormat::UNormRGB10A2:
+                //TODO:Not test yet.
+                mTexture2DDesc.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
+                mRenderTargetDesc.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
+                mShaderResourceDesc.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
+                break;
+            case ERenderTargetFormat::UNormRGBA8:
+                //TODO:Not test yet.
+                mTexture2DDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                mRenderTargetDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                mShaderResourceDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                break;
+            }
+
+            //TODO: more general way.
+            unsigned int miplevels = 1;
+            mTexture2DDesc.MipLevels = miplevels;
+            mTexture2DDesc.ArraySize = 1;
+            mTexture2DDesc.SampleDesc.Count = 1;
+            mTexture2DDesc.SampleDesc.Quality = 0;
+            mTexture2DDesc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+            mTexture2DDesc.BindFlags = usedByShader ? (D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE) : D3D11_BIND_RENDER_TARGET;;
+            mTexture2DDesc.CPUAccessFlags = 0;
+            mTexture2DDesc.MiscFlags = 0;
+
+            mRenderTargetDesc.Format;
+            mRenderTargetDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+            mRenderTargetDesc.Texture2D.MipSlice = 0;
+
+            mShaderResourceDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            mShaderResourceDesc.Texture2D.MipLevels = miplevels;
+            mShaderResourceDesc.Texture2D.MostDetailedMip = 0;
+        }
+
+        bool IsSame(ERenderTargetFormat format, unsigned int width, unsigned int height, bool forshader)
+        {
+            return format == mRenderTargetFormat
+                && width == GetWidth()
+                && height == GetHeight()
+                && (forshader ? mShaderResourceView != nullptr : true);
+        }
+
+        ERenderTargetFormat mRenderTargetFormat;
+
+        D3D11_RENDER_TARGET_VIEW_DESC mRenderTargetDesc;
+        ComPtr<ID3D11RenderTargetView> mRenderTargetView = nullptr;
     };
 
     enum EDepthStencilFormat
@@ -168,7 +234,7 @@ namespace engine
     struct GfxDepthStencil : public GfxTexture2D
     {
         GfxDepthStencil(EDepthStencilFormat format, bool usedByShader)
-            :mDSFormat(format)
+            :mDepthStencilFormat(format)
         {
             switch (format)
             {
@@ -176,7 +242,7 @@ namespace engine
             case EDepthStencilFormat::UNormDepth24_UIntStencil8:
                 if (!usedByShader)
                 {
-                    mBufferDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D24_UNORM_S8_UINT;
+                    mTexture2DDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D24_UNORM_S8_UINT;
                     mDepthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
                     mShaderResourceDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
                 }
@@ -184,13 +250,13 @@ namespace engine
                 {
                     //break;
                     //case EDepthStencilFormat::TyplessR24G8:
-                    mBufferDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R24G8_TYPELESS;
+                    mTexture2DDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R24G8_TYPELESS;
                     mDepthStencilDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D24_UNORM_S8_UINT;
                     mShaderResourceDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
                 }
                 break;
             case EDepthStencilFormat::FloatDepth32:
-                mBufferDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
+                mTexture2DDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
                 mDepthStencilDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
                 mShaderResourceDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R32_FLOAT;
                 break;
@@ -198,15 +264,14 @@ namespace engine
 
             unsigned int miplevels = 1;
             //TODO: more general way.
-            mBufferDesc.MipLevels = miplevels;
-            mBufferDesc.ArraySize = 1;
-
-            mBufferDesc.SampleDesc.Count = 1;
-            mBufferDesc.SampleDesc.Quality = 0;
-            mBufferDesc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
-            mBufferDesc.BindFlags = usedByShader ? (D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE) : D3D11_BIND_DEPTH_STENCIL;
-            mBufferDesc.CPUAccessFlags = 0;
-            mBufferDesc.MiscFlags = 0;
+            mTexture2DDesc.MipLevels = miplevels;
+            mTexture2DDesc.ArraySize = 1;
+            mTexture2DDesc.SampleDesc.Count = 1;
+            mTexture2DDesc.SampleDesc.Quality = 0;
+            mTexture2DDesc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+            mTexture2DDesc.BindFlags = usedByShader ? (D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE) : D3D11_BIND_DEPTH_STENCIL;
+            mTexture2DDesc.CPUAccessFlags = 0;
+            mTexture2DDesc.MiscFlags = 0;
 
             mDepthStencilDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
             mDepthStencilDesc.Flags = 0;
@@ -217,7 +282,15 @@ namespace engine
             mShaderResourceDesc.Texture2D.MostDetailedMip = 0;
         }
 
-        EDepthStencilFormat mDSFormat;
+        bool IsSame(EDepthStencilFormat format, unsigned int width, unsigned int height, bool forshader)
+        {
+            return format == mDepthStencilFormat
+                && width == GetWidth()
+                && height == GetHeight()
+                && (forshader ? mShaderResourceView != nullptr : true);
+        }
+
+        EDepthStencilFormat mDepthStencilFormat;
         D3D11_DEPTH_STENCIL_VIEW_DESC mDepthStencilDesc;
         ComPtr<ID3D11DepthStencilView> mDepthStencilView = nullptr;
     };
@@ -234,7 +307,7 @@ namespace engine
         GfxDefaultVertexBuffer* CreateDefaultVertexBufferImpl(unsigned int vertexCount);
         GfxDefaultIndexBuffer* CreateDefaultIndexBufferImpl(unsigned int indexCount);
         GfxDynamicConstantBuffer* CreateDynamicConstantBuffer(unsigned int bufferLength);
-        //GfxRenderTarget* CreateRenderTarget(unsigned int width, unsigned int height);
+        GfxRenderTarget* CreateRenderTarget(ERenderTargetFormat format, unsigned int width, unsigned int height, bool usedByShader);
         GfxDepthStencil* CreateDepthStencil(EDepthStencilFormat format, unsigned int width, unsigned int height, bool usedByShader);
         bool InitializeTemporaryStagingBuffer(GfxStagingBuffer& outBuffer, unsigned int length);
 
@@ -272,10 +345,15 @@ namespace engine
         void SetIndexBufferImpl(GfxBaseIndexBuffer*, unsigned int);
         void SetVSConstantBufferImpl(unsigned int startIndex, GfxBaseConstantBuffer*);
         void SetPSConstantBufferImpl(unsigned int startIndex, GfxBaseConstantBuffer*);
+        void SetRenderTargets(GfxRenderTarget** rt, unsigned int rtCount, GfxDepthStencil* ds);
+        void ClearRenderTarget(GfxRenderTarget* rt, const math::float4& color);
+        void ClearDepthOnly(GfxDepthStencil* ds, float depth);
+        void ClearStencilOnly(GfxDepthStencil* ds, unsigned char stencil);
+        void ClearDepthStencil(GfxDepthStencil* ds, float depth, unsigned char stencil);
 
         GfxDevice* mGfxDevice;
         ID3D11DeviceContext* mGfxDeviceContext;
-
+        ID3D11RenderTargetView* mRenderTargetViews[8];
     private:
         void* MapBufferImpl(GfxBuffer& buffer, UINT subresource, EMapMethod method);
         void UnmapBufferImpl(GfxBuffer& buffer, UINT subresource);

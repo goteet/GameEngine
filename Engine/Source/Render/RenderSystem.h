@@ -15,6 +15,7 @@ namespace engine
         CreateSwapchainFail,
         CreateBackbufferDSFail,
         CreateBackbufferRTVFail,
+        CreateBackbufferSRVFail,
         CreateDeferredContextFail,
         RetrieveDXGIFactoryFail,
         RetrieveBackbufferFail,
@@ -62,10 +63,8 @@ namespace engine
         std::unique_ptr<GfxDevice> mGfxDevice = nullptr;
         std::unique_ptr<GfxImmediateContext> mGfxDeviceImmediateContext = nullptr;
         std::unique_ptr<GfxDeferredContext> mGfxDeviceDeferredContext = nullptr;
+        std::unique_ptr<GfxRenderTarget> mBackbufferRenderTarget = nullptr;
         std::unique_ptr<GfxDepthStencil> mBackbufferDepthStencil = nullptr;
         ComPtr<IDXGISwapChain1> mGfxSwapChain = nullptr;
-        ComPtr<ID3D11Texture2D> mBackbuffer = nullptr;
-        
-        ComPtr<ID3D11RenderTargetView> mBackbufferRTV = nullptr;
     };
 }

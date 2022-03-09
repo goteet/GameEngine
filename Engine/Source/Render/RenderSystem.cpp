@@ -315,8 +315,9 @@ namespace engine
         ComPtr<ID3D11DeviceContext> outD3DDeviceImmediateContext = nullptr;
         ComPtr<ID3D11DeviceContext> outD3DDeferredContext = nullptr;
         ComPtr<IDXGISwapChain1> outSwapChain = nullptr;
-        ComPtr<ID3D11Texture2D> outBackbuffer = nullptr;
+        ComPtr<ID3D11Texture2D> outBackbufferTexture = nullptr;
         ComPtr<ID3D11RenderTargetView> outBackbufferRTV = nullptr;
+        ComPtr<ID3D11ShaderResourceView> outBackbufferSRV = nullptr;
         D3D_FEATURE_LEVEL outFeatureLevel;
 
         IDXGIAdapter* defualtAdpater = nullptr;
@@ -344,19 +345,23 @@ namespace engine
         }
 
         ///* CreateVertexBuffer SwapChain */
+        bool usedForshader = true;
+        mBackbufferRenderTarget = std::make_unique<GfxRenderTarget>(ERenderTargetFormat::UNormRGB10A2, usedForshader);
+        mBackbufferRenderTarget->mTexture2DDesc.Width = mClientWidth;
+        mBackbufferRenderTarget->mTexture2DDesc.Height = mClientHeight;
 
         DXGI_SWAP_CHAIN_DESC1 swapchainDesc;
-        swapchainDesc.Width = mClientWidth;
-        swapchainDesc.Height = mClientHeight;
+        swapchainDesc.Width = mBackbufferRenderTarget->mTexture2DDesc.Width;
+        swapchainDesc.Height = mBackbufferRenderTarget->mTexture2DDesc.Height;
         swapchainDesc.BufferCount = 2;
-        swapchainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapchainDesc.BufferUsage = usedForshader ? (DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT) : DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapchainDesc.Stereo = false;
-        swapchainDesc.SampleDesc.Count = 1;
-        swapchainDesc.SampleDesc.Quality = 0;
+        swapchainDesc.SampleDesc.Count = mBackbufferRenderTarget->mTexture2DDesc.SampleDesc.Count;
+        swapchainDesc.SampleDesc.Quality = mBackbufferRenderTarget->mTexture2DDesc.SampleDesc.Quality;
         swapchainDesc.Flags = 0;
         swapchainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
         swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-        swapchainDesc.Format = DXGI_FORMAT_R10G10B10A2_UNORM;
+        swapchainDesc.Format = mBackbufferRenderTarget->mTexture2DDesc.Format;
         swapchainDesc.Scaling = DXGI_SCALING_STRETCH;
 
         DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullScreenDesc;
@@ -383,18 +388,25 @@ namespace engine
         }
 
         //CreateVertexBuffer RenderTargetView
-        HRESULT resultGetBackbuffer = outSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &outBackbuffer);
+        HRESULT resultGetBackbuffer = outSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &outBackbufferTexture);
         if (FAILED(resultGetBackbuffer))
         {
             ASSERT_SUCCEEDED(resultGetBackbuffer);
             return EGfxIntializationError::RetrieveBackbufferFail;
         }
 
-        HRESULT resultCreateBackbufferRT = outD3DDevice->CreateRenderTargetView(outBackbuffer.Get(), nullptr, &outBackbufferRTV);
+        HRESULT resultCreateBackbufferRT = outD3DDevice->CreateRenderTargetView(outBackbufferTexture.Get(), &mBackbufferRenderTarget->mRenderTargetDesc, &outBackbufferRTV);
         if (FAILED(resultCreateBackbufferRT))
         {
             ASSERT_SUCCEEDED(resultCreateBackbufferRT);
             return EGfxIntializationError::CreateBackbufferRTVFail;
+        }
+
+        HRESULT resultCreateBackbufferSRV = outD3DDevice->CreateShaderResourceView(outBackbufferTexture.Get(), &mBackbufferRenderTarget->mShaderResourceDesc, &outBackbufferSRV);
+        if (FAILED(resultCreateBackbufferSRV))
+        {
+            ASSERT_SUCCEEDED(resultCreateBackbufferSRV);
+            return EGfxIntializationError::CreateBackbufferSRVFail;
         }
 
         HRESULT resultCreateDeferredContext = outD3DDevice->CreateDeferredContext(0, &outD3DDeferredContext);
@@ -415,9 +427,10 @@ namespace engine
         mGfxDeviceImmediateContext = std::make_unique<GfxImmediateContext>(mGfxDevice.get(), outD3DDeviceImmediateContext.Detach());
         mGfxDeviceDeferredContext = std::make_unique<GfxDeferredContext>(mGfxDevice.get(), outD3DDeferredContext.Detach());
         mGfxSwapChain = outSwapChain;
-        mBackbuffer = outBackbuffer;
-        mBackbufferRTV = outBackbufferRTV;
         mBackbufferDepthStencil = std::unique_ptr<GfxDepthStencil>(outDepthStencil);
+        mBackbufferRenderTarget->mTexturePtr = outBackbufferTexture;
+        mBackbufferRenderTarget->mRenderTargetView = outBackbufferRTV;
+        mBackbufferRenderTarget->mShaderResourceView = outBackbufferSRV;
         return EGfxIntializationError::NoError;
     }
 
@@ -453,7 +466,7 @@ namespace engine
 
         if (CubeRenderingCommandList == nullptr)
         {
-            auto RenderTagetView = mBackbufferRTV.Get();
+            auto RenderTagetView = mBackbufferRenderTarget->mRenderTargetView.Get();
             float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
             D3D11_RASTERIZER_DESC RasterizerDesc;

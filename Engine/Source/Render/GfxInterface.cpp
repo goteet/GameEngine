@@ -123,6 +123,30 @@ namespace engine
         return CreateConstantBuffer<GfxDynamicConstantBuffer>(mGfxDevice, bufferLength);
     }
 
+    GfxRenderTarget* GfxDevice::CreateRenderTarget(ERenderTargetFormat format, unsigned int width, unsigned int height, bool usedByShader)
+    {
+        GfxRenderTarget* pRenderTarget = new GfxRenderTarget(format, usedByShader);
+        pRenderTarget->mTexture2DDesc.Width = width;
+        pRenderTarget->mTexture2DDesc.Height = height;
+
+        HRESULT rstCreate = mGfxDevice->CreateTexture2D(&pRenderTarget->mTexture2DDesc, nullptr, pRenderTarget->mTexturePtr.ReleaseAndGetAddressOf());
+        if (FAILED(rstCreate))
+        {
+            safe_delete(pRenderTarget);
+            return nullptr;
+        }
+
+        HRESULT resultCreateRTV = mGfxDevice->CreateRenderTargetView(pRenderTarget->mTexturePtr.Get(), &pRenderTarget->mRenderTargetDesc, pRenderTarget->mRenderTargetView.ReleaseAndGetAddressOf());
+        ASSERT_SUCCEEDED(resultCreateRTV);
+
+        if (usedByShader)
+        {
+            HRESULT resultCreateSRV = mGfxDevice->CreateShaderResourceView(pRenderTarget->mTexturePtr.Get(), &pRenderTarget->mShaderResourceDesc, pRenderTarget->mShaderResourceView.ReleaseAndGetAddressOf());
+            ASSERT_SUCCEEDED(resultCreateSRV);
+        }
+        return pRenderTarget;
+    }
+
     GfxDepthStencil* GfxDevice::CreateDepthStencil(EDepthStencilFormat format, unsigned int width, unsigned int height, bool usedByShader)
     {
         //std::vector<D3D11_SUBRESOURCE_DATA> Data;
@@ -137,10 +161,10 @@ namespace engine
         //https://docs.microsoft.com/en-us/windows/uwp/gaming/create-depth-buffer-resource--view--and-sampler-state
 
         GfxDepthStencil* pDepthStencil = new GfxDepthStencil(format, usedByShader);
-        pDepthStencil->mBufferDesc.Width = width;
-        pDepthStencil->mBufferDesc.Height = height;
+        pDepthStencil->mTexture2DDesc.Width = width;
+        pDepthStencil->mTexture2DDesc.Height = height;
 
-        HRESULT rstCreate = mGfxDevice->CreateTexture2D(&pDepthStencil->mBufferDesc, nullptr, pDepthStencil->mTexturePtr.ReleaseAndGetAddressOf());
+        HRESULT rstCreate = mGfxDevice->CreateTexture2D(&pDepthStencil->mTexture2DDesc, nullptr, pDepthStencil->mTexturePtr.ReleaseAndGetAddressOf());
         if (FAILED(rstCreate))
         {
             safe_delete(pDepthStencil);
@@ -163,7 +187,6 @@ namespace engine
         using namespace engine_gfx_impl;
         return InitializeD3D11Buffer(mGfxDevice, outBuffer, length);
     }
-
 
     GfxDeviceContext::GfxDeviceContext(GfxDevice* device, ID3D11DeviceContext* context)
         : mGfxDevice(device)
@@ -231,9 +254,47 @@ namespace engine
         return nullptr;
     }
 
+
     void GfxDeviceContext::UnmapBufferImpl(GfxBuffer& buffer, UINT subresource)
     {
         mGfxDeviceContext->Unmap(buffer.mBufferPtr.Get(), subresource);
+    }
+
+    void GfxDeviceContext::SetRenderTargets(GfxRenderTarget** renderTargets, unsigned int rtCount, GfxDepthStencil* ds)
+    {
+        rtCount = math::min2(rtCount, 8);
+        for (unsigned int i = 0; i < rtCount; i++)
+        {
+            mRenderTargetViews[i] = renderTargets[i]->mRenderTargetView.Get();
+        }
+        mGfxDeviceContext->OMSetRenderTargets(rtCount, mRenderTargetViews,
+            ds == nullptr ? nullptr : ds->mDepthStencilView.Get());
+    }
+
+    void GfxDeviceContext::ClearRenderTarget(GfxRenderTarget* rt, const math::float4& color)
+    {
+        mGfxDeviceContext->ClearRenderTargetView(rt->mRenderTargetView.Get(), color.v);
+    }
+
+    void ClearDeptnStencil(ID3D11DeviceContext* context, ID3D11DepthStencilView* view, UINT clearFlags, float depth, unsigned char stencil)
+    {
+        context->ClearDepthStencilView(view, clearFlags, depth, stencil);
+    }
+
+    void GfxDeviceContext::ClearDepthOnly(GfxDepthStencil* ds, float depth)
+    {
+        ClearDeptnStencil(mGfxDeviceContext, ds->mDepthStencilView.Get(), D3D11_CLEAR_DEPTH, depth, 0);
+    }
+
+    void GfxDeviceContext::ClearStencilOnly(GfxDepthStencil* ds, unsigned char stencil)
+    {
+        ClearDeptnStencil(mGfxDeviceContext, ds->mDepthStencilView.Get(), D3D11_CLEAR_STENCIL, 1.0f, stencil);
+    }
+
+
+    void GfxDeviceContext::ClearDepthStencil(GfxDepthStencil* ds, float depth, unsigned char stencil)
+    {
+        ClearDeptnStencil(mGfxDeviceContext, ds->mDepthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, depth, stencil);
     }
 
     GfxImmediateContext::GfxImmediateContext(GfxDevice* device, ID3D11DeviceContext* context)
