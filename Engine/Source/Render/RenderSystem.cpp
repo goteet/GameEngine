@@ -431,6 +431,7 @@ namespace engine
         mBackbufferRenderTarget->mTexturePtr = outBackbufferTexture;
         mBackbufferRenderTarget->mRenderTargetView = outBackbufferRTV;
         mBackbufferRenderTarget->mShaderResourceView = outBackbufferSRV;
+        mTransientBufferRegistry = std::make_unique<TransientBufferRegistry>(mGfxDevice.get(), mBackbufferRenderTarget.get(), mBackbufferDepthStencil.get());
         return EGfxIntializationError::NoError;
     }
 

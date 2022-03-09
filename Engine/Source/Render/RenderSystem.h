@@ -1,6 +1,7 @@
 #pragma once
 #include "PreIncludeFiles.h"
 #include "GfxInterface.h"
+#include "TransientBufferRegistry.h"
 
 namespace engine
 {
@@ -40,6 +41,7 @@ namespace engine
         void RenderFrame(Scene& scene);
         bool OnResizeWindow(void* hWindow, int width, int height);
         void SetObjectToWorldMatrixForTest(const math::float4x4& matrix);
+        TransientBufferRegistry* GetTransientBufferRegistry() { return mTransientBufferRegistry.get(); }
 
     public:
         struct ViewConstantBufferData
@@ -65,6 +67,7 @@ namespace engine
         std::unique_ptr<GfxDeferredContext> mGfxDeviceDeferredContext = nullptr;
         std::unique_ptr<GfxRenderTarget> mBackbufferRenderTarget = nullptr;
         std::unique_ptr<GfxDepthStencil> mBackbufferDepthStencil = nullptr;
+        std::unique_ptr<TransientBufferRegistry> mTransientBufferRegistry = nullptr;
         ComPtr<IDXGISwapChain1> mGfxSwapChain = nullptr;
     };
 }

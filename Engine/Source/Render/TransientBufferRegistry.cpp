@@ -2,9 +2,10 @@
 
 namespace engine
 {
-    TransientBufferRegistry::TransientBufferRegistry(GfxDevice* creator, GfxRenderTarget* defaultBackbufferRT)
+    TransientBufferRegistry::TransientBufferRegistry(GfxDevice* creator, GfxRenderTarget* defaultBackbufferRT, GfxDepthStencil* defaultBackbufferDS)
         : mGfxResourceCreator(creator)
         , mDefaultBackbufferRT(defaultBackbufferRT)
+        , mDefaultBackbufferDSTemp(defaultBackbufferDS)
     {
 
     }
