@@ -123,11 +123,47 @@ namespace engine
         return CreateConstantBuffer<GfxDynamicConstantBuffer>(mGfxDevice, bufferLength);
     }
 
+    GfxDepthStencil* GfxDevice::CreateDepthStencil(EDepthStencilFormat format, unsigned int width, unsigned int height, bool usedByShader)
+    {
+        //std::vector<D3D11_SUBRESOURCE_DATA> Data;
+        //if (InSubResourceData != nullptr)
+        //{
+        //    uint32_t DataSize = InDesc->ArraySize * std::max(1u, InDesc->MipLevels);
+        //    Data.resize(DataSize);
+        //    for (uint32_t Slice = 0; Slice < DataSize; ++Slice)
+        //        Data[Slice] = InSubResourceData[Slice];
+        //}
+
+        //https://docs.microsoft.com/en-us/windows/uwp/gaming/create-depth-buffer-resource--view--and-sampler-state
+
+        GfxDepthStencil* pDepthStencil = new GfxDepthStencil(format, usedByShader);
+        pDepthStencil->mBufferDesc.Width = width;
+        pDepthStencil->mBufferDesc.Height = height;
+
+        HRESULT rstCreate = mGfxDevice->CreateTexture2D(&pDepthStencil->mBufferDesc, nullptr, pDepthStencil->mTexturePtr.ReleaseAndGetAddressOf());
+        if (FAILED(rstCreate))
+        {
+            safe_delete(pDepthStencil);
+            return nullptr;
+        }
+
+        HRESULT resultCreateDSV = mGfxDevice->CreateDepthStencilView(pDepthStencil->mTexturePtr.Get(), &pDepthStencil->mDepthStencilDesc, pDepthStencil->mDepthStencilView.ReleaseAndGetAddressOf());
+        ASSERT_SUCCEEDED(resultCreateDSV);
+
+        if (usedByShader)
+        {
+            HRESULT resultCreateSRV = mGfxDevice->CreateShaderResourceView(pDepthStencil->mTexturePtr.Get(), &pDepthStencil->mShaderResourceDesc, pDepthStencil->mShaderResourceView.ReleaseAndGetAddressOf());
+            ASSERT_SUCCEEDED(resultCreateSRV);
+        }
+        return pDepthStencil;
+    }
+
     bool GfxDevice::InitializeTemporaryStagingBuffer(GfxStagingBuffer& outBuffer, unsigned int length)
     {
         using namespace engine_gfx_impl;
         return InitializeD3D11Buffer(mGfxDevice, outBuffer, length);
     }
+
 
     GfxDeviceContext::GfxDeviceContext(GfxDevice* device, ID3D11DeviceContext* context)
         : mGfxDevice(device)

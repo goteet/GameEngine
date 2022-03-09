@@ -302,6 +302,7 @@ namespace engine
         safe_delete(SimpleShaderProgramPtr);
         SafeRelease(CubeRenderingCommandList);
 
+        safe_release(mBackbufferDepthStencil);
         safe_release(mGfxDeviceDeferredContext);
         safe_release(mGfxDeviceImmediateContext);
         safe_release(mGfxDevice);
@@ -315,9 +316,7 @@ namespace engine
         ComPtr<ID3D11DeviceContext> outD3DDeferredContext = nullptr;
         ComPtr<IDXGISwapChain1> outSwapChain = nullptr;
         ComPtr<ID3D11Texture2D> outBackbuffer = nullptr;
-        ComPtr<ID3D11Texture2D> outBackbufferDS = nullptr;
         ComPtr<ID3D11RenderTargetView> outBackbufferRTV = nullptr;
-        ComPtr<ID3D11DepthStencilView> outBackbufferDSV = nullptr;
         D3D_FEATURE_LEVEL outFeatureLevel;
 
         IDXGIAdapter* defualtAdpater = nullptr;
@@ -398,33 +397,6 @@ namespace engine
             return EGfxIntializationError::CreateBackbufferRTVFail;
         }
 
-        D3D11_TEXTURE2D_DESC depthStencilDesc;
-        depthStencilDesc.Width = mClientWidth;
-        depthStencilDesc.Height = mClientHeight;
-        depthStencilDesc.MipLevels = 1;
-        depthStencilDesc.ArraySize = 1;
-        depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-        depthStencilDesc.SampleDesc.Count = 1;
-        depthStencilDesc.SampleDesc.Quality = 0;
-        depthStencilDesc.Usage = D3D11_USAGE_DEFAULT;
-        depthStencilDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-        depthStencilDesc.CPUAccessFlags = 0;
-        depthStencilDesc.MiscFlags = 0;
-        HRESULT resultCreateDSBuffer = outD3DDevice->CreateTexture2D(&depthStencilDesc, nullptr, &outBackbufferDS);
-        if (FAILED(resultCreateDSBuffer))
-        {
-            ASSERT_SUCCEEDED(resultCreateDSBuffer);
-            return EGfxIntializationError::CreateBackbufferDSFail;
-        }
-
-        HRESULT resultCreateDSV = outD3DDevice->CreateDepthStencilView(outBackbufferDS.Get(), nullptr, &outBackbufferDSV);
-        ASSERT_SUCCEEDED(resultCreateDSV);
-        if (FAILED(resultCreateDSV))
-        {
-            ASSERT_SUCCEEDED(resultCreateDSV);
-            return EGfxIntializationError::CreateBackbufferDSVFail;
-        }
-
         HRESULT resultCreateDeferredContext = outD3DDevice->CreateDeferredContext(0, &outD3DDeferredContext);
         if (FAILED(resultCreateDeferredContext))
         {
@@ -432,15 +404,20 @@ namespace engine
             return EGfxIntializationError::CreateDeferredContextFail;
         }
 
-
         mGfxDevice = std::make_unique<GfxDevice>(outD3DDevice.Detach());
+        GfxDepthStencil* outDepthStencil = mGfxDevice->CreateDepthStencil(EDepthStencilFormat::UNormDepth24_UIntStencil8, mClientWidth, mClientHeight, false);
+        if (outDepthStencil == nullptr)
+        {
+            ASSERT(outDepthStencil != nullptr);
+            return EGfxIntializationError::CreateBackbufferDSFail;
+        }
+
         mGfxDeviceImmediateContext = std::make_unique<GfxImmediateContext>(mGfxDevice.get(), outD3DDeviceImmediateContext.Detach());
         mGfxDeviceDeferredContext = std::make_unique<GfxDeferredContext>(mGfxDevice.get(), outD3DDeferredContext.Detach());
         mGfxSwapChain = outSwapChain;
         mBackbuffer = outBackbuffer;
-        mBackbufferDS = outBackbufferDS;
         mBackbufferRTV = outBackbufferRTV;
-        mBackbufferDSV = outBackbufferDSV;
+        mBackbufferDepthStencil = std::unique_ptr<GfxDepthStencil>(outDepthStencil);
         return EGfxIntializationError::NoError;
     }
 
@@ -495,9 +472,9 @@ namespace engine
             mGfxDevice->mGfxDevice->CreateRasterizerState(&RasterizerDesc, pRasterState.ReleaseAndGetAddressOf());
             mGfxDeviceDeferredContext->mGfxDeviceContext->RSSetState(pRasterState.Get());
 
-            mGfxDeviceDeferredContext->mGfxDeviceContext->OMSetRenderTargets(1, &RenderTagetView, mBackbufferDSV.Get());
+            mGfxDeviceDeferredContext->mGfxDeviceContext->OMSetRenderTargets(1, &RenderTagetView, mBackbufferDepthStencil->mDepthStencilView.Get());
             mGfxDeviceDeferredContext->mGfxDeviceContext->ClearRenderTargetView(RenderTagetView, ClearColor);
-            mGfxDeviceDeferredContext->mGfxDeviceContext->ClearDepthStencilView(mBackbufferDSV.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+            mGfxDeviceDeferredContext->mGfxDeviceContext->ClearDepthStencilView(mBackbufferDepthStencil->mDepthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
             D3D11_VIEWPORT Viewport;
             Viewport.TopLeftX = 0.0f;

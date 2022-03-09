@@ -147,6 +147,81 @@ namespace engine
         virtual ID3D11Buffer* GetBufferPtr() override { return mBufferPtr.Get(); }
     };
 
+    struct GfxTexture2D
+    {
+        D3D11_TEXTURE2D_DESC mBufferDesc;
+        ComPtr<ID3D11Texture2D> mTexturePtr = nullptr;
+
+        //D3D11_BIND_SHADER_RESOURCE
+        //  Bind a buffer or texture to a shader stage;
+        //  this flag cannot be used with the D3D11_MAP_WRITE_NO_OVERWRITE flag.
+        D3D11_SHADER_RESOURCE_VIEW_DESC mShaderResourceDesc;
+        ComPtr<ID3D11ShaderResourceView> mShaderResourceView = nullptr;
+    };
+
+    enum EDepthStencilFormat
+    {
+        UNormDepth24_UIntStencil8,    //TyplessR24G8,
+        FloatDepth32,
+    };
+
+    struct GfxDepthStencil : public GfxTexture2D
+    {
+        GfxDepthStencil(EDepthStencilFormat format, bool usedByShader)
+            :mDSFormat(format)
+        {
+            switch (format)
+            {
+            default:
+            case EDepthStencilFormat::UNormDepth24_UIntStencil8:
+                if (!usedByShader)
+                {
+                    mBufferDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D24_UNORM_S8_UINT;
+                    mDepthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+                    mShaderResourceDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+                }
+                else
+                {
+                    //break;
+                    //case EDepthStencilFormat::TyplessR24G8:
+                    mBufferDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R24G8_TYPELESS;
+                    mDepthStencilDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D24_UNORM_S8_UINT;
+                    mShaderResourceDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+                }
+                break;
+            case EDepthStencilFormat::FloatDepth32:
+                mBufferDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
+                mDepthStencilDesc.Format = DXGI_FORMAT::DXGI_FORMAT_D32_FLOAT;
+                mShaderResourceDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R32_FLOAT;
+                break;
+            }
+
+            unsigned int miplevels = 1;
+            //TODO: more general way.
+            mBufferDesc.MipLevels = miplevels;
+            mBufferDesc.ArraySize = 1;
+
+            mBufferDesc.SampleDesc.Count = 1;
+            mBufferDesc.SampleDesc.Quality = 0;
+            mBufferDesc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
+            mBufferDesc.BindFlags = usedByShader ? (D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE) : D3D11_BIND_DEPTH_STENCIL;
+            mBufferDesc.CPUAccessFlags = 0;
+            mBufferDesc.MiscFlags = 0;
+
+            mDepthStencilDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+            mDepthStencilDesc.Flags = 0;
+            mDepthStencilDesc.Texture2D.MipSlice = 0;
+
+            mShaderResourceDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            mShaderResourceDesc.Texture2D.MipLevels = miplevels;
+            mShaderResourceDesc.Texture2D.MostDetailedMip = 0;
+        }
+
+        EDepthStencilFormat mDSFormat;
+        D3D11_DEPTH_STENCIL_VIEW_DESC mDepthStencilDesc;
+        ComPtr<ID3D11DepthStencilView> mDepthStencilView = nullptr;
+    };
+
     class GfxDevice : public GE::GfxDevice
     {
     public:
@@ -159,9 +234,13 @@ namespace engine
         GfxDefaultVertexBuffer* CreateDefaultVertexBufferImpl(unsigned int vertexCount);
         GfxDefaultIndexBuffer* CreateDefaultIndexBufferImpl(unsigned int indexCount);
         GfxDynamicConstantBuffer* CreateDynamicConstantBuffer(unsigned int bufferLength);
+        //GfxRenderTarget* CreateRenderTarget(unsigned int width, unsigned int height);
+        GfxDepthStencil* CreateDepthStencil(EDepthStencilFormat format, unsigned int width, unsigned int height, bool usedByShader);
         bool InitializeTemporaryStagingBuffer(GfxStagingBuffer& outBuffer, unsigned int length);
 
-    //private:
+        //private:
+        bool PromoteToShaderResource(GfxTexture2D* texture2D);
+
         ID3D11Device* mGfxDevice;
     };
 
