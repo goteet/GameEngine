@@ -64,6 +64,8 @@ namespace engine
             int Index;
             std::vector<int> ReadingRenderTargets;
             std::vector<int> WritingRenderTargets;
+            std::vector<int> ReadingRenderTargetAliasing;
+            std::vector<int> WritingRenderTargetAliasing;
             int WritingDepthStencil = -1;
             std::vector<ClearState> RenderTargetBindStates;
             ClearState DepthStencilBindState;

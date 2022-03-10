@@ -99,6 +99,21 @@ namespace engine
             if (it == mCompiledNodeExecuteOrder.end())
             {
                 mCompiledNodeExecuteOrder.emplace_back(nodeIndex);
+
+                RFGNode& node = mNodes[nodeIndex];
+                int aliasing = GetAliasingResourceIndex(node.Index);
+                node.ReadingRenderTargetAliasing.clear();
+                node.WritingRenderTargetAliasing.clear();
+                for (int nodeIndex : node.WritingRenderTargets)
+                {
+                    int aliasing = GetAliasingResourceIndex(nodeIndex);
+                    node.WritingRenderTargetAliasing.emplace_back(aliasing);
+                }
+                for (int nodeIndex : node.ReadingRenderTargets)
+                {
+                    int aliasing = GetAliasingResourceIndex(nodeIndex);
+                    node.ReadingRenderTargetAliasing.emplace_back(aliasing);
+                }
             }
         }
     }
@@ -227,9 +242,8 @@ namespace engine
         TransientBufferRegistry* registry = mTransientBufferRegistry;
         GfxRenderTarget* renderTargets[100];
         int rtCount = 0;
-        for (int renderTargetIndex : node.WritingRenderTargets)
+        for (int renderTargetIndex : node.WritingRenderTargetAliasing)
         {
-            renderTargetIndex = GetAliasingResourceIndex(renderTargetIndex);
             renderTargets[rtCount] = renderTargetIndex == mBackbufferRTIndex
                 ? registry->GetDefaultBackbufferRT()
                 : nullptr;                //: registry->AllocateRenderTarget();
@@ -262,7 +276,6 @@ namespace engine
                 node.DepthStencilBindState.ClearDepthValue,
                 node.DepthStencilBindState.ClearStencilValue);
         }
-
     }
 
     void RenderFrameGraph::ExecuteNode(GfxDeferredContext& context, RenderFrameGraph::RFGNode& node)
