@@ -21,7 +21,13 @@ namespace engine
         auto it = std::find_if(container.begin(), container.end(),
             [&](T* v) { return (v != nullptr) && v->IsSame(format, width, height, forshader); }
         );
-        return it != container.end() ? *it : nullptr;
+        if (it != container.end())
+        {
+            T* rst = *it;
+            *it = nullptr;
+            return rst;
+        }
+        return nullptr;
     }
 
     GfxRenderTarget* TransientBufferRegistry::AllocateRenderTarget(ERenderTargetFormat format, unsigned int width, unsigned int height, bool usedForShader)
