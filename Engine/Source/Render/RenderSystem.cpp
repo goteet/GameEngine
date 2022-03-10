@@ -315,9 +315,9 @@ namespace fullscreen_quad
     const unsigned int FSQuadVertexCount = 3;
     engine::VertexLayout FSQuadVertices[FSQuadVertexCount] =
     {
-        { math::float4(-0.5f, -0.5f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 0) },
-        { math::float4(-0.5f, +1.5f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 1) },
-        { math::float4(+1.5f, -0.5f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 1) }
+        { math::float4(-1.0f, -1.0f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 1) },
+        { math::float4(+3.0f, -1.0f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(2, 1) },
+        { math::float4(-1.0f, +3.0f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, -1) }
     };
 }
 
@@ -329,7 +329,9 @@ namespace engine
     ShaderProgram* SimpleShaderProgramPtr = nullptr;
     ShaderProgram* BlitShaderProgramPtr = nullptr;
     ID3D11CommandList* CubeRenderingCommandList = nullptr;
+    ID3D11CommandList* BlitRenderingCommandList = nullptr;
     ID3D11RasterizerState* DefaultRasterState = nullptr;
+    ID3D11SamplerState* DefaultSamplerState = nullptr;
 
     RenderSystem::RenderSystem(void* hWindow, bool fullscreen, int width, int height)
         : mMainWindowHandle((HWND)hWindow)
@@ -348,12 +350,15 @@ namespace engine
     void safe_release(std::unique_ptr<T>& ptr) { ptr.release(); }
     RenderSystem::~RenderSystem()
     {
+        safe_delete(FullscreenQuadVertexBuffer);
         safe_delete(ObjectConstantBufferPtr);
         safe_delete(SceneConstantBufferPtr);
         safe_delete(SimpleShaderProgramPtr);
         safe_delete(BlitShaderProgramPtr);
         SafeRelease(DefaultRasterState);
+        SafeRelease(DefaultSamplerState);
         SafeRelease(CubeRenderingCommandList);
+        SafeRelease(BlitRenderingCommandList);
 
         safe_release(mBackbufferDepthStencil);
         safe_release(mGfxDeviceDeferredContext);
@@ -527,6 +532,7 @@ namespace engine
             RFGRenderPass blitPass = MainGraph.AddRenderPass("test.blit");
             RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
             RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferDSFormat());
+            RFGResourceHandle blitRenderTarget = MainGraph.RequestResource("test.blitrendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
 
             ClearState state;
             state.ClearColor = true;
@@ -572,7 +578,74 @@ namespace engine
                     mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(CubeRenderingCommandList, DontRestoreContextState);
                 }
             );
-            MainGraph.BindOutput(renderTarget);
+
+            state.ClearColorValue.set(0.0f, 0.0f, 0.0f, 1.0f);
+            blitPass.BindReading(renderTarget);
+            blitPass.BindWriting(blitRenderTarget, state);
+            blitPass.BindWriting(depthStencil, state);
+            blitPass.AttachJob(
+                [&](GfxDeferredContext& context)
+                {
+                    if (DefaultSamplerState == nullptr)
+                    {
+                        // Create a texture sampler state description.
+                        D3D11_SAMPLER_DESC samplerDesc;
+                        samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+                        samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+                        samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+                        samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+                        samplerDesc.MipLODBias = 0.0f;
+                        samplerDesc.MaxAnisotropy = 1;
+                        samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+                        samplerDesc.BorderColor[0] = 0;
+                        samplerDesc.BorderColor[1] = 0;
+                        samplerDesc.BorderColor[2] = 0;
+                        samplerDesc.BorderColor[3] = 0;
+                        samplerDesc.MinLOD = 0;
+                        samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+                        mGfxDevice->mGfxDevice->CreateSamplerState(&samplerDesc, &DefaultSamplerState);
+                    }
+                    context.mGfxDeviceContext->PSSetSamplers(0, 1, &DefaultSamplerState);
+                    context.mGfxDeviceContext->RSSetState(DefaultRasterState);
+
+
+                    if (BlitShaderProgramPtr == nullptr)
+                    {
+                        const std::string vsEntryName = "VSMain";
+                        const std::string psEntryName = "PSMain";
+                        const std::vector<D3D11_INPUT_ELEMENT_DESC> InputLayoutArray(InputLayout, InputLayout + InputLayoutCount);
+                        auto VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, BlitVertexShaderSource, vsEntryName, InputLayoutArray);
+                        auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, BlitPixelShaderSource, psEntryName);
+                        BlitShaderProgramPtr = LinkShader(VertexShader, PixelShader);
+                        ASSERT(BlitShaderProgramPtr != nullptr);
+
+                        FullscreenQuadVertexBuffer = mGfxDevice->CreateDefaultVertexBufferImpl(fullscreen_quad::FSQuadVertexCount);
+                        mGfxDeviceImmediateContext->UploadEntireBufferFromMemory(FullscreenQuadVertexBuffer, fullscreen_quad::FSQuadVertices);
+                    }
+
+                    D3D11_VIEWPORT Viewport;
+                    Viewport.TopLeftX = 0.0f;
+                    Viewport.TopLeftY = 0.0f;
+                    Viewport.Width = (float)mClientWidth;
+                    Viewport.Height = (float)mClientHeight;
+                    Viewport.MinDepth = 0.0f;
+                    Viewport.MaxDepth = 1.0f;
+
+                    context.mGfxDeviceContext->RSSetViewports(1, &Viewport);
+                    context.mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+                    context.mGfxDeviceContext->IASetInputLayout(BlitShaderProgramPtr->VertexShader->mInputLayout.Get());
+                    context.mGfxDeviceContext->VSSetShader(BlitShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
+                    context.mGfxDeviceContext->PSSetShader(BlitShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
+
+                    context.SetVertexBuffer(FullscreenQuadVertexBuffer, 0);
+                    context.mGfxDeviceContext->Draw(3, 0);
+
+                    const bool DontRestoreContextState = false;
+                    context.mGfxDeviceContext->FinishCommandList(DontRestoreContextState, &BlitRenderingCommandList);
+                    mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(BlitRenderingCommandList, DontRestoreContextState);
+                }
+            );
+            MainGraph.BindOutput(blitRenderTarget);
             MainGraph.BindOutput(depthStencil);
             MainGraph.Compile();
             MainGraph.Execute(*mGfxDeviceDeferredContext);
@@ -617,13 +690,8 @@ namespace engine
             auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, SimpleColorPixelShaderSourceCode, psEntryName);
             SimpleShaderProgramPtr = LinkShader(VertexShader, PixelShader);
 
-
-            VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, BlitVertexShaderSource, vsEntryName, InputLayoutArray);
-            PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, BlitPixelShaderSource, psEntryName);
-            BlitShaderProgramPtr = LinkShader(VertexShader, PixelShader);
-
             if (SceneConstantBufferPtr == nullptr || ObjectConstantBufferPtr == nullptr
-                || SimpleShaderProgramPtr == nullptr || BlitShaderProgramPtr == nullptr)
+                || SimpleShaderProgramPtr == nullptr)
             {
                 initialize_error = true;
                 safe_delete(SceneConstantBufferPtr);

@@ -84,15 +84,13 @@ namespace engine
     {
         for (RFGResource& resource : mResources)
         {
+            ASSERT(resource.ReadingCount == 0);
+            resource.ReadingCount = 0;
             resource.ReadingNodes.clear();
             resource.WritingNodes.clear();
         }
         for (const RFGNode& node : mNodes)
         {
-            for (int index : node.ReadingRenderTargets)
-            {
-                mResources[index].ReadingNodes.emplace_back(node.Index);
-            }
             for (int index : node.WritingRenderTargets)
             {
                 mResources[index].WritingNodes.emplace_back(node.Index);
@@ -156,6 +154,9 @@ namespace engine
                 {
                     int aliasing = GetAliasingResourceIndex(nodeIndex);
                     node.ReadingRenderTargetAliasing.emplace_back(aliasing);
+                    RFGResource& resource = mResources[aliasing];
+                    resource.ReadingNodes.emplace_back(node.Index);
+                    resource.ReadingCount++;
                 }
             }
         }
@@ -382,12 +383,24 @@ namespace engine
         return mResources.back();
     }
 
+    void RenderFrameGraph::BindReadingResources(GfxDeferredContext& context, RFGNode& node)
+    {
+        ID3D11ShaderResourceView* views[16];
+        int viewCount = 0;
+        for (int renderTargetIndex : node.ReadingRenderTargetAliasing)
+        {
+            RFGResource& resource = mResources[renderTargetIndex];
+            resource.ReadingCount--;
+            views[viewCount] = resource.GfxRenderTargetPtr == nullptr ? nullptr
+                : resource.GfxRenderTargetPtr->mShaderResourceView.Get();
+            viewCount++;
+        }
+
+        context.mGfxDeviceContext->PSSetShaderResources(0, viewCount, views);
+    }
 
     void RenderFrameGraph::BindWritingResources(GfxDeferredContext& context, RenderFrameGraph::RFGNode& node)
     {
-        ASSERT(mTransientRenderTargets.size() == 0);
-        ASSERT(mTransientDepthStencil == nullptr);
-
         TransientBufferRegistry* registry = mTransientBufferRegistry;
         GfxRenderTarget* renderTargets[100] = { 0 };
         int rtCount = 0;
@@ -399,40 +412,43 @@ namespace engine
             }
             else
             {
-                RFGResource& depthStencilDesc = mResources[renderTargetIndex];
-                ASSERT(depthStencilDesc.RenderTarget == 1);
-                renderTargets[rtCount] = registry->AllocateRenderTarget(depthStencilDesc.RenderTargetFormat, depthStencilDesc.Width, depthStencilDesc.Height, depthStencilDesc.ShaderAccess);
-                mTransientRenderTargets.emplace_back(renderTargets[rtCount]);
+                RFGResource& resRenderTarget = mResources[renderTargetIndex];
+                ASSERT(resRenderTarget.RenderTarget == 1);
+                renderTargets[rtCount] = registry->AllocateRenderTarget(resRenderTarget.RenderTargetFormat, resRenderTarget.Width, resRenderTarget.Height, resRenderTarget.ReadingCount > 0);
+                resRenderTarget.GfxRenderTargetPtr = renderTargets[rtCount];
             }
             rtCount++;
         }
 
-        int depthStencilIndex = -1;
         GfxDepthStencil* depthStencil = nullptr;
         if (node.WritingDepthStencil != -1)
         {
-            depthStencilIndex = GetAliasingResourceIndex(node.WritingDepthStencil);
-            if (depthStencilIndex == mBackbufferDSIndex)
+            node.WritingDepthStencilAliasing = GetAliasingResourceIndex(node.WritingDepthStencil);
+            if (node.WritingDepthStencilAliasing == mBackbufferDSIndex)
             {
                 depthStencil = registry->GetDefaultBackbufferDS();
             }
             else
             {
-                RFGResource& depthStencilDesc = mResources[depthStencilIndex];
-                ASSERT(depthStencilDesc.RenderTarget == 0);
-                depthStencil = registry->AllocateDepthStencil(depthStencilDesc.DepthStencilFormat, depthStencilDesc.Width, depthStencilDesc.Height, depthStencilDesc.ShaderAccess);
-                mTransientDepthStencil = depthStencil;
+                RFGResource& resDepthStencil = mResources[node.WritingDepthStencilAliasing];
+                ASSERT(resDepthStencil.RenderTarget == 0);
+                depthStencil = registry->AllocateDepthStencil(resDepthStencil.DepthStencilFormat, resDepthStencil.Width, resDepthStencil.Height, resDepthStencil.ReadingCount > 0);
+                resDepthStencil.GfxDepthStencilPtr = depthStencil;
             }
         }
 
         context.SetRenderTargets(renderTargets, rtCount, depthStencil);
+
         rtCount = 0;
         for (auto& state : node.RenderTargetBindStates)
         {
             if (state.ClearColor)
+            {
                 context.ClearRenderTarget(renderTargets[rtCount], state.ClearColorValue);
+            }
             rtCount++;
         }
+
         if (depthStencil != nullptr)
         {
             context.ClearDepthStencil(depthStencil,
@@ -447,50 +463,42 @@ namespace engine
     {
         if (node.mExecuteJob)
         {
+            BindReadingResources(context, node);
             BindWritingResources(context, node);
             node.mExecuteJob(context);
-            ReleaseTransientResources();
-        }
-
-        Printf("RenderPass{%s} is Running.\n", node.DebugName.c_str());
-        for (int index : node.ReadingRenderTargets)
-        {
-            if (index == -1)
-                continue;
-            int aliasingIndex = GetAliasingResourceIndex(index);
-            PrintSubMessage("Map Input Resource From{%s} to {%s}",
-                mResources[index].DebugName.c_str(),
-                mResources[aliasingIndex].DebugName.c_str());
-            index = aliasingIndex;
-            RFGResource& resource = mResources[index];
-            PrintSubMessage("Reading Resource{%s}", resource.DebugName.c_str());
-        }
-
-        for (int index : node.WritingRenderTargets)
-        {
-            if (index == -1)
-                continue;
-            int aliasingIndex = GetAliasingResourceIndex(index);
-            PrintSubMessage("Map Output Resource From{%s} to {%s}",
-                mResources[index].DebugName.c_str(),
-                mResources[aliasingIndex].DebugName.c_str());
-            index = aliasingIndex;
-            RFGResource& resource = mResources[index];
-            PrintSubMessage("Writing Resource{%s}", resource.DebugName.c_str());
+            ReleaseTransientResources(node);
         }
     }
-    void RenderFrameGraph::ReleaseTransientResources()
+    void RenderFrameGraph::ReleaseTransientResources(RenderFrameGraph::RFGNode& node)
     {
-        for (GfxRenderTarget* renderTarget : mTransientRenderTargets)
+        for (int index : node.WritingRenderTargetAliasing)
         {
-            mTransientBufferRegistry->RecycleRenderTarget(renderTarget);
+            RFGResource& resource = mResources[index];
+            if (resource.ReadingCount == 0 && resource.GfxRenderTargetPtr)
+            {
+                mTransientBufferRegistry->RecycleRenderTarget(resource.GfxRenderTargetPtr);
+                resource.GfxRenderTargetPtr = nullptr;
+            }
         }
-        mTransientRenderTargets.clear();
 
-        if (mTransientDepthStencil != nullptr)
+        for (int index : node.ReadingRenderTargetAliasing)
         {
-            mTransientBufferRegistry->RecycleDepthStencil(mTransientDepthStencil);
-            mTransientDepthStencil = nullptr;
+            RFGResource& resource = mResources[index];
+            if (resource.ReadingCount == 0 && resource.GfxRenderTargetPtr)
+            {
+                mTransientBufferRegistry->RecycleRenderTarget(resource.GfxRenderTargetPtr);
+                resource.GfxRenderTargetPtr = nullptr;
+            }
+        }
+
+        if (node.WritingDepthStencilAliasing != -1)
+        {
+            RFGResource& resource = mResources[node.WritingDepthStencilAliasing];
+            if (resource.ReadingCount == 0 && resource.GfxDepthStencilPtr)
+            {
+                mTransientBufferRegistry->RecycleDepthStencil(resource.GfxDepthStencilPtr);
+                resource.GfxDepthStencilPtr = nullptr;
+            }
         }
     }
 

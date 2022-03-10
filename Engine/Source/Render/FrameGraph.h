@@ -81,6 +81,7 @@ namespace engine
             std::vector<int> ReadingRenderTargetAliasing;
             std::vector<int> WritingRenderTargetAliasing;
             int WritingDepthStencil = -1;
+            int WritingDepthStencilAliasing = -1;
             std::vector<ClearState> RenderTargetBindStates;
             ClearState DepthStencilBindState;
 
@@ -95,7 +96,7 @@ namespace engine
             int Width;
             int Height;
             int RenderTarget = 1;
-            int ShaderAccess = 0;
+            int ReadingCount = 0;
             union
             {
                 ERenderTargetFormat RenderTargetFormat;
@@ -104,22 +105,24 @@ namespace engine
             std::vector<int> ReadingNodes;
             std::vector<int> WritingNodes;
             std::vector<int> AliasingResources;
+
+            GfxRenderTarget* GfxRenderTargetPtr = nullptr;
+            GfxDepthStencil* GfxDepthStencilPtr = nullptr;
         };
 
         bool MoveResource(RFGResource& from, RFGResource& to);
         RFGResource& CreateNewResource(const std::string& name, int width, int height, ERenderTargetFormat format);
         RFGResource& CreateNewResource(const std::string& name, int width, int height, EDepthStencilFormat format);
+        void BindReadingResources(GfxDeferredContext& context, RFGNode& node);
         void BindWritingResources(GfxDeferredContext& context, RFGNode& node);
         void ExecuteNode(GfxDeferredContext& context, RFGNode& node);
-        void ReleaseTransientResources();
+        void ReleaseTransientResources(RFGNode& node);
         int GetAliasingResourceIndex(int);
 
         std::vector<RFGNode> mNodes;
         std::vector<RFGResource> mResources;
         std::vector<int> mCompiledNodeExecuteOrder;
         TransientBufferRegistry* mTransientBufferRegistry;
-        std::vector<GfxRenderTarget*> mTransientRenderTargets;
-        GfxDepthStencil* mTransientDepthStencil = nullptr;
         int mBackbufferRTIndex;
         int mBackbufferDSIndex;
     };
