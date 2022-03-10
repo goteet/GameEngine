@@ -274,11 +274,60 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
     }
 )";
 
+const std::string BlitVertexShaderSource = R"(
+    struct VertexLayout
+    {
+        float4 Position : POSITION;
+        float3 Normal   : NORMAL;
+        float2 Texcoord : TEXCOORD0;
+    };
+    struct VertexOutput
+    {
+        float4 Position : SV_POSITION;
+        float2 Texcoord : TEXCOORD0;
+    };
+    VertexOutput VSMain(VertexLayout input)
+    {
+        VertexOutput output;
+        output.Position = input.Position;
+        output.Texcoord = input.Texcoord;
+        return output;
+    }
+)";
+
+const std::string BlitPixelShaderSource = R"(
+    Texture2D Texture : register(t0);
+    sampler Sampler : register(s0);
+    struct VertexOutput
+    {
+        float4 Position : SV_POSITION;
+        float2 Texcoord : TEXCOORD0;
+    };
+    float4 PSMain(VertexOutput input) : SV_TARGET
+    {
+        float4 color = Texture.Sample(Sampler, input.Texcoord);
+        return float4(color.rgb, 1.0);
+    }
+)";
+
+namespace fullscreen_quad
+{
+    const unsigned int FSQuadVertexCount = 3;
+    engine::VertexLayout FSQuadVertices[FSQuadVertexCount] =
+    {
+        { math::float4(-0.5f, -0.5f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 0) },
+        { math::float4(-0.5f, +1.5f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, 1) },
+        { math::float4(+1.5f, -0.5f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(1, 1) }
+    };
+}
+
 namespace engine
 {
+    GfxDefaultVertexBuffer* FullscreenQuadVertexBuffer = nullptr;
     GfxDynamicConstantBuffer* ObjectConstantBufferPtr = nullptr;
     GfxDynamicConstantBuffer* SceneConstantBufferPtr = nullptr;
     ShaderProgram* SimpleShaderProgramPtr = nullptr;
+    ShaderProgram* BlitShaderProgramPtr = nullptr;
     ID3D11CommandList* CubeRenderingCommandList = nullptr;
     ID3D11RasterizerState* DefaultRasterState = nullptr;
 
@@ -302,6 +351,7 @@ namespace engine
         safe_delete(ObjectConstantBufferPtr);
         safe_delete(SceneConstantBufferPtr);
         safe_delete(SimpleShaderProgramPtr);
+        safe_delete(BlitShaderProgramPtr);
         SafeRelease(DefaultRasterState);
         SafeRelease(CubeRenderingCommandList);
 
@@ -474,6 +524,7 @@ namespace engine
         {
             RenderFrameGraph MainGraph(mTransientBufferRegistry.get());
             RFGRenderPass forwardPass = MainGraph.AddRenderPass("test.forward");
+            RFGRenderPass blitPass = MainGraph.AddRenderPass("test.blit");
             RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
             RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferDSFormat());
 
@@ -484,7 +535,8 @@ namespace engine
             state.ClearColorValue = math::float4{ 0.15f, 0.0f, 0.0f, 1.0f };
             forwardPass.BindWriting(renderTarget, state);
             forwardPass.BindWriting(depthStencil, state);
-            forwardPass.AttachJob([&](GfxDeferredContext& context)
+            forwardPass.AttachJob(
+                [&](GfxDeferredContext& context)
                 {
                     if (DefaultRasterState == nullptr)
                     {
@@ -559,19 +611,25 @@ namespace engine
 
             // 创建顶点着色器
             const std::string vsEntryName = "VSMain";
+            const std::string psEntryName = "PSMain";
             const std::vector<D3D11_INPUT_ELEMENT_DESC> InputLayoutArray(InputLayout, InputLayout + InputLayoutCount);
             auto VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, DefaultVertexShaderSourceCode, vsEntryName, InputLayoutArray);
-
-            const std::string psEntryName = "PSMain";
             auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, SimpleColorPixelShaderSourceCode, psEntryName);
             SimpleShaderProgramPtr = LinkShader(VertexShader, PixelShader);
 
-            if (SceneConstantBufferPtr == nullptr || ObjectConstantBufferPtr == nullptr || SimpleShaderProgramPtr == nullptr)
+
+            VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, BlitVertexShaderSource, vsEntryName, InputLayoutArray);
+            PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, BlitPixelShaderSource, psEntryName);
+            BlitShaderProgramPtr = LinkShader(VertexShader, PixelShader);
+
+            if (SceneConstantBufferPtr == nullptr || ObjectConstantBufferPtr == nullptr
+                || SimpleShaderProgramPtr == nullptr || BlitShaderProgramPtr == nullptr)
             {
                 initialize_error = true;
                 safe_delete(SceneConstantBufferPtr);
                 safe_delete(ObjectConstantBufferPtr);
                 safe_delete(SimpleShaderProgramPtr);
+                safe_delete(BlitShaderProgramPtr);
             }
             initialize = true;
         }
@@ -606,10 +664,8 @@ namespace engine
             context.UnmapBuffer(*SceneConstantBufferPtr);
 
             context.mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
             context.mGfxDeviceContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
             context.mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
-
             context.SetVSConstantBufferImpl(1, SceneConstantBufferPtr);
             context.mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
             context.SetPSConstantBufferImpl(0, SceneConstantBufferPtr);
