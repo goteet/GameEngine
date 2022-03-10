@@ -474,8 +474,8 @@ namespace engine
         {
             RenderFrameGraph MainGraph(mTransientBufferRegistry.get());
             RFGRenderPass forwardPass = MainGraph.AddRenderPass("test.forward");
-            RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget", true);
-            RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil", false);
+            RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
+            RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferDSFormat());
 
             ClearState state;
             state.ClearColor = true;

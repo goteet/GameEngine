@@ -25,6 +25,10 @@ namespace engine
     {
         RenderFrameGraph* Graph;
         int Index;
+        int GetWidth() const;
+        int GetHeigt() const;
+        int GetFormat() const;
+        bool IsRenderTarget() const;
     };
 
     struct RFGRenderPass
@@ -42,7 +46,8 @@ namespace engine
     public:
         RenderFrameGraph(TransientBufferRegistry* registry);
         RFGRenderPass AddRenderPass(const std::string& name);
-        RFGResourceHandle RequestResource(const std::string& name, bool rendertarget);
+        RFGResourceHandle RequestResource(const std::string& name, int width, int height, ERenderTargetFormat format);
+        RFGResourceHandle RequestResource(const std::string& name, int width, int height, EDepthStencilFormat format);
         void Compile();
         void Execute(GfxDeferredContext&);
         bool BindReading(RFGRenderPass, RFGResourceHandle&);
@@ -50,6 +55,15 @@ namespace engine
         void BindOutput(RFGResourceHandle resource);
         bool AttachJob(RFGRenderPass pass, std::function<void(GfxDeferredContext&)> job);
         void CreateTestFrameGraph();
+
+        int GetBackbufferWidth() const;
+        int GetBackbufferHeight() const;
+        ERenderTargetFormat GetBackbufferRTFormat() const;
+        EDepthStencilFormat GetBackbufferDSFormat() const;
+        int GetWidth(const RFGResourceHandle&) const;
+        int GetHeigt(const RFGResourceHandle&) const;
+        int GetFormat(const RFGResourceHandle&) const;
+        bool IsRenderTarget(const RFGResourceHandle&) const;
 
         template<typename RenderPassType>
         RenderPassType AddRenderPass(const std::string& name)
@@ -78,21 +92,34 @@ namespace engine
             std::string DebugName;
             int Index;
             int AliasingTo = -1;
+            int Width;
+            int Height;
             int RenderTarget = 1;
+            int ShaderAccess = 0;
+            union
+            {
+                ERenderTargetFormat RenderTargetFormat;
+                EDepthStencilFormat DepthStencilFormat;
+            };
             std::vector<int> ReadingNodes;
             std::vector<int> WritingNodes;
             std::vector<int> AliasingResources;
         };
-        void MoveResource(RFGResource& from, RFGResource& to);
-        RFGResource& CreateNewResource(const std::string& name, bool rendertarget);
+
+        bool MoveResource(RFGResource& from, RFGResource& to);
+        RFGResource& CreateNewResource(const std::string& name, int width, int height, ERenderTargetFormat format);
+        RFGResource& CreateNewResource(const std::string& name, int width, int height, EDepthStencilFormat format);
         void BindWritingResources(GfxDeferredContext& context, RFGNode& node);
         void ExecuteNode(GfxDeferredContext& context, RFGNode& node);
+        void ReleaseTransientResources();
         int GetAliasingResourceIndex(int);
 
         std::vector<RFGNode> mNodes;
         std::vector<RFGResource> mResources;
         std::vector<int> mCompiledNodeExecuteOrder;
         TransientBufferRegistry* mTransientBufferRegistry;
+        std::vector<GfxRenderTarget*> mTransientRenderTargets;
+        GfxDepthStencil* mTransientDepthStencil = nullptr;
         int mBackbufferRTIndex;
         int mBackbufferDSIndex;
     };
