@@ -43,7 +43,7 @@ namespace math
         ray(const vector_t<value_type, (EDim)(dimension + 1)>& o, const normalized_vector_t<value_type, dimension>& d) : _origin(o), _direction(d) { _inv_direction = inversed(_direction); }
         constexpr const point<value_type, dimension>& origin() const { return _origin; }
         constexpr point<value_type, dimension>& origin() { return _origin; }
-        constexpr const vector_t<value_type, dimension>& direction() const { return _direction; }
+        constexpr const normalized_vector_t<value_type, dimension>& direction() const { return _direction; }
         constexpr const vector_t<value_type, dimension>& inv_direction() const { return _inv_direction; }
         constexpr void set_origin(const point<value_type, dimension>& o) { _origin = o; }
         constexpr void set_direction(const normalized_vector_t<value_type, dimension>& dir) { _direction = dir; _inv_direction = inversed(_direction); }
