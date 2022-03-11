@@ -5,6 +5,7 @@
 #include <Foundation/Math/Geometry.h>
 
 using F = double;
+class Scene;
 
 template<typename T>
 struct random
@@ -29,21 +30,19 @@ private:
 struct IMaterial
 {
     virtual ~IMaterial() { }
-    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, F& outPdf) const = 0;
+    virtual bool Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const = 0;
     virtual math::vector3<F> Emitting() const { return math::vector3<F>::zero(); }
-    virtual math::vector3<F> BRDF() const { return math::vector3<F>::zero(); }
 };
 
-struct Lambertian : public IMaterial
+struct Lambertian : public virtual IMaterial
 {
     math::vector3<F> Albedo = math::vector3<F>::one();
 
     Lambertian() = default;
     Lambertian(F r, F g, F b) : Albedo(r, g, b) { }
-    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, F& outPdf) const override;
-    virtual math::vector3<F> BRDF() const override;
+    virtual bool Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const override;
 };
 
 struct Metal : public IMaterial
@@ -52,9 +51,20 @@ struct Metal : public IMaterial
 
     Metal() = default;
     Metal(F f) : Fuzzy(f) { }
-    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, F& outPdf) const override;
-    virtual math::vector3<F> BRDF() const override { return math::vector3<F>::one(); }
+    virtual bool Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const override;
+};
+
+struct Glossy : public Lambertian
+{
+    mutable random<F> RandGenerator;
+    F RefractiveIndex = F(2.5);
+    F SampleProbability = F(0.5);
+
+    Glossy() = default;
+    Glossy(F r, F g, F b, F ior = F(2.5)) : Lambertian(r, g, b), RefractiveIndex(ior) { }
+    virtual bool Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const override;
 };
 
 struct Dielectric : public IMaterial
@@ -63,9 +73,8 @@ struct Dielectric : public IMaterial
 
     Dielectric() = default;
     Dielectric(F ior) : RefractiveIndex(ior) { }
-    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, F& outPdf) const override;
-    virtual math::vector3<F> BRDF() const override { return math::vector3<F>::one(); }
+    virtual bool Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const override;
 };
 
 struct PureLight_ForTest : IMaterial
@@ -74,7 +83,7 @@ struct PureLight_ForTest : IMaterial
 
     PureLight_ForTest() = default;
     PureLight_ForTest(F x, F y, F z) : Emission(x, y, z) { }
-    virtual bool Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, F& outPdf) const override;
+    virtual bool Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const override;
     virtual math::vector3<F> Emitting() const override;
 };

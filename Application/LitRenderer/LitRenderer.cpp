@@ -42,57 +42,21 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
     F biasedDistance = math::max2<F>(contactRecord.Distance, F(0));
     math::point3d<F> shadingPoint = ray.calc_offset(biasedDistance);
 
+
     F pdf = F(1);
-    math::vector3<F> Li;
+    F cosTheta = F(1);
+    math::vector3<F> f = math::vector3<F>::zero();
+    math::vector3<F> Li = math::vector3<F>::zero();
     math::ray3d<F> scattering;
-    scattering.set_origin(shadingPoint);
 
-    F N = F(1) / F(scene.GetLightCount() + 1);
-    F Ln = scene.GetLightCount() * N;
-    F e = random<F>::value();
-    if (e < Ln)
+    if (material.Scattering(scene, shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering, f, pdf))
     {
-        int lightIndex = math::clamp(math::floor2<int>(scene.GetLightCount() * e), 0, scene.GetLightCount() - 1);
-        SceneObject* LightObject = scene.GetLightSourceByIndex(lightIndex);
-        if (LightObject != contactRecord.Object)
-        {
-            math::vector3<F> LightNormal;
-            math::point3d<F> LightSamplePos = LightObject->SampleRandomPoint(LightNormal, pdf);
-            pdf *= Ln;
-            math::vector3<F> lightDirectoin = LightSamplePos - shadingPoint;
-            scattering.set_direction(lightDirectoin);
-            F cosThetaPrime = math::dot(-LightNormal, scattering.direction());
-            if (cosThetaPrime < -math::SMALL_NUM<F> && LightObject->IsDualface())
-            {
-                cosThetaPrime = -cosThetaPrime;
-            }
-            if (cosThetaPrime > math::SMALL_NUM<F>)
-            {
-                HitRecord lightHitRecord = scene.DetectIntersecting(scattering, nullptr, math::SMALL_NUM<F>);
-                if (lightHitRecord.Object == LightObject)
-                {
-                    //direct light sampling.
-                    F distSquare = math::dot(lightDirectoin, lightDirectoin);
-                    F invDistSquare = (distSquare > F(0)) ? math::clamp(F(1) / distSquare) : F(1);
-                    Li = LightObject->Material->Emitting() * cosThetaPrime * invDistSquare;
-                }
-            }
-        }
+        cosTheta = math::dot(normal, scattering.direction());
+        math::vector3<F> reflectance = f * cosTheta / pdf;
+        Li = Trace(scene, scattering, TerminalRecord.Next(reflectance));
     }
-    else
-    {
-        if (material.Scattering(shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering, pdf))
-        {
-            pdf *= F(1) - Ln;
-            F cosTheta = math::dot(normal, scattering.direction());
-            math::vector3<F> reflectance = material.BRDF() * cosTheta / pdf;
-            Li = Trace(scene, scattering, TerminalRecord.Next(reflectance));
-        }
-    }
-
-    F cosTheta = math::dot(normal, scattering.direction());
-    math::vector3<F> reflection = material.BRDF() * Li * cosTheta / pdf;
     math::vector3<F> emission = material.Emitting();
+    math::vector3<F> reflection = f * Li * cosTheta / pdf;
     return emission + reflection;
 }
 
@@ -614,13 +578,13 @@ void SimpleScene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjec
     const F SmallObjectSize = 8;
     const F BigObjectSize = SmallObjectSize * F(1.75);
 
-    SceneSphere* dielectricSphereFloat = new SceneSphere(); OutSceneObjects.push_back(dielectricSphereFloat);
-    dielectricSphereFloat->SetRadius(20);
-    dielectricSphereFloat->SetTranslate(
+    SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
+    mainSphere->SetRadius(20);
+    mainSphere->SetTranslate(
         SceneCenterX + 20,
         SceneBottom + 22,
         SceneCenterZ + 10);
-    dielectricSphereFloat->Material = std::make_unique<Lambertian>();
+    mainSphere->Material = std::make_unique<Glossy>(1, 1, 1, 1.5);
 
     SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
     wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
@@ -656,6 +620,6 @@ void SimpleScene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjec
     LightDisk->SetTranslate(SceneCenterX, SceneTop - F(0.01), SceneCenterZ + F(10));
     LightDisk->SetExtends(25, 25);
     LightDisk->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
-    F Intensity = 5;
+    F Intensity = 2.5;
     LightDisk->Material = std::make_unique<PureLight_ForTest>(Intensity, Intensity, Intensity);
 }

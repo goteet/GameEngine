@@ -1,5 +1,5 @@
 #include "Material.h"
-
+#include "LitRenderer.h"
 
 
 struct UVW
@@ -100,37 +100,86 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F
 
 
 
-bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, F& outPdf) const
+bool Lambertian::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
 {
-    math::normalized_vector3<F> scatterDirection = GenerateCosineWeightedHemisphereDirection(N);
-    outScattering.set_origin(P);
-    outScattering.set_direction(scatterDirection);
+    //make brdf-lighting = 1:1.
+    int numBrdf_virtual = scene.GetLightCount();
+    int numLights = scene.GetLightCount();
+    F rrAll = F(1) / (numLights + numBrdf_virtual);
+    F rrBrdf = numBrdf_virtual * rrAll;
+    F rrLights = numLights * rrAll;
+    F epsilon = random<F>::value();
 
-    F cosTheta = math::dot(N, scatterDirection);
-    outPdf = math::max2(F(0), cosTheta) / math::PI<F>;
-    return true;
+
+    bool chooseLightSample = epsilon <= rrLights;
+    if (chooseLightSample)
+    {
+        int lightIndex = math::floor2<int>(epsilon / rrLights);
+        lightIndex = math::clamp(lightIndex, 0, numLights - 1);
+        SceneObject* LightObject = scene.GetLightSourceByIndex(lightIndex);
+
+        math::vector3<F> lightN;
+        math::point3d<F> LightSampleP = LightObject->SampleRandomPoint(lightN, outPdf);
+        math::vector3<F> lightDisplacement = LightSampleP - P;
+
+        //direct light sampling.
+        outScattering.set_origin(P);
+        outScattering.set_direction(lightDisplacement);
+
+        //calculate pdf(w) = pdf(x') * dist_sqr / cos_theta'
+        const math::normalized_vector3<F>& lightV = outScattering.direction();
+        F cosThetaPrime = math::dot(lightN, -lightV);
+        
+        if (cosThetaPrime < -math::SMALL_NUM<F> && LightObject->IsDualface())
+        {
+            cosThetaPrime = -cosThetaPrime;
+        }
+
+        if (cosThetaPrime <= math::SMALL_NUM<F>)
+            return false;
+
+        F distSqr = math::dot(lightDisplacement, lightDisplacement);
+        outBrdf = Albedo / math::PI<F>;
+        outPdf *= distSqr / cosThetaPrime;
+        outPdf *= rrLights;
+        return true;
+    }
+    else
+    {
+        math::normalized_vector3<F> scatterDirection = GenerateCosineWeightedHemisphereDirection(N);
+
+        outScattering.set_origin(P);
+        outScattering.set_direction(scatterDirection);
+
+        F cosTheta = math::dot(N, scatterDirection);
+        outBrdf = Albedo / math::PI<F>;
+        outPdf = math::max2(F(0), cosTheta) / math::PI<F>;
+        outPdf *= rrBrdf;
+        return true;
+    }
+
 }
 
-math::vector3<F> Lambertian::BRDF() const
-{
-    return Albedo / math::PI<F>;
-}
-
-math::vector3<F> Reflect(const math::vector3<F>& In, const math::vector3<F>& N)
+math::normalized_vector3<F> Reflect(
+    const math::normalized_vector3<F>& In,
+    const math::normalized_vector3<F>& N
+)
 {
     return In - F(2) * math::dot(In, N) * N;
 }
 
-bool Metal::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, F& outPdf) const
+bool Metal::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
 {
     math::vector3<F> FuzzyDirection = Fuzzy * GenerateUnitSphereVector();
-    math::vector3<F> Direction = Reflect(Ray.direction(), N) + FuzzyDirection;
+    math::normalized_vector3<F> reflectDirection = Reflect(Ray.direction(), N) + FuzzyDirection;
     outScattering.set_origin(P);
-    outScattering.set_direction(Direction);
-    outPdf = F(1);
-    return math::dot(Direction, N) > F(0);
+    outScattering.set_direction(reflectDirection);
+    outBrdf = math::vector3<F>::one();
+    F cosTheta = math::dot(N, reflectDirection);
+    outPdf = cosTheta;
+    return cosTheta > F(0);
 }
 
 F Power5(F Base)
@@ -148,8 +197,8 @@ F ReflectanceSchlick(F CosTheta, F eta1, F eta2)
     return R0 + (F(1) - R0) * Power5(Base);
 }
 
-bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, F& outPdf) const
+bool Dielectric::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
 {
     const F AirRefractiveIndex = F(1.0003);
 
@@ -180,12 +229,13 @@ bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N
 
     outScattering.set_origin(P);
     outScattering.set_direction(ScatteredDirection);
+    outBrdf = math::vector3<F>::one();
     outPdf = F(1);
     return true;
 }
 
-bool PureLight_ForTest::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, F& outPdf) const
+bool PureLight_ForTest::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
 {
     return false;
 }
@@ -193,4 +243,37 @@ bool PureLight_ForTest::Scattering(const math::vector3<F>& P, const math::vector
 math::vector3<F> PureLight_ForTest::Emitting() const
 {
     return Emission;
+}
+
+bool Glossy::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
+{
+    const F AirRefractiveIndex = F(1.0003);
+
+    const math::vector3<F>& InDirection = Ray.direction();
+    const F eta1 = IsFrontFace ? AirRefractiveIndex : RefractiveIndex;
+    const F eta2 = IsFrontFace ? RefractiveIndex : AirRefractiveIndex;
+    const F IdotN = -math::dot(InDirection, N);
+    const F cosTheta = math::clamp(IdotN);
+    const F Frehnel = ReflectanceSchlick(cosTheta, eta1, eta2);
+
+    const F SpecularRatio = F(0.6);
+    const F DiffuseRatio = F(1) - SpecularRatio;
+    bool chooseReflectRay = RandGenerator() < SpecularRatio;
+    if (chooseReflectRay)
+    {
+        math::normalized_vector3<F> direction = Reflect(Ray.direction(), N);
+        outScattering.set_origin(P);
+        outScattering.set_direction(direction);
+        outBrdf = math::vector3<F>(Frehnel, Frehnel, Frehnel);
+        outPdf = cosTheta * SpecularRatio;
+        return math::dot(direction, N) > F(0);
+    }
+    else
+    {
+        bool rst = Lambertian::Scattering(scene, P, N, Ray, IsFrontFace, outScattering, outBrdf, outPdf);
+        outBrdf *= F(1) - Frehnel;
+        outPdf *= DiffuseRatio;
+        return rst;
+    }
 }
