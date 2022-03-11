@@ -81,9 +81,8 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
     }
     else
     {
-        if (material.Scattering(shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering))
+        if (material.Scattering(shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering, pdf))
         {
-            pdf = material.ScatteringPDF(normal, scattering.direction());
             pdf *= F(1) - Ln;
             F cosTheta = math::dot(normal, scattering.direction());
             math::vector3<F> reflectance = material.BRDF() * cosTheta / pdf;

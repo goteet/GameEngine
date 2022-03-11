@@ -101,18 +101,20 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F
 
 
 bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering) const
+    math::ray3d<F>& outScattering, F& outPdf) const
 {
-    math::normalized_vector3<F> Direction = GenerateCosineWeightedHemisphereDirection(N);
+    math::normalized_vector3<F> scatterDirection = GenerateCosineWeightedHemisphereDirection(N);
     outScattering.set_origin(P);
-    outScattering.set_direction(Direction);
+    outScattering.set_direction(scatterDirection);
+
+    F cosTheta = math::dot(N, scatterDirection);
+    outPdf = math::max2(F(0), cosTheta) / math::PI<F>;
     return true;
 }
 
-F Lambertian::ScatteringPDF(const math::vector3<F>& N, const math::vector3<F>& Scattering) const
+math::vector3<F> Lambertian::BRDF() const
 {
-    F cosTheta = math::dot(N, Scattering);
-    return cosTheta < F(0) ? F(0) : cosTheta / math::constant_value<F>::pi;
+    return Albedo / math::PI<F>;
 }
 
 math::vector3<F> Reflect(const math::vector3<F>& In, const math::vector3<F>& N)
@@ -121,12 +123,13 @@ math::vector3<F> Reflect(const math::vector3<F>& In, const math::vector3<F>& N)
 }
 
 bool Metal::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering) const
+    math::ray3d<F>& outScattering, F& outPdf) const
 {
     math::vector3<F> FuzzyDirection = Fuzzy * GenerateUnitSphereVector();
     math::vector3<F> Direction = Reflect(Ray.direction(), N) + FuzzyDirection;
     outScattering.set_origin(P);
     outScattering.set_direction(Direction);
+    outPdf = F(1);
     return math::dot(Direction, N) > F(0);
 }
 
@@ -146,7 +149,7 @@ F ReflectanceSchlick(F CosTheta, F eta1, F eta2)
 }
 
 bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering) const
+    math::ray3d<F>& outScattering, F& outPdf) const
 {
     const F AirRefractiveIndex = F(1.0003);
 
@@ -177,11 +180,12 @@ bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N
 
     outScattering.set_origin(P);
     outScattering.set_direction(ScatteredDirection);
+    outPdf = F(1);
     return true;
 }
 
 bool PureLight_ForTest::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering) const
+    math::ray3d<F>& outScattering, F& outPdf) const
 {
     return false;
 }
