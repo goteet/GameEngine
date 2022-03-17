@@ -263,9 +263,17 @@ namespace engine
     void GfxDeviceContext::SetRenderTargets(GfxRenderTarget** renderTargets, unsigned int rtCount, GfxDepthStencil* ds)
     {
         rtCount = math::min2(rtCount, 8);
-        for (unsigned int i = 0; i < rtCount; i++)
+        if (rtCount == 0)
         {
-            mRenderTargetViews[i] = renderTargets[i]->mRenderTargetView.Get();
+            rtCount = 1;
+            mRenderTargetViews[0] = nullptr;
+        }
+        else
+        {
+            for (unsigned int i = 0; i < rtCount; i++)
+            {
+                mRenderTargetViews[i] = renderTargets[i]->mRenderTargetView.Get();
+            }
         }
         mGfxDeviceContext->OMSetRenderTargets(rtCount, mRenderTargetViews,
             ds == nullptr ? nullptr : ds->mDepthStencilView.Get());
