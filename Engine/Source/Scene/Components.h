@@ -42,6 +42,7 @@ namespace engine
         virtual math::float3 GetColor() const override { return mColor; }
         virtual void SetIntensity(float intensity) override;
         virtual float GetIntensity() const override { return mIntensity; }
+        math::view_matrix4x4f GetViewMatrix() const;
 
     private:
         float mIntensity;

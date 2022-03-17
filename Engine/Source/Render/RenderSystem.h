@@ -54,7 +54,7 @@ namespace engine
         };
 
     private:
-        void RenderScene(Scene& scene, GfxDeferredContext& context, const ViewConstantBufferData& data);
+        void RenderScene(Scene& scene, GfxDeferredContext& context, const ViewConstantBufferData& data, bool shadow);
 
         HWND mMainWindowHandle;
         bool mIsFullScreen = false;

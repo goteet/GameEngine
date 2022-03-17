@@ -198,6 +198,12 @@ struct ObjectConstantDesc
     math::float4x4 MatrixWorldToObject;
 };
 
+struct LightViewConstantDesc
+{
+    math::float4x4 MatrixView;
+    math::float4x4 MatrixProj;
+};
+
 const std::string DefaultVertexShaderSourceCode = R"(
     cbuffer object
     {
@@ -214,6 +220,11 @@ const std::string DefaultVertexShaderSourceCode = R"(
         float3   LightDirection;
         float    Padding1;
     }
+    cbuffer lightView
+    {
+        float4x4 LightMatrixView;
+        float4x4 LightMatrixProj;
+    }
     struct VertexLayout
     {
         float4 Position  : POSITION;
@@ -225,6 +236,7 @@ const std::string DefaultVertexShaderSourceCode = R"(
         float4 Position  : SV_POSITION;
         float3 Normal    : TEXCOORD0;
         float3 ViewDirWS : TEXCOORD1;
+        float4 LightPos  : TEXCOORD2;
     };
     VertexOutput VSMain(VertexLayout input)
     {
@@ -235,12 +247,15 @@ const std::string DefaultVertexShaderSourceCode = R"(
         float4 ModelNormal   = float4(input.Normal, 0.0f);
         output.Normal        = normalize(mul(ModelNormal, transpose(MatrixWorldToObject)).xyz);
         float3 CameraPositionWS = InvMatrixView._m03_m13_m23;
-        output.ViewDirWS        = CameraPositionWS - ModelPosition.xyz;
+        output.ViewDirWS     = CameraPositionWS - ModelPosition.xyz;
+        output.LightPos      = mul(mul(ModelPosition, LightMatrixView), LightMatrixProj);
         return output;
     }
 )";
 
 const std::string SimpleColorPixelShaderSourceCode = R"(
+    Texture2D Texture : register(t0);
+    sampler Sampler : register(s0);
     cbuffer scene
     {
         float4x4 MatrixView;
@@ -251,15 +266,22 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
         float3   LightDirection;
         float    Padding1;
     }
-
     struct VertexOutput
     {
         float4 Position  : SV_POSITION;
         float3 Normal    : TEXCOORD0;
         float3 ViewDirWS : TEXCOORD1;
+        float4 LightPos  : TEXCOORD2;
     };
     float4 PSMain(VertexOutput input) : SV_TARGET
     {
+        float3 projection = input.LightPos.xyz / input.LightPos.w;
+        projection.y = -projection.y;
+        float2 shadowDepthTexcoord = 0.5 * projection.xy + 0.5;
+        float depth = projection.z;
+        float shadowDepth = Texture.Sample(Sampler, shadowDepthTexcoord).r;
+        float shadow = shadowDepth + 0.0000025 >= depth ;
+        //return float4(float3(1,1,1) * shadow, 1); 
         float3 N = normalize(input.Normal);
         float3 L = -LightDirection;
         float3 V = normalize(input.ViewDirWS);
@@ -269,7 +291,7 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
         float3 Ambient = float3(0.15, 0.1, 0.1);
         float3 Diffuse = float3(1.0, 1.0, 1.0) * NoL;
         float3 Specular = pow(NoH, 128);
-        float4 Color = float4((Diffuse + Specular) * LightColor + Ambient, 1.0);
+        float4 Color = float4((Diffuse + Specular) * LightColor * shadow + Ambient, 1.0);
         return Color;
     }
 )";
@@ -310,6 +332,54 @@ const std::string BlitPixelShaderSource = R"(
     }
 )";
 
+
+const std::string ShadowVertexShaderSource = R"(
+    cbuffer object
+    {
+        float4x4 MatrixObjectToWorld;
+        float4x4 MatrixWorldToObject;
+    }
+    cbuffer lightView
+    {
+        float4x4 LightMatrixView;
+        float4x4 LightMatrixProj;
+    }
+    struct VertexLayout
+    {
+        float4 Position  : POSITION;
+        float3 Normal    : NORMAL;
+        float2 Texcoord0 : TEXCOORD0;
+    };
+    struct VertexOutput
+    {
+        float4 Position  : SV_POSITION;
+        float2 DepthPos  : TEXCOORD0;
+    };
+    VertexOutput VSMain(VertexLayout input)
+    {
+        VertexOutput output;
+        float4 ModelPosition = mul(input.Position, MatrixObjectToWorld);
+        float4 ViewPosition  = mul(ModelPosition, LightMatrixView);
+        float4 HomoPosition  = mul(ViewPosition, LightMatrixProj);
+        output.Position      = HomoPosition;
+        output.DepthPos      = HomoPosition.zw;
+        return output;
+    }
+)";
+
+const std::string ShadowPixelShaderSource = R"(
+    struct VertexOutput
+    {
+        float4 Position : SV_POSITION;
+        float2 DepthPos  : TEXCOORD0;
+    };
+    float4 PSMain(VertexOutput input) : SV_TARGET
+    {
+        return float4(0.0, 0.0, 0.0, 1.0);
+    }
+)";
+
+
 namespace fullscreen_quad
 {
     const unsigned int FSQuadVertexCount = 3;
@@ -326,6 +396,8 @@ namespace engine
     GfxDefaultVertexBuffer* FullscreenQuadVertexBuffer = nullptr;
     GfxDynamicConstantBuffer* ObjectConstantBufferPtr = nullptr;
     GfxDynamicConstantBuffer* SceneConstantBufferPtr = nullptr;
+    GfxDynamicConstantBuffer* LightViewConstantBufferPtr = nullptr;
+    ShaderProgram* ShadowShaderProgramPtr = nullptr;
     ShaderProgram* SimpleShaderProgramPtr = nullptr;
     ShaderProgram* BlitShaderProgramPtr = nullptr;
     ID3D11CommandList* CubeRenderingCommandList = nullptr;
@@ -353,6 +425,8 @@ namespace engine
         safe_delete(FullscreenQuadVertexBuffer);
         safe_delete(ObjectConstantBufferPtr);
         safe_delete(SceneConstantBufferPtr);
+        safe_delete(LightViewConstantBufferPtr);
+        safe_delete(ShadowShaderProgramPtr);
         safe_delete(SimpleShaderProgramPtr);
         safe_delete(BlitShaderProgramPtr);
         SafeRelease(DefaultRasterState);
@@ -529,19 +603,20 @@ namespace engine
         {
             RenderFrameGraph MainGraph(mTransientBufferRegistry.get());
             RFGRenderPass forwardPass = MainGraph.AddRenderPass("test.forward");
+            RFGRenderPass shadowPass = MainGraph.AddRenderPass("test.shadowdepth");
             RFGRenderPass blitPass = MainGraph.AddRenderPass("test.blit");
             RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
+            RFGResourceHandle shadowDepth = MainGraph.RequestResource("test.shadowdepth", 1024, 1024, EDepthStencilFormat::UNormDepth24_UIntStencil8);
             RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferDSFormat());
             RFGResourceHandle blitRenderTarget = MainGraph.RequestResource("test.blitrendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
 
             ClearState state;
-            state.ClearColor = true;
             state.ClearDepth = true;
             state.ClearStencil = true;
-            state.ClearColorValue = math::float4{ 0.15f, 0.0f, 0.0f, 1.0f };
-            forwardPass.BindWriting(renderTarget, state);
-            forwardPass.BindWriting(depthStencil, state);
-            forwardPass.AttachJob(
+            state.ClearDepthValue= 1.0;
+            state.ClearStencilValue = 0;
+            shadowPass.BindWriting(shadowDepth, state);
+            shadowPass.AttachJob(
                 [&](GfxDeferredContext& context)
                 {
                     if (DefaultRasterState == nullptr)
@@ -555,10 +630,61 @@ namespace engine
                         RasterizerDesc.SlopeScaledDepthBias = 0.0;
                         RasterizerDesc.DepthClipEnable = TRUE;
                         RasterizerDesc.ScissorEnable = FALSE;
-                        RasterizerDesc.MultisampleEnable = TRUE;
-                        RasterizerDesc.AntialiasedLineEnable = TRUE;
+                        RasterizerDesc.MultisampleEnable = FALSE;
+                        RasterizerDesc.AntialiasedLineEnable = FALSE;
                         mGfxDevice->mGfxDevice->CreateRasterizerState(&RasterizerDesc, &DefaultRasterState);
                     }
+                    context.mGfxDeviceContext->RSSetState(DefaultRasterState);
+
+                    D3D11_VIEWPORT Viewport;
+                    Viewport.TopLeftX = 0.0f;
+                    Viewport.TopLeftY = 0.0f;
+                    Viewport.Width = (float)1024;
+                    Viewport.Height = (float)1024;
+                    Viewport.MinDepth = 0.0f;
+                    Viewport.MaxDepth = 1.0f;
+
+                    context.mGfxDeviceContext->RSSetViewports(1, &Viewport);
+
+                    RenderScene(scene, context, data, true);
+
+                    const bool DontRestoreContextState = false;
+                    context.mGfxDeviceContext->FinishCommandList(DontRestoreContextState, &CubeRenderingCommandList);
+                    mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(CubeRenderingCommandList, DontRestoreContextState);
+                }
+            );
+
+            state.ClearColor = true;
+            state.ClearDepth = true;
+            state.ClearStencil = true;
+            state.ClearColorValue = math::float4{ 0.15f, 0.0f, 0.0f, 1.0f };
+            forwardPass.BindReading(shadowDepth);
+            forwardPass.BindWriting(renderTarget, state);
+            forwardPass.BindWriting(depthStencil, state);
+            forwardPass.AttachJob(
+                [&](GfxDeferredContext& context)
+                {
+                    if (DefaultSamplerState == nullptr)
+                    {
+                        // Create a texture sampler state description.
+                        D3D11_SAMPLER_DESC samplerDesc;
+                        samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+                        samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+                        samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+                        samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+                        samplerDesc.MipLODBias = 0.0f;
+                        samplerDesc.MaxAnisotropy = 1;
+                        samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+                        samplerDesc.BorderColor[0] = 0;
+                        samplerDesc.BorderColor[1] = 0;
+                        samplerDesc.BorderColor[2] = 0;
+                        samplerDesc.BorderColor[3] = 0;
+                        samplerDesc.MinLOD = 0;
+                        samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+                        mGfxDevice->mGfxDevice->CreateSamplerState(&samplerDesc, &DefaultSamplerState);
+                    }
+
+                    context.mGfxDeviceContext->PSSetSamplers(0, 1, &DefaultSamplerState);
                     context.mGfxDeviceContext->RSSetState(DefaultRasterState);
 
                     D3D11_VIEWPORT Viewport;
@@ -571,7 +697,7 @@ namespace engine
 
                     context.mGfxDeviceContext->RSSetViewports(1, &Viewport);
 
-                    RenderScene(scene, context, data);
+                    RenderScene(scene, context, data, false);
 
                     const bool DontRestoreContextState = false;
                     context.mGfxDeviceContext->FinishCommandList(DontRestoreContextState, &CubeRenderingCommandList);
@@ -670,7 +796,7 @@ namespace engine
         return false;
     }
 
-    void RenderSystem::RenderScene(Scene& scene, GfxDeferredContext& context, const ViewConstantBufferData& data)
+    void RenderSystem::RenderScene(Scene& scene, GfxDeferredContext& context, const ViewConstantBufferData& data, bool shadow)
     {
         static bool initialize = false;
         static bool initialize_error = false;
@@ -682,6 +808,9 @@ namespace engine
             const unsigned int ObjectConstBufferLength = sizeof(ObjectConstantDesc);
             ObjectConstantBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(ObjectConstBufferLength);
 
+            const unsigned int LightViewConstBufferLength = sizeof(LightViewConstantDesc);
+            LightViewConstantBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(LightViewConstBufferLength);
+
             // 创建顶点着色器
             const std::string vsEntryName = "VSMain";
             const std::string psEntryName = "PSMain";
@@ -689,6 +818,19 @@ namespace engine
             auto VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, DefaultVertexShaderSourceCode, vsEntryName, InputLayoutArray);
             auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, SimpleColorPixelShaderSourceCode, psEntryName);
             SimpleShaderProgramPtr = LinkShader(VertexShader, PixelShader);
+
+
+            if (ShadowShaderProgramPtr == nullptr)
+            {
+                const std::string vsEntryName = "VSMain";
+                const std::string psEntryName = "PSMain";
+                const std::vector<D3D11_INPUT_ELEMENT_DESC> InputLayoutArray(InputLayout, InputLayout + InputLayoutCount);
+                auto VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, ShadowVertexShaderSource, vsEntryName, InputLayoutArray);
+                auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, ShadowPixelShaderSource, psEntryName);
+                ShadowShaderProgramPtr = LinkShader(VertexShader, PixelShader);
+                ASSERT(ShadowShaderProgramPtr != nullptr);
+            }
+
 
             if (SceneConstantBufferPtr == nullptr || ObjectConstantBufferPtr == nullptr
                 || SimpleShaderProgramPtr == nullptr)
@@ -731,11 +873,32 @@ namespace engine
             }
             context.UnmapBuffer(*SceneConstantBufferPtr);
 
+            LightViewConstantDesc* pLightViewConstBuffer = context.MapBuffer<LightViewConstantDesc>(*LightViewConstantBufferPtr);
+            {
+                //TODO:
+                engine::DirectionalLight* pLight = dynamic_cast<engine::DirectionalLight*>(scene.GetDirectionalLight(0));
+                pLightViewConstBuffer->MatrixView = pLight->GetViewMatrix();
+                pLightViewConstBuffer->MatrixProj = math::ortho_lh_matrix4x4f(20, 20, -50, 50);
+            }
+            context.UnmapBuffer(*LightViewConstantBufferPtr);
+
             context.mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             context.mGfxDeviceContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
-            context.mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
-            context.SetVSConstantBufferImpl(1, SceneConstantBufferPtr);
-            context.mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
+            if (shadow)
+            {
+                context.mGfxDeviceContext->VSSetShader(ShadowShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
+                context.SetVSConstantBufferImpl(1, LightViewConstantBufferPtr);
+            }
+            else
+            {
+                context.mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
+                context.SetVSConstantBufferImpl(1, SceneConstantBufferPtr);
+                context.SetVSConstantBufferImpl(2, LightViewConstantBufferPtr);
+            }
+            if (shadow)
+                context.mGfxDeviceContext->PSSetShader(ShadowShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
+            else
+                context.mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
             context.SetPSConstantBufferImpl(0, SceneConstantBufferPtr);
             scene.RecursiveRender(mGfxDeviceDeferredContext.get());
         }

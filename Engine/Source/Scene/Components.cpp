@@ -62,6 +62,15 @@ namespace engine
         mIntensity = intensity;
     }
 
+    math::view_matrix4x4f DirectionalLight::GetViewMatrix() const
+    {
+        const math::point3df& eye = GetSceneNode()->GetWorldPosition();
+        const math::point3df& forward = GetSceneNode()->GetForwardDirection();
+        const math::point3df& up = GetSceneNode()->GetUpDirection();
+        const math::point3df& right = GetSceneNode()->GetRightDirection();
+        return math::view_matrix4x4f(eye, forward, up, right);
+    }
+
 
     namespace cube_geometry_desc
     {

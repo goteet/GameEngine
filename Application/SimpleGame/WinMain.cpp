@@ -58,7 +58,7 @@ void InitializeSimpleScene()
     g_DefaultScene = g_GameEngine->CreateOrGetDefaultScene();
 
     auto nodeCube = g_DefaultScene->CreateSceneNode();
-    nodeCube->SetLocalScale(math::float3(1.2f, 2, 1.2f));
+    nodeCube->SetLocalScale(math::float3(1.2f, 2.5, 1.2f));
     nodeCube->SetRightDirection(math::float3(1, 0, 0.2f));
     nodeCube->SetLocalPosition(math::point3df(1.0f, -1.2f, 1.25f));
     GE::MeshRenderer* boxMesh = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Box); nodeCube->AddComponent(boxMesh, GE::AutoReleaseComponent);
@@ -69,10 +69,10 @@ void InitializeSimpleScene()
     auto nodeTWall = g_DefaultScene->CreateSceneNode();
     auto nodeBWall = g_DefaultScene->CreateSceneNode();
 
-    GE::MeshRenderer* planeMeshL = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeLWall->AddComponent(planeMeshL, GE::AutoReleaseComponent);
-    GE::MeshRenderer* planeMeshR = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeRWall->AddComponent(planeMeshR, GE::AutoReleaseComponent);
-    GE::MeshRenderer* planeMeshF = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeFWall->AddComponent(planeMeshF, GE::AutoReleaseComponent);
-    GE::MeshRenderer* planeMeshT = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeTWall->AddComponent(planeMeshT, GE::AutoReleaseComponent);
+    //GE::MeshRenderer* planeMeshL = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeLWall->AddComponent(planeMeshL, GE::AutoReleaseComponent);
+    //GE::MeshRenderer* planeMeshR = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeRWall->AddComponent(planeMeshR, GE::AutoReleaseComponent);
+    //GE::MeshRenderer* planeMeshF = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeFWall->AddComponent(planeMeshF, GE::AutoReleaseComponent);
+    //GE::MeshRenderer* planeMeshT = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeTWall->AddComponent(planeMeshT, GE::AutoReleaseComponent);
     GE::MeshRenderer* planeMeshB = GE::MeshRenderer::CreateMeshRenderer(GE::MeshRenderer::EMeshType::Plane);    nodeBWall->AddComponent(planeMeshB, GE::AutoReleaseComponent);
 
     nodeLWall->SetUpDirection(math::normalized_float3::unit_x());
@@ -86,6 +86,7 @@ void InitializeSimpleScene()
     nodeFWall->SetLocalScale(math::float3(5.0f, 5.0f, 5.0f));
     nodeTWall->SetLocalScale(math::float3(5.0f, 5.0f, 5.0f));
     nodeBWall->SetLocalScale(math::float3(5.0f, 5.0f, 5.0f));
+    nodeBWall->SetLocalScale(math::float3(15.0f, 15.0f, 15.0f));
 
     nodeLWall->SetLocalPosition(math::point3df(-2.5, 0, 0));
     nodeRWall->SetLocalPosition(math::point3df(+2.5, 0, 0));
@@ -98,8 +99,8 @@ void InitializeSimpleScene()
     mainCamera->Lookat(math::point3df(0, 0, 0));
 
     GE::DirectionalLight* mainLight = g_DefaultScene->CreateDirectionalLightNode();
-    mainLight->GetSceneNode()->SetWorldPosition(math::point3df(5.0f, 5.0f, -5.0f));
-    math::normalized_float3 lightDirection(-0.55f, -0.55f, 1.0f);
+    mainLight->GetSceneNode()->SetWorldPosition(math::point3df(20, 10.0f, -20.0f));
+    math::normalized_float3 lightDirection = math::point3df(0, 0, 0) - math::point3df(20, 10, -20);//(-0.55f, -0.55f, 1.0f);
     mainLight->GetSceneNode()->SetForwardDirection(lightDirection);
     mainLight->SetIntensity(1.2f);
     mainLight->SetColor(math::float3(0.98f, 0.98f, 0.9f));
