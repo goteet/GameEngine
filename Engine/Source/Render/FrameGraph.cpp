@@ -95,6 +95,9 @@ namespace engine
             {
                 mResources[index].WritingNodes.emplace_back(node.Index);
             }
+
+            ASSERT(node.WritingDepthStencil != -1)
+            mResources[node.WritingDepthStencil].WritingNodes.emplace_back(node.Index);
         }
 
         std::queue<int> floodResourceQueue;
@@ -118,7 +121,7 @@ namespace engine
 
                 //TODO: Avoid duplicated index
                 //check early when binding
-                for (int intputResourceIndex : node.ReadingRenderTargets)
+                for (int intputResourceIndex : node.ReadingResources)
                 {
                     if (intputResourceIndex != -1)
                     {
@@ -143,20 +146,27 @@ namespace engine
 
                 RFGNode& node = mNodes[nodeIndex];
                 int aliasing = GetAliasingResourceIndex(node.Index);
-                node.ReadingRenderTargetAliasing.clear();
+                node.ReadingResourcesAliasing.clear();
                 node.WritingRenderTargetAliasing.clear();
+                node.WritingDepthStencilAliasing = -1;
                 for (int nodeIndex : node.WritingRenderTargets)
                 {
                     int aliasing = GetAliasingResourceIndex(nodeIndex);
                     node.WritingRenderTargetAliasing.emplace_back(aliasing);
                 }
-                for (int nodeIndex : node.ReadingRenderTargets)
+                for (int nodeIndex : node.ReadingResources)
                 {
                     int aliasing = GetAliasingResourceIndex(nodeIndex);
-                    node.ReadingRenderTargetAliasing.emplace_back(aliasing);
+                    node.ReadingResourcesAliasing.emplace_back(aliasing);
                     RFGResource& resource = mResources[aliasing];
                     resource.ReadingNodes.emplace_back(node.Index);
                     resource.ReadingCount++;
+                }
+
+                if (node.WritingDepthStencil != -1)
+                {
+                    int aliasing = GetAliasingResourceIndex(node.WritingDepthStencil);
+                    node.WritingDepthStencilAliasing = aliasing;
                 }
             }
         }
@@ -177,7 +187,7 @@ namespace engine
             return false;
 
         RFGNode& node = mNodes[pass.Index];
-        node.ReadingRenderTargets.emplace_back(resource.Index);
+        node.ReadingResources.emplace_back(resource.Index);
         return true;
     }
 
@@ -387,12 +397,20 @@ namespace engine
     {
         ID3D11ShaderResourceView* views[16];
         int viewCount = 0;
-        for (int renderTargetIndex : node.ReadingRenderTargetAliasing)
+        for (int renderTargetIndex : node.ReadingResourcesAliasing)
         {
             RFGResource& resource = mResources[renderTargetIndex];
             resource.ReadingCount--;
-            views[viewCount] = resource.GfxRenderTargetPtr == nullptr ? nullptr
-                : resource.GfxRenderTargetPtr->mShaderResourceView.Get();
+            if (resource.RenderTarget)
+            {
+                views[viewCount] = resource.GfxRenderTargetPtr == nullptr ? nullptr
+                    : resource.GfxRenderTargetPtr->mShaderResourceView.Get();
+            }
+            else
+            {
+                views[viewCount] = resource.GfxDepthStencilPtr == nullptr ? nullptr
+                    : resource.GfxDepthStencilPtr->mShaderResourceView.Get();
+            }
             viewCount++;
         }
 
@@ -402,7 +420,7 @@ namespace engine
     void RenderFrameGraph::BindWritingResources(GfxDeferredContext& context, RenderFrameGraph::RFGNode& node)
     {
         TransientBufferRegistry* registry = mTransientBufferRegistry;
-        GfxRenderTarget* renderTargets[100] = { 0 };
+        GfxRenderTarget* renderTargets[32] = { 0 };
         int rtCount = 0;
         for (int renderTargetIndex : node.WritingRenderTargetAliasing)
         {
@@ -436,17 +454,15 @@ namespace engine
                 resDepthStencil.GfxDepthStencilPtr = depthStencil;
             }
         }
-
         context.SetRenderTargets(renderTargets, rtCount, depthStencil);
 
-        rtCount = 0;
-        for (auto& state : node.RenderTargetBindStates)
+        for (int index = 0; index < node.WritingRenderTargetAliasing.size(); index++)
         {
+            const auto& state =node.RenderTargetBindStates[index];
             if (state.ClearColor)
             {
-                context.ClearRenderTarget(renderTargets[rtCount], state.ClearColorValue);
+                context.ClearRenderTarget(renderTargets[index], state.ClearColorValue);
             }
-            rtCount++;
         }
 
         if (depthStencil != nullptr)
@@ -461,27 +477,42 @@ namespace engine
 
     void RenderFrameGraph::ExecuteNode(GfxDeferredContext& context, RenderFrameGraph::RFGNode& node)
     {
+        BindReadingResources(context, node);
+        BindWritingResources(context, node);
         if (node.mExecuteJob)
         {
-            BindReadingResources(context, node);
-            BindWritingResources(context, node);
             node.mExecuteJob(context);
-            ReleaseTransientResources(node);
         }
+        ReleaseTransientResources(node);
     }
     void RenderFrameGraph::ReleaseTransientResources(RenderFrameGraph::RFGNode& node)
     {
-        for (int index : node.WritingRenderTargetAliasing)
+        for (int index : node.ReadingResourcesAliasing)
         {
             RFGResource& resource = mResources[index];
-            if (resource.ReadingCount == 0 && resource.GfxRenderTargetPtr)
+
+            if (resource.ReadingCount == 0)
             {
-                mTransientBufferRegistry->RecycleRenderTarget(resource.GfxRenderTargetPtr);
-                resource.GfxRenderTargetPtr = nullptr;
+                if (resource.RenderTarget)
+                {
+                    if (resource.GfxRenderTargetPtr)
+                    {
+                        mTransientBufferRegistry->RecycleRenderTarget(resource.GfxRenderTargetPtr);
+                        resource.GfxRenderTargetPtr = nullptr;
+                    }
+                }
+                else
+                {
+                    if (resource.GfxDepthStencilPtr)
+                    {
+                        mTransientBufferRegistry->RecycleDepthStencil(resource.GfxDepthStencilPtr);
+                        resource.GfxDepthStencilPtr = nullptr;
+                    }
+                }
             }
         }
 
-        for (int index : node.ReadingRenderTargetAliasing)
+        for (int index : node.WritingRenderTargetAliasing)
         {
             RFGResource& resource = mResources[index];
             if (resource.ReadingCount == 0 && resource.GfxRenderTargetPtr)

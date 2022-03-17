@@ -76,9 +76,9 @@ namespace engine
         {
             std::string DebugName;
             int Index;
-            std::vector<int> ReadingRenderTargets;
+            std::vector<int> ReadingResources;
+            std::vector<int> ReadingResourcesAliasing;
             std::vector<int> WritingRenderTargets;
-            std::vector<int> ReadingRenderTargetAliasing;
             std::vector<int> WritingRenderTargetAliasing;
             int WritingDepthStencil = -1;
             int WritingDepthStencilAliasing = -1;
