@@ -205,10 +205,10 @@ bool Glossy::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, co
 {
     const F AirRefractiveIndex = F(1.0003);
 
-    const math::vector3<F>& InDirection = Ray.direction();
+    const math::vector3<F>& Wo = Ray.direction();
     const F eta1 = IsFrontFace ? AirRefractiveIndex : RefractiveIndex;
     const F eta2 = IsFrontFace ? RefractiveIndex : AirRefractiveIndex;
-    const F IdotN = -math::dot(InDirection, N);
+    const F IdotN = -math::dot(Wo, N);
     const F cosTheta = math::clamp(IdotN);
     const F Frehnel = ReflectanceSchlick(cosTheta, eta1, eta2);
 
@@ -216,11 +216,11 @@ bool Glossy::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, co
     bool chooseReflectRay = RandGenerator() < SpecularSampleProbability;
     if (chooseReflectRay)
     {
-        math::normalized_vector3<F> direction = Reflect(Ray.direction(), N);
+        math::normalized_vector3<F> Wr = Reflect(Wo, N);
         outScattering.set_origin(P);
-        outScattering.set_direction(direction);
+        outScattering.set_direction(Wr);
         outBrdf = math::vector3<F>(Frehnel, Frehnel, Frehnel);
-        result = math::dot(direction, N) > F(0);
+        result = math::dot(Wr, N) > F(0);
     }
     else
     {

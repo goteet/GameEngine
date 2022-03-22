@@ -84,12 +84,15 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
     if (result)
     {
         F pdfLight = F(0);
-        for (int lightIndex = 0; lightIndex < numLights; lightIndex++)
+        if (numLights > 0)
         {
-            SceneObject* light = scene.GetLightSourceByIndex(lightIndex);
-            pdfLight += light->SamplePdf(scattering);
+            for (int lightIndex = 0; lightIndex < numLights; lightIndex++)
+            {
+                SceneObject* light = scene.GetLightSourceByIndex(lightIndex);
+                pdfLight += light->SamplePdf(scattering);
+            }
+            pdfLight = pdfLight / F(numLights);
         }
-        pdfLight = pdfLight / F(numLights);
 
         F pdfBxDF = material.pdf(normal, ray.direction(), scattering.direction());
         F pdf = ratioLights * pdfLight + (F(1) - ratioLights) * pdfBxDF;
@@ -98,7 +101,7 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
         math::vector3<F> Li = Trace(scene, scattering, TerminalRecord.Next(reflectance));
 
         math::vector3<F> emission = material.Emitting();
-        math::vector3<F> reflection = f * Li * cosTheta / pdf;
+        math::vector3<F> reflection = Li * reflectance;
         return emission + reflection;
     }
     else
