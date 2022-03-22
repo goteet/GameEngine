@@ -60,6 +60,10 @@ namespace math
     template<typename value_type>
     constexpr value_type HALF_PI = constant_value<value_type>::half_pi;
 
+
+    template<typename value_type>
+    constexpr value_type InvPI = value_type(1) / constant_value<value_type>::pi;
+
     template<typename value_type>
     constexpr value_type EPSILON = constant_value<value_type>::epsilon;
 

@@ -64,7 +64,7 @@ struct SceneObject
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const = 0;
     void SetTranslate(F x, F y, F z) { Transform.Translate.set(x, y, z); }
     void SetRotation(const math::quaternion<F>& q) { Transform.Rotation = q; }
-    virtual math::point3d<F> SampleRandomPoint(math::vector3<F>& outN, F& outPDF) { return math::vector3<F>::zero(); }
+    virtual math::point3d<F> SampleRandomPoint(math::vector3<F>& outN, F& outPDF) const { return math::vector3<F>::zero(); }
     virtual bool IsDualface() const { return false; }
     Transform Transform;
     std::unique_ptr<IMaterial> Material;
@@ -92,7 +92,7 @@ struct SceneRect : SceneObject
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
     void SetExtends(F x, F y) { Rect.set_extends(x, y); }
     void SetDualFace(bool dual) { mDualFace = dual; }
-    virtual math::point3d<F> SampleRandomPoint(math::vector3<F>& outN, F& outPDF) override;
+    virtual math::point3d<F> SampleRandomPoint(math::vector3<F>& outN, F& outPDF) const override;
     virtual bool IsDualface() const override { return mDualFace; }
 private:
     bool mDualFace = false;

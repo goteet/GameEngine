@@ -103,62 +103,79 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F
 bool Lambertian::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
 {
-    //make brdf-lighting = 1:1.
-    int numBrdf_virtual = scene.GetLightCount();
+    //int numLights = scene.GetLightCount();
+    //F rrAll = F(1) / (numLights + 1);
+    //F rrBrdf = rrAll;
+    //F rrLights = numLights * rrAll;
+    //F epsilon = random<F>::value();
+    math::normalized_vector3<F> Wi;
+    //
+    //bool chooseLightSample = epsilon <= rrLights;
+    //if (chooseLightSample)
+    //{
+    //    int lightIndex = math::floor2<int>(epsilon / rrLights);
+    //    lightIndex = math::clamp(lightIndex, 0, numLights - 1);
+    //    SceneObject* LightObject = scene.GetLightSourceByIndex(lightIndex);
+    //
+    //    math::vector3<F> lightN;
+    //    math::point3d<F> LightSampleP = LightObject->SampleRandomPoint(lightN, outPdf);
+    //    math::vector3<F> lightDisplacement = LightSampleP - P;
+    //
+    //    //direct light sampling.
+    //    outScattering.set_origin(P);
+    //    outScattering.set_direction(lightDisplacement);
+    //
+    //    //calculate pdf(w) = pdf(x') * dist_sqr / cos_theta'
+    //    const math::normalized_vector3<F>& lightV = outScattering.direction();
+    //    F cosThetaPrime = math::dot(lightN, -lightV);
+    //    
+    //    if (cosThetaPrime < -math::SMALL_NUM<F> && LightObject->IsDualface())
+    //    {
+    //        cosThetaPrime = -cosThetaPrime;
+    //    }
+    //
+    //    if (cosThetaPrime <= math::SMALL_NUM<F>)
+    //        return false;
+    //
+    //    F distSqr = math::dot(lightDisplacement, lightDisplacement);
+    //    outBrdf = Albedo / math::PI<F>;
+    //    outPdf *= distSqr / cosThetaPrime;
+    //    outPdf *= rrLights;
+    //    return true;
+    //}
+    //else
+    {
+        Wi = GenerateCosineWeightedHemisphereDirection(N);
+        outBrdf = Albedo / math::PI<F>;
+    }
+
+    outScattering.set_origin(P);
+    outScattering.set_direction(Wi);
+    outPdf = pdf(scene, N, Ray.direction(), Wi);
+    return true;
+}
+
+F Lambertian::pdf(Scene& scene, const math::normalized_vector3<F>& N,
+    const math::normalized_vector3<F>& Wo, const math::normalized_vector3<F>& Wi) const
+{
     int numLights = scene.GetLightCount();
-    F rrAll = F(1) / (numLights + numBrdf_virtual);
-    F rrBrdf = numBrdf_virtual * rrAll;
-    F rrLights = numLights * rrAll;
-    F epsilon = random<F>::value();
+    F invNumLights = F(1) / (numLights + 1);
 
+    F cosTheta = math::dot(N, Wi);
+    F pdfLambertian =  math::max2(F(0), cosTheta) * math::InvPI<F>;
+    return pdfLambertian;
 
-    bool chooseLightSample = epsilon <= rrLights;
-    if (chooseLightSample)
-    {
-        int lightIndex = math::floor2<int>(epsilon / rrLights);
-        lightIndex = math::clamp(lightIndex, 0, numLights - 1);
-        SceneObject* LightObject = scene.GetLightSourceByIndex(lightIndex);
-
-        math::vector3<F> lightN;
-        math::point3d<F> LightSampleP = LightObject->SampleRandomPoint(lightN, outPdf);
-        math::vector3<F> lightDisplacement = LightSampleP - P;
-
-        //direct light sampling.
-        outScattering.set_origin(P);
-        outScattering.set_direction(lightDisplacement);
-
-        //calculate pdf(w) = pdf(x') * dist_sqr / cos_theta'
-        const math::normalized_vector3<F>& lightV = outScattering.direction();
-        F cosThetaPrime = math::dot(lightN, -lightV);
-        
-        if (cosThetaPrime < -math::SMALL_NUM<F> && LightObject->IsDualface())
-        {
-            cosThetaPrime = -cosThetaPrime;
-        }
-
-        if (cosThetaPrime <= math::SMALL_NUM<F>)
-            return false;
-
-        F distSqr = math::dot(lightDisplacement, lightDisplacement);
-        outBrdf = Albedo / math::PI<F>;
-        outPdf *= distSqr / cosThetaPrime;
-        outPdf *= rrLights;
-        return true;
-    }
-    else
-    {
-        math::normalized_vector3<F> scatterDirection = GenerateCosineWeightedHemisphereDirection(N);
-
-        outScattering.set_origin(P);
-        outScattering.set_direction(scatterDirection);
-
-        F cosTheta = math::dot(N, scatterDirection);
-        outBrdf = Albedo / math::PI<F>;
-        outPdf = math::max2(F(0), cosTheta) / math::PI<F>;
-        outPdf *= rrBrdf;
-        return true;
-    }
-
+    //F pdfDirectLight = F(0);
+    //math::vector3<F> dummy;
+    //for (int index = 0; index < numLights; index++)
+    //{
+    //    const SceneObject& light = *scene.GetLightSourceByIndex(index);
+    //    F pdf;
+    //    light.SampleRandomPoint(dummy, pdf);
+    //    pdfDirectLight += pdf;
+    //}
+    //
+    //return invNumLights * (pdfDirectLight + pdfLambertian);
 }
 
 math::normalized_vector3<F> Reflect(
@@ -244,7 +261,8 @@ math::vector3<F> PureLight_ForTest::Emitting() const
 {
     return Emission;
 }
-
+const F SpecularRatio = F(0.45);
+const F DiffuseRatio = F(1) - SpecularRatio;
 bool Glossy::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
 {
@@ -257,23 +275,34 @@ bool Glossy::Scattering(Scene& scene, const math::vector3<F>& P, const math::vec
     const F cosTheta = math::clamp(IdotN);
     const F Frehnel = ReflectanceSchlick(cosTheta, eta1, eta2);
 
-    const F SpecularRatio = F(0.6);
-    const F DiffuseRatio = F(1) - SpecularRatio;
+
     bool chooseReflectRay = RandGenerator() < SpecularRatio;
+
+
+    bool result = false;
     if (chooseReflectRay)
     {
         math::normalized_vector3<F> direction = Reflect(Ray.direction(), N);
         outScattering.set_origin(P);
         outScattering.set_direction(direction);
         outBrdf = math::vector3<F>(Frehnel, Frehnel, Frehnel);
-        outPdf = cosTheta * SpecularRatio;
-        return math::dot(direction, N) > F(0);
+        result = math::dot(direction, N) > F(0);
     }
     else
     {
-        bool rst = Lambertian::Scattering(scene, P, N, Ray, IsFrontFace, outScattering, outBrdf, outPdf);
+        result = Lambertian::Scattering(scene, P, N, Ray, IsFrontFace, outScattering, outBrdf, outPdf);
         outBrdf *= F(1) - Frehnel;
-        outPdf *= DiffuseRatio;
-        return rst;
     }
+
+    F pdfDiffuse = Lambertian::pdf(scene, N, Ray.direction(), outScattering.direction());
+    F pdfSpecular = math::max2(F(0), cosTheta);
+    outPdf = DiffuseRatio * pdfDiffuse + SpecularRatio * pdfSpecular;
+    return result;
+}
+
+F Glossy::pdf(Scene& scene, const math::normalized_vector3<F>& N, const math::normalized_vector3<F>& Wo, const math::normalized_vector3<F>& Wi) const
+{
+    F pdfDiffuse = Lambertian::pdf(scene, N, Wo, Wi);
+    F pdfSpecular = math::max2(F(0), math::dot(Wo, N));
+    return DiffuseRatio * pdfDiffuse + SpecularRatio * pdfSpecular;
 }

@@ -60,7 +60,7 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
     return emission + reflection;
 }
 
-math::point3d<F> SceneRect::SampleRandomPoint(math::vector3<F>& outN, F& outPDF)
+math::point3d<F> SceneRect::SampleRandomPoint(math::vector3<F>& outN, F& outPDF) const
 {
     outN = mWorldNormal;
     outPDF = F(1) / (Rect.width() * Rect.height());
@@ -584,7 +584,7 @@ void SimpleScene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjec
         SceneCenterX + 20,
         SceneBottom + 22,
         SceneCenterZ + 10);
-    mainSphere->Material = std::make_unique<Glossy>(1, 1, 1, 1.5);
+    mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 1.7);
 
     SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
     wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);

@@ -33,6 +33,8 @@ struct IMaterial
     virtual bool Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
         math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const = 0;
     virtual math::vector3<F> Emitting() const { return math::vector3<F>::zero(); }
+    virtual F pdf(Scene& scene, const math::normalized_vector3<F>& N,
+        const math::normalized_vector3<F>& Wo, const math::normalized_vector3<F>& Wi) const { return F(1); }
 };
 
 struct Lambertian : public virtual IMaterial
@@ -43,6 +45,8 @@ struct Lambertian : public virtual IMaterial
     Lambertian(F r, F g, F b) : Albedo(r, g, b) { }
     virtual bool Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
         math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const override;
+    virtual F pdf(Scene& scene, const math::normalized_vector3<F>& N,
+        const math::normalized_vector3<F>& Wo, const math::normalized_vector3<F>& Wi) const override;
 };
 
 struct Metal : public IMaterial
@@ -65,6 +69,8 @@ struct Glossy : public Lambertian
     Glossy(F r, F g, F b, F ior = F(2.5)) : Lambertian(r, g, b), RefractiveIndex(ior) { }
     virtual bool Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
         math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const override;
+    virtual F pdf(Scene& scene, const math::normalized_vector3<F>& N,
+        const math::normalized_vector3<F>& Wo, const math::normalized_vector3<F>& Wi) const override;
 };
 
 struct Dielectric : public IMaterial
