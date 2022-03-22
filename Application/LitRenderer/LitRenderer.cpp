@@ -42,34 +42,110 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
     F biasedDistance = math::max2<F>(contactRecord.Distance, F(0));
     math::point3d<F> shadingPoint = ray.calc_offset(biasedDistance);
 
-
-    F pdf = F(1);
-    F cosTheta = F(1);
     math::vector3<F> f = math::vector3<F>::zero();
-    math::vector3<F> Li = math::vector3<F>::zero();
     math::ray3d<F> scattering;
 
-    if (material.Scattering(scene, shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering, f, pdf))
+    int numLights = scene.GetLightCount();
+    F invNumLights = F(1) / (numLights + F(1));
+    F ratioLights = numLights * invNumLights;
+    F epsilon = random<F>::value();
+    bool result = false;
+    bool chooseLightSample = epsilon <= ratioLights;
+    if (chooseLightSample)
     {
-        cosTheta = math::dot(normal, scattering.direction());
-        math::vector3<F> reflectance = f * cosTheta / pdf;
-        Li = Trace(scene, scattering, TerminalRecord.Next(reflectance));
+        int lightIndex = math::floor2<int>(epsilon / invNumLights);
+        lightIndex = math::clamp(lightIndex, 0, numLights - 1);
+        SceneObject* LightObject = scene.GetLightSourceByIndex(lightIndex);
+
+        math::vector3<F> lightN;
+        math::point3d<F> LightSampleP = LightObject->SampleRandomPoint(lightN);
+        math::vector3<F> lightDisplacement = LightSampleP - shadingPoint;
+
+        //direct light sampling.
+        scattering.set_origin(shadingPoint);
+        scattering.set_direction(lightDisplacement);
+
+        const math::normalized_vector3<F>& lightV = scattering.direction();
+        F cosThetaPrime = math::dot(lightN, -lightV);
+
+        if (cosThetaPrime < -math::SMALL_NUM<F> && LightObject->IsDualface())
+        {
+            cosThetaPrime = -cosThetaPrime;
+        }
+
+        f = material.Albedo / math::PI<F>;
+        result = cosThetaPrime > math::SMALL_NUM<F>;
     }
-    math::vector3<F> emission = material.Emitting();
-    math::vector3<F> reflection = f * Li * cosTheta / pdf;
-    return emission + reflection;
+    else
+    {
+        result = material.Scattering(shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering, f);
+    }
+
+    if (result)
+    {
+        F pdfLight = F(0);
+        for (int lightIndex = 0; lightIndex < numLights; lightIndex++)
+        {
+            SceneObject* light = scene.GetLightSourceByIndex(lightIndex);
+            pdfLight += light->SamplePdf(scattering);
+        }
+        pdfLight = pdfLight / F(numLights);
+
+        F pdfBxDF = material.pdf(normal, ray.direction(), scattering.direction());
+        F pdf = ratioLights * pdfLight + (F(1) - ratioLights) * pdfBxDF;
+        F cosTheta = math::dot(normal, scattering.direction());
+        math::vector3<F> reflectance = f * cosTheta / pdf;
+        math::vector3<F> Li = Trace(scene, scattering, TerminalRecord.Next(reflectance));
+
+        math::vector3<F> emission = material.Emitting();
+        math::vector3<F> reflection = f * Li * cosTheta / pdf;
+        return emission + reflection;
+    }
+    else
+    {
+        math::vector3<F> emission = material.Emitting();
+        return emission;
+    }
 }
 
-math::point3d<F> SceneRect::SampleRandomPoint(math::vector3<F>& outN, F& outPDF) const
+math::point3d<F> SceneRect::SampleRandomPoint(math::vector3<F>& outN) const
 {
     outN = mWorldNormal;
-    outPDF = F(1) / (Rect.width() * Rect.height());
 
     F e1 = random<F>::value() * Rect.width();
     F e2 = random<F>::value() * Rect.height();
 
     math::vector3<F> Bitangent = math::cross(mWorldNormal, mWorldTagent);
     return math::point3d<F>(mWorldPosition + e1 * mWorldTagent + e2 * Bitangent);
+}
+
+F SceneRect::SamplePdf(const math::ray3d<F>& ray) const
+{
+    HitRecord hr = this->IntersectWithRay(ray, math::SMALL_NUM<F>);
+    if (hr.Object != this)
+    {
+        return F(0);
+    }
+
+    //calculate pdf(w) = pdf(x') * dist_sqr / cos_theta'
+    // pdf(x') = 1 / area = > pdf(w) = dist_sqr / (area * cos_theta')
+    const math::normalized_vector3<F>& V = ray.direction();
+    const math::normalized_vector3<F>& N = this->mWorldNormal;
+    F cosThetaPrime = math::dot(N, -V);
+
+    if (cosThetaPrime < -math::SMALL_NUM<F> && IsDualface())
+    {
+        cosThetaPrime = -cosThetaPrime;
+    }
+
+    if (cosThetaPrime <= math::SMALL_NUM<F>)
+    {
+        return F(0);
+    }
+
+    F area = Rect.width() * Rect.height();
+    return (hr.Distance * hr.Distance) / (area * cosThetaPrime);
+
 }
 
 template<typename value_type>

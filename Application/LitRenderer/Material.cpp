@@ -100,82 +100,23 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F
 
 
 
-bool Lambertian::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
+bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
-    //int numLights = scene.GetLightCount();
-    //F rrAll = F(1) / (numLights + 1);
-    //F rrBrdf = rrAll;
-    //F rrLights = numLights * rrAll;
-    //F epsilon = random<F>::value();
-    math::normalized_vector3<F> Wi;
-    //
-    //bool chooseLightSample = epsilon <= rrLights;
-    //if (chooseLightSample)
-    //{
-    //    int lightIndex = math::floor2<int>(epsilon / rrLights);
-    //    lightIndex = math::clamp(lightIndex, 0, numLights - 1);
-    //    SceneObject* LightObject = scene.GetLightSourceByIndex(lightIndex);
-    //
-    //    math::vector3<F> lightN;
-    //    math::point3d<F> LightSampleP = LightObject->SampleRandomPoint(lightN, outPdf);
-    //    math::vector3<F> lightDisplacement = LightSampleP - P;
-    //
-    //    //direct light sampling.
-    //    outScattering.set_origin(P);
-    //    outScattering.set_direction(lightDisplacement);
-    //
-    //    //calculate pdf(w) = pdf(x') * dist_sqr / cos_theta'
-    //    const math::normalized_vector3<F>& lightV = outScattering.direction();
-    //    F cosThetaPrime = math::dot(lightN, -lightV);
-    //    
-    //    if (cosThetaPrime < -math::SMALL_NUM<F> && LightObject->IsDualface())
-    //    {
-    //        cosThetaPrime = -cosThetaPrime;
-    //    }
-    //
-    //    if (cosThetaPrime <= math::SMALL_NUM<F>)
-    //        return false;
-    //
-    //    F distSqr = math::dot(lightDisplacement, lightDisplacement);
-    //    outBrdf = Albedo / math::PI<F>;
-    //    outPdf *= distSqr / cosThetaPrime;
-    //    outPdf *= rrLights;
-    //    return true;
-    //}
-    //else
-    {
-        Wi = GenerateCosineWeightedHemisphereDirection(N);
-        outBrdf = Albedo / math::PI<F>;
-    }
-
+    math::normalized_vector3<F> Wi = GenerateCosineWeightedHemisphereDirection(N);
+    outBrdf = Albedo / math::PI<F>;
     outScattering.set_origin(P);
     outScattering.set_direction(Wi);
-    outPdf = pdf(scene, N, Ray.direction(), Wi);
-    return true;
+    return math::dot(Wi, N) > F(0);
 }
 
-F Lambertian::pdf(Scene& scene, const math::normalized_vector3<F>& N,
-    const math::normalized_vector3<F>& Wo, const math::normalized_vector3<F>& Wi) const
+F Lambertian::pdf(const math::normalized_vector3<F>& N,
+    const math::normalized_vector3<F>& Wo,
+    const math::normalized_vector3<F>& Wi) const
 {
-    int numLights = scene.GetLightCount();
-    F invNumLights = F(1) / (numLights + 1);
-
     F cosTheta = math::dot(N, Wi);
-    F pdfLambertian =  math::max2(F(0), cosTheta) * math::InvPI<F>;
+    F pdfLambertian = math::max2(F(0), cosTheta) * math::InvPI<F>;
     return pdfLambertian;
-
-    //F pdfDirectLight = F(0);
-    //math::vector3<F> dummy;
-    //for (int index = 0; index < numLights; index++)
-    //{
-    //    const SceneObject& light = *scene.GetLightSourceByIndex(index);
-    //    F pdf;
-    //    light.SampleRandomPoint(dummy, pdf);
-    //    pdfDirectLight += pdf;
-    //}
-    //
-    //return invNumLights * (pdfDirectLight + pdfLambertian);
 }
 
 math::normalized_vector3<F> Reflect(
@@ -186,8 +127,8 @@ math::normalized_vector3<F> Reflect(
     return In - F(2) * math::dot(In, N) * N;
 }
 
-bool Metal::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
+bool Metal::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
     math::vector3<F> FuzzyDirection = Fuzzy * GenerateUnitSphereVector();
     math::normalized_vector3<F> reflectDirection = Reflect(Ray.direction(), N) + FuzzyDirection;
@@ -195,7 +136,6 @@ bool Metal::Scattering(Scene& scene, const math::vector3<F>& P, const math::vect
     outScattering.set_direction(reflectDirection);
     outBrdf = math::vector3<F>::one();
     F cosTheta = math::dot(N, reflectDirection);
-    outPdf = cosTheta;
     return cosTheta > F(0);
 }
 
@@ -214,8 +154,8 @@ F ReflectanceSchlick(F CosTheta, F eta1, F eta2)
     return R0 + (F(1) - R0) * Power5(Base);
 }
 
-bool Dielectric::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
+bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
     const F AirRefractiveIndex = F(1.0003);
 
@@ -247,12 +187,11 @@ bool Dielectric::Scattering(Scene& scene, const math::vector3<F>& P, const math:
     outScattering.set_origin(P);
     outScattering.set_direction(ScatteredDirection);
     outBrdf = math::vector3<F>::one();
-    outPdf = F(1);
     return true;
 }
 
-bool PureLight_ForTest::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
+bool PureLight_ForTest::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
     return false;
 }
@@ -261,10 +200,8 @@ math::vector3<F> PureLight_ForTest::Emitting() const
 {
     return Emission;
 }
-const F SpecularRatio = F(0.45);
-const F DiffuseRatio = F(1) - SpecularRatio;
-bool Glossy::Scattering(Scene& scene, const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf, F& outPdf) const
+bool Glossy::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
     const F AirRefractiveIndex = F(1.0003);
 
@@ -275,11 +212,8 @@ bool Glossy::Scattering(Scene& scene, const math::vector3<F>& P, const math::vec
     const F cosTheta = math::clamp(IdotN);
     const F Frehnel = ReflectanceSchlick(cosTheta, eta1, eta2);
 
-
-    bool chooseReflectRay = RandGenerator() < SpecularRatio;
-
-
     bool result = false;
+    bool chooseReflectRay = RandGenerator() < SpecularSampleProbability;
     if (chooseReflectRay)
     {
         math::normalized_vector3<F> direction = Reflect(Ray.direction(), N);
@@ -290,19 +224,17 @@ bool Glossy::Scattering(Scene& scene, const math::vector3<F>& P, const math::vec
     }
     else
     {
-        result = Lambertian::Scattering(scene, P, N, Ray, IsFrontFace, outScattering, outBrdf, outPdf);
+        result = Lambertian::Scattering(P, N, Ray, IsFrontFace, outScattering, outBrdf);
         outBrdf *= F(1) - Frehnel;
     }
-
-    F pdfDiffuse = Lambertian::pdf(scene, N, Ray.direction(), outScattering.direction());
-    F pdfSpecular = math::max2(F(0), cosTheta);
-    outPdf = DiffuseRatio * pdfDiffuse + SpecularRatio * pdfSpecular;
     return result;
 }
 
-F Glossy::pdf(Scene& scene, const math::normalized_vector3<F>& N, const math::normalized_vector3<F>& Wo, const math::normalized_vector3<F>& Wi) const
+F Glossy::pdf(const math::normalized_vector3<F>& N,
+    const math::normalized_vector3<F>& Wo,
+    const math::normalized_vector3<F>& Wi) const
 {
-    F pdfDiffuse = Lambertian::pdf(scene, N, Wo, Wi);
+    F pdfDiffuse = Lambertian::pdf(N, Wo, Wi);
     F pdfSpecular = math::max2(F(0), math::dot(Wo, N));
-    return DiffuseRatio * pdfDiffuse + SpecularRatio * pdfSpecular;
+    return (F(1) - SpecularSampleProbability) * pdfDiffuse + SpecularSampleProbability * pdfSpecular;
 }
