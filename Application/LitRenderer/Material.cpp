@@ -38,13 +38,13 @@ math::vector3<F> GenerateUnitSphereVector()
     }
 }
 
-math::normalized_vector3<F> GenerateHemisphereDirection(const math::vector3<F>& normal)
+math::normalized_vector3<F> GenerateHemisphereDirection(F epsilon[2], const math::vector3<F>& normal)
 {
-    static random<F> rand_theta;
-    static random<F> rand_phi;
-    F cosTheta = F(1) - F(2) * rand_theta();
+    F rand_theta = epsilon[0];
+    F rand_phi = epsilon[1];
+    F cosTheta = F(1) - F(2) * rand_theta;
     F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
-    math::radian<F> phi(math::TWO_PI<F> *rand_phi());
+    math::radian<F> phi(math::TWO_PI<F> *rand_phi);
     F cosPhi = math::cos(phi);
     F sinPhi = math::sin(phi);
 
@@ -56,17 +56,17 @@ math::normalized_vector3<F> GenerateHemisphereDirection(const math::vector3<F>& 
     return uvw.local(x, y, z);
 }
 
-math::normalized_vector3<F> GenerateUniformHemisphereDirection(const math::vector3<F>& normal)
+math::normalized_vector3<F> GenerateUniformHemisphereDirection(F epsilon[2], const math::vector3<F>& normal)
 {
-    static random<F> rand_theta;
-    static random<F> rand_phi;
+    F rand_theta = epsilon[0];
+    F rand_phi = epsilon[1];
     // pdf = 1/2PI
     // => cdf = 1/2PI*phi*(1-cos_theta)
     // => f_phi = 1/2PI*phi       --> phi(x) = 2*PI*x
     // => f_theta = 1-cos_theta   --> cos_theta(x) = 1-x = x'
-    F cosTheta = rand_theta(); //replace 1-e to e'
+    F cosTheta = rand_theta; //replace 1-e to e'
     F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
-    math::radian<F> phi(math::TWO_PI<F> *rand_phi());
+    math::radian<F> phi(math::TWO_PI<F> *rand_phi);
     F cosPhi = math::cos(phi);
     F sinPhi = math::sin(phi);
 
@@ -78,15 +78,15 @@ math::normalized_vector3<F> GenerateUniformHemisphereDirection(const math::vecto
 }
 
 
-math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F>& normal)
+math::vector3<F> GenerateCosineWeightedHemisphereDirection(F epsilon[2], const math::vector3<F>& normal)
 {
-    static random<F> rand_theta;
-    static random<F> rand_phi;
+    F rand_theta = epsilon[0];
+    F rand_phi = epsilon[1];
     // pdf = cos(theta) / Pi.
-    F cosTheta_sqr = rand_theta(); //replace 1-e to e'
+    F cosTheta_sqr = rand_theta; //replace 1-e to e'
     F cosTheta = sqrt(cosTheta_sqr);
     F sinTheta = sqrt(F(1) - cosTheta_sqr);
-    math::radian<F> phi(F(2) * math::PI<F> *rand_phi());
+    math::radian<F> phi(F(2) * math::PI<F> *rand_phi);
     F cosPhi = math::cos(phi);
     F sinPhi = math::sin(phi);
 
@@ -100,10 +100,10 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(const math::vector3<F
 
 
 
-bool Lambertian::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+bool Lambertian::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
-    math::normalized_vector3<F> Wi = GenerateCosineWeightedHemisphereDirection(N);
+    math::normalized_vector3<F> Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
     outBrdf = Albedo / math::PI<F>;
     outScattering.set_origin(P);
     outScattering.set_direction(Wi);
@@ -127,7 +127,7 @@ math::normalized_vector3<F> Reflect(
     return In - F(2) * math::dot(In, N) * N;
 }
 
-bool Metal::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+bool Metal::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
     math::vector3<F> FuzzyDirection = Fuzzy * GenerateUnitSphereVector();
@@ -154,7 +154,7 @@ F ReflectanceSchlick(F CosTheta, F eta1, F eta2)
     return R0 + (F(1) - R0) * Power5(Base);
 }
 
-bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+bool Dielectric::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
     const F AirRefractiveIndex = F(1.0003);
@@ -171,7 +171,7 @@ bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N
     F Det = F(1) - SinThetaSqr * RefractionRatio * RefractionRatio;
     bool RefractRay = Det >= F(0);
 
-    bool ReflectRay = ReflectanceSchlick(CosTheta, eta1, eta2) > random<F>::value();
+    bool ReflectRay = epsilon[0] < ReflectanceSchlick(CosTheta, eta1, eta2);
     math::vector3<F> ScatteredDirection;
     if (!RefractRay || ReflectRay)
     {
@@ -190,7 +190,7 @@ bool Dielectric::Scattering(const math::vector3<F>& P, const math::vector3<F>& N
     return true;
 }
 
-bool PureLight_ForTest::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+bool PureLight_ForTest::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
     return false;
@@ -200,7 +200,7 @@ math::vector3<F> PureLight_ForTest::Emitting() const
 {
     return Emission;
 }
-bool Glossy::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
+bool Glossy::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
     math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
 {
     const F AirRefractiveIndex = F(1.0003);
@@ -213,7 +213,7 @@ bool Glossy::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, co
     const F Frehnel = ReflectanceSchlick(cosTheta, eta1, eta2);
 
     bool result = false;
-    bool chooseReflectRay = RandGenerator() < SpecularSampleProbability;
+    bool chooseReflectRay = epsilon[0] < SpecularSampleProbability;
     if (chooseReflectRay)
     {
         math::normalized_vector3<F> Wr = Reflect(Wo, N);
@@ -224,7 +224,7 @@ bool Glossy::Scattering(const math::vector3<F>& P, const math::vector3<F>& N, co
     }
     else
     {
-        result = Lambertian::Scattering(P, N, Ray, IsFrontFace, outScattering, outBrdf);
+        result = Lambertian::Scattering(epsilon, P, N, Ray, IsFrontFace, outScattering, outBrdf);
         outBrdf *= F(1) - Frehnel;
     }
     return result;

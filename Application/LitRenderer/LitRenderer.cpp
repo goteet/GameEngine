@@ -4,29 +4,41 @@
 #include "LitRenderer.h"
 
 
-struct TerminalRecord
+struct TerminalCondition
 {
     static const int MinRecursiveDepth = 10;
 
     math::vector3<F> OuterReflectance = math::vector3<F>::one();
     int CurrentRecursiveDepth = MinRecursiveDepth;
+    random<F>& RandomGenerator;
 
-    TerminalRecord Next(const math::vector3<F>& reflectance) const
+    TerminalCondition(random<F>& generator)
+        : RandomGenerator(generator)
+    {   }
+
+    TerminalCondition Next(const math::vector3<F>& reflectance) const
     {
-        return TerminalRecord{ OuterReflectance * reflectance,  CurrentRecursiveDepth - 1 };
+        return TerminalCondition(OuterReflectance * reflectance, CurrentRecursiveDepth - 1, RandomGenerator);
     }
 
     bool IsTerminal() const
     {
         const F RussiaRoulette = F(0.9);
         return math::near_zero(OuterReflectance)
-            || (CurrentRecursiveDepth == 0 && random<F>::value() > RussiaRoulette);
+            || (CurrentRecursiveDepth == 0 && RandomGenerator() > RussiaRoulette);
     };
+
+private:
+    TerminalCondition(const math::vector3<F>& reflectance, int depth, random<F>& generator)
+        :OuterReflectance(reflectance)
+        , CurrentRecursiveDepth(depth)
+        , RandomGenerator(generator)
+    {   }
 };
 
-math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRecord& TerminalRecord)
+math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::ray3d<F>& ray, const TerminalCondition& condition)
 {
-    if (TerminalRecord.IsTerminal())
+    if (condition.IsTerminal())
     {
         return math::vector3<F>::zero();
     }
@@ -48,19 +60,24 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
     math::ray3d<F> scattering;
 
     int numLights = scene.GetLightCount();
-    F invNumLights = F(1) / (numLights + F(1));
+    F invNumLights = F(1) / (numLights + F(2));
     F ratioLights = numLights * invNumLights;
-    F epsilon = random<F>::value();
+    F ratioBxDF = F(1) - ratioLights;
+    F epsilon[3] = {
+        epsilonGenerator[0].value(),
+        epsilonGenerator[1].value(),
+        epsilonGenerator[2].value()
+    };
     bool result = false;
-    bool chooseLightSample = epsilon <= ratioLights;
+    bool chooseLightSample = epsilon[0] <= ratioLights;
     if (chooseLightSample)
     {
-        int lightIndex = math::floor2<int>(epsilon / invNumLights);
+        int lightIndex = math::floor2<int>(epsilon[0] / invNumLights);
         lightIndex = math::clamp(lightIndex, 0, numLights - 1);
         SceneObject* LightObject = scene.GetLightSourceByIndex(lightIndex);
 
         math::vector3<F> lightN;
-        math::point3d<F> LightSampleP = LightObject->SampleRandomPoint(lightN);
+        math::point3d<F> LightSampleP = LightObject->SampleRandomPoint(epsilon, lightN);
         math::vector3<F> lightDisplacement = LightSampleP - shadingPoint;
 
         //direct light sampling.
@@ -80,7 +97,8 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
     }
     else
     {
-        result = material.Scattering(shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering, f);
+        epsilon[0] = (epsilon[0] - ratioLights) / ratioBxDF;
+        result = material.Scattering(epsilon, shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering, f);
     }
 
     if (result)
@@ -97,10 +115,10 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
         }
 
         F pdfBxDF = material.pdf(normal, ray.direction(), scattering.direction());
-        F pdf = ratioLights * pdfLight + (F(1) - ratioLights) * pdfBxDF;
+        F pdf = ratioLights * pdfLight + ratioBxDF * pdfBxDF;
         F cosTheta = math::dot(normal, scattering.direction());
         math::vector3<F> reflectance = f * cosTheta / pdf;
-        math::vector3<F> Li = Trace(scene, scattering, TerminalRecord.Next(reflectance));
+        math::vector3<F> Li = Trace(epsilonGenerator, scene, scattering, condition.Next(reflectance));
 
         math::vector3<F> emission = material.Emitting();
         math::vector3<F> reflection = Li * reflectance;
@@ -113,12 +131,12 @@ math::vector3<F> Trace(Scene& scene, const math::ray3d<F>& ray, const TerminalRe
     }
 }
 
-math::point3d<F> SceneRect::SampleRandomPoint(math::vector3<F>& outN) const
+math::point3d<F> SceneRect::SampleRandomPoint(F epsilon[3], math::vector3<F>& outN) const
 {
     outN = mWorldNormal;
 
-    F e1 = random<F>::value() * Rect.width();
-    F e2 = random<F>::value() * Rect.height();
+    F e1 = epsilon[1] * Rect.width();
+    F e2 = epsilon[2] * Rect.height();
 
     math::vector3<F> Bitangent = math::cross(mWorldNormal, mWorldTagent);
     return math::point3d<F>(mWorldPosition + e1 * mWorldTagent + e2 * Bitangent);
@@ -317,8 +335,8 @@ void LitRenderer::GenerateSamples()
             const F pixelCenterY = rowIndex * PixelSize + HalfPixelSize - halfHeight;
 
             Sample& sample = mImageSamples[colIndex + rowOffset];
-            F x = F(2) * random<F>::value() - F(1);
-            F y = F(2) * random<F>::value() - F(1);
+            F x = F(2) * mRandomGeneratorPickingPixel.value() - F(1);
+            F y = F(2) * mRandomGeneratorPickingPixel.value() - F(1);
 
             sample.pixelCol = colIndex;
             sample.pixelRow = rowIndex;
@@ -328,11 +346,11 @@ void LitRenderer::GenerateSamples()
         }
     }
 }
-
 void LitRenderer::ResolveSamples()
 {
     const math::vector3<F> StartReflectance = math::vector3<F>::one();
-    TerminalRecord Record;
+
+    TerminalCondition condition(mRandomGeneratorTracingTermination);
     math::vector3<F>* canvasDataPtr = mCanvas.GetBackbufferPtr();
     for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
     {
@@ -341,7 +359,7 @@ void LitRenderer::ResolveSamples()
         {
             Sample& sample = mImageSamples[colIndex + rowOffset];
             math::vector3<F>& canvasPixel = canvasDataPtr[colIndex + rowOffset];
-            canvasPixel += Trace(*mScene, sample.ray, Record);
+            canvasPixel += Trace(mRandomGeneratorEpsilon, *mScene, sample.ray, condition);
         }
     }
     mCanvas.IncreaseSampleCount();
