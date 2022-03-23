@@ -6,10 +6,10 @@
 
 struct TerminalRecord
 {
-    static const int MaxRecursiveDepth = 10;
+    static const int MinRecursiveDepth = 10;
 
     math::vector3<F> OuterReflectance = math::vector3<F>::one();
-    int CurrentRecursiveDepth = MaxRecursiveDepth;
+    int CurrentRecursiveDepth = MinRecursiveDepth;
 
     TerminalRecord Next(const math::vector3<F>& reflectance) const
     {
@@ -18,7 +18,9 @@ struct TerminalRecord
 
     bool IsTerminal() const
     {
-        return CurrentRecursiveDepth == 0 || math::near_zero(OuterReflectance);
+        const F RussiaRoulette = F(0.9);
+        return math::near_zero(OuterReflectance)
+            || (CurrentRecursiveDepth == 0 && random<F>::value() > RussiaRoulette);
     };
 };
 
