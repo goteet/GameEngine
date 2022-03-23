@@ -4,36 +4,45 @@
 #include "LitRenderer.h"
 
 
+const F InitialTerminalRatio = F(0.95);
+const int MinRecursiveDepth = 5;
+
 struct TerminalCondition
 {
-    static const int MinRecursiveDepth = 10;
-
-    math::vector3<F> OuterReflectance = math::vector3<F>::one();
-    int CurrentRecursiveDepth = MinRecursiveDepth;
-    random<F>& RandomGenerator;
 
     TerminalCondition(random<F>& generator)
-        : RandomGenerator(generator)
+        : mRandomGeneratorRef(generator)
     {   }
 
     TerminalCondition Next(const math::vector3<F>& reflectance) const
     {
-        return TerminalCondition(OuterReflectance * reflectance, CurrentRecursiveDepth - 1, RandomGenerator);
+        unsigned int nextDepth = mCurrentRecursiveDepth == 0 ? 0 : mCurrentRecursiveDepth - 1;
+        F nextRatio = mCurrentRecursiveDepth > 1 ? F(1)
+            : (mCurrentRecursiveDepth == 1 ? InitialTerminalRatio : mTerminalRatio * mTerminalRatio);
+        return TerminalCondition(mOuterReflectance * reflectance, nextRatio, nextDepth, mRandomGeneratorRef);
     }
 
     bool IsTerminal() const
     {
         const F RussiaRoulette = F(0.9);
-        return math::near_zero(OuterReflectance)
-            || (CurrentRecursiveDepth == 0 && RandomGenerator() > RussiaRoulette);
+        return (mCurrentRecursiveDepth == 0 && mRandomGeneratorRef() > mTerminalRatio)
+            || math::near_zero(mOuterReflectance);
     };
 
+    F  GetInvTerminalRatio() const { return F(1) / mTerminalRatio; }
+
 private:
-    TerminalCondition(const math::vector3<F>& reflectance, int depth, random<F>& generator)
-        :OuterReflectance(reflectance)
-        , CurrentRecursiveDepth(depth)
-        , RandomGenerator(generator)
+    TerminalCondition(const math::vector3<F>& reflectance, F ratio, int depth, random<F>& generator)
+        : mOuterReflectance(reflectance)
+        , mTerminalRatio(ratio)
+        , mCurrentRecursiveDepth(depth)
+        , mRandomGeneratorRef(generator)
     {   }
+
+    const F mTerminalRatio = F(1);
+    const math::vector3<F> mOuterReflectance = math::vector3<F>::one();
+    const unsigned int mCurrentRecursiveDepth = MinRecursiveDepth;
+    random<F>& mRandomGeneratorRef;
 };
 
 math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::ray3d<F>& ray, const TerminalCondition& condition)
@@ -95,7 +104,7 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
         f = material.Albedo / math::PI<F>;
         result = cosThetaPrime > math::SMALL_NUM<F>;
     }
-    else
+    else //bxdf
     {
         epsilon[0] = (epsilon[0] - ratioLights) / ratioBxDF;
         result = material.Scattering(epsilon, shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering, f);
@@ -122,12 +131,12 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
 
         math::vector3<F> emission = material.Emitting();
         math::vector3<F> reflection = Li * reflectance;
-        return emission + reflection;
+        return (emission + reflection) * condition.GetInvTerminalRatio();
     }
     else
     {
         math::vector3<F> emission = material.Emitting();
-        return emission;
+        return emission * condition.GetInvTerminalRatio();
     }
 }
 
