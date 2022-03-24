@@ -27,6 +27,16 @@ private:
 };
 
 
+F BalanceHeuristic(F pdfA, F pdfB);
+F PowerHeuristic(F pdfA, F pdfB);
+
+struct LightRay
+{
+    bool isSpecular = false;
+    math::ray3d<F> scattering;
+    math::vector3<F> f = math::vector3<F>::zero();
+};
+
 struct IMaterial
 {
     math::vector3<F> Albedo = math::vector3<F>::one();
@@ -34,10 +44,26 @@ struct IMaterial
     IMaterial() = default;
     IMaterial(F r, F g, F b) : Albedo(r, g, b) { }
     virtual ~IMaterial() { }
-    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const = 0;
-    virtual math::vector3<F> Emitting() const { return math::vector3<F>::zero(); }
-    virtual F pdf(const math::normalized_vector3<F>& N, const math::normalized_vector3<F>& Wo, const math::normalized_vector3<F>& Wi) const { return F(1); }
+    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const = 0;
+    virtual math::vector3<F> Emitting() const
+    {
+        return math::vector3<F>::zero();
+    }
+    virtual math::vector3<F> f(
+        const math::normalized_vector3<F>& N,
+        const math::normalized_vector3<F>& Wo,
+        const math::normalized_vector3<F>& Wi,
+        bool IsOnSurface) const
+    {
+        return math::vector3<F>::zero();
+    }
+    virtual F pdf(
+        const math::normalized_vector3<F>& N,
+        const math::normalized_vector3<F>& Wo,
+        const math::normalized_vector3<F>& Wi) const
+    {
+        return F(1);
+    }
 };
 
 struct Lambertian : public virtual IMaterial
@@ -45,9 +71,14 @@ struct Lambertian : public virtual IMaterial
 
     Lambertian() = default;
     Lambertian(F r, F g, F b) : IMaterial(r, g, b) { }
-    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const override;
-    virtual F pdf(const math::normalized_vector3<F>& N,
+    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
+    virtual math::vector3<F> f(
+        const math::normalized_vector3<F>& N,
+        const math::normalized_vector3<F>& Wo,
+        const math::normalized_vector3<F>& Wi,
+        bool IsOnSurface) const override;
+    virtual F pdf(
+        const math::normalized_vector3<F>& N,
         const math::normalized_vector3<F>& Wo,
         const math::normalized_vector3<F>& Wi) const override;
 };
@@ -58,8 +89,7 @@ struct Metal : public IMaterial
 
     Metal() = default;
     Metal(F f) : Fuzzy(f) { }
-    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const override;
+    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
 };
 
 struct Glossy : public Lambertian
@@ -69,9 +99,14 @@ struct Glossy : public Lambertian
 
     Glossy() = default;
     Glossy(F r, F g, F b, F ior = F(2.5)) : IMaterial(r, g, b), RefractiveIndex(ior) { }
-    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const override;
-    virtual F pdf(const math::normalized_vector3<F>& N,
+    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
+    virtual math::vector3<F> f(
+        const math::normalized_vector3<F>& N,
+        const math::normalized_vector3<F>& Wo,
+        const math::normalized_vector3<F>& Wi,
+        bool IsOnSurface) const override;
+    virtual F pdf(
+        const math::normalized_vector3<F>& N,
         const math::normalized_vector3<F>& Wo,
         const math::normalized_vector3<F>& Wi) const override;
 };
@@ -82,8 +117,7 @@ struct Dielectric : public IMaterial
 
     Dielectric() = default;
     Dielectric(F ior) : RefractiveIndex(ior) { }
-    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const override;
+    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
 };
 
 struct PureLight_ForTest : IMaterial
@@ -92,7 +126,6 @@ struct PureLight_ForTest : IMaterial
 
     PureLight_ForTest() = default;
     PureLight_ForTest(F x, F y, F z) : Emission(x, y, z) { }
-    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-        math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const override;
+    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual math::vector3<F> Emitting() const override;
 };

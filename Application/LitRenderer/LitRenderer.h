@@ -38,14 +38,14 @@ struct HitRecord
 {
     HitRecord() = default;
     HitRecord(SceneObject* o, bool f, math::vector3<F> n, F d)
-        : Object(o), SurfaceNormal(n), Distance(d), IsFrontFace(f)
+        : Object(o), SurfaceNormal(n), Distance(d), IsOnSurface(f)
     {
 
     }
 
     SceneObject* Object = nullptr;
-    bool IsFrontFace = true;
-    math::vector3<F> SurfaceNormal;
+    bool IsOnSurface = true;
+    math::normalized_vector3<F> SurfaceNormal;
     F Distance = F(0);
 };
 
@@ -64,8 +64,8 @@ struct SceneObject
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const = 0;
     void SetTranslate(F x, F y, F z) { Transform.Translate.set(x, y, z); }
     void SetRotation(const math::quaternion<F>& q) { Transform.Rotation = q; }
-    virtual math::point3d<F> SampleRandomPoint(F epsilon[3], math::vector3<F>& outN) const { return math::vector3<F>::zero(); }
-    virtual F SamplePdf(const math::ray3d<F>& ray) const { return F(0); }
+    virtual math::point3d<F> SampleRandomPoint(F epsilon[3]) const { return math::vector3<F>::zero(); }
+    virtual F SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const { return F(0); }
     virtual bool IsDualface() const { return false; }
     Transform Transform;
     std::unique_ptr<IMaterial> Material;
@@ -93,8 +93,8 @@ struct SceneRect : SceneObject
     virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
     void SetExtends(F x, F y) { Rect.set_extends(x, y); }
     void SetDualFace(bool dual) { mDualFace = dual; }
-    virtual math::point3d<F> SampleRandomPoint(F epsilon[3], math::vector3<F>& outN) const override;
-    virtual F SamplePdf(const math::ray3d<F>& ray) const override;
+    virtual math::point3d<F> SampleRandomPoint(F epsilon[3]) const override;
+    virtual F SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const override;
     virtual bool IsDualface() const override { return mDualFace; }
 private:
     bool mDualFace = false;
@@ -142,7 +142,7 @@ public:
     void Create(F aspect);
     int GetLightCount() const { return (int)mSceneLights.size(); }
     SceneObject* GetLightSourceByIndex(int index) { return mSceneLights[index]; }
-
+    F SampleLightPdf(const math::ray3d<F>& ray);
 private:
     virtual void CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects);
     void FindAllLights();

@@ -2,6 +2,19 @@
 #include "LitRenderer.h"
 
 
+F PowerHeuristic(F pdfA, F pdfB)
+{
+    pdfA *= pdfA;
+    pdfB *= pdfB;
+    return pdfA / (pdfA + pdfB);
+}
+
+F BalanceHeuristic(F pdfA, F pdfB)
+{
+    return pdfA / (pdfA + pdfB);
+}
+
+
 struct UVW
 {
     math::vector3<F> u, v, w;
@@ -100,17 +113,26 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(F epsilon[2], const m
 
 
 
-bool Lambertian::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
+bool Lambertian::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
     math::normalized_vector3<F> Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
-    outBrdf = Albedo / math::PI<F>;
-    outScattering.set_origin(P);
-    outScattering.set_direction(Wi);
+    outLightRay.scattering.set_origin(P);
+    outLightRay.scattering.set_direction(Wi);
+    outLightRay.f = Albedo / math::PI<F>;
     return math::dot(Wi, N) > F(0);
 }
 
-F Lambertian::pdf(const math::normalized_vector3<F>& N,
+math::vector3<F> Lambertian::f(
+    const math::normalized_vector3<F>& N,
+    const math::normalized_vector3<F>& Wo,
+    const math::normalized_vector3<F>& Wi,
+    bool IsOnSurface) const
+{
+    return Albedo / math::PI<F>;
+}
+
+F Lambertian::pdf(
+    const math::normalized_vector3<F>& N,
     const math::normalized_vector3<F>& Wo,
     const math::normalized_vector3<F>& Wi) const
 {
@@ -127,22 +149,16 @@ math::normalized_vector3<F> Reflect(
     return In - F(2) * math::dot(In, N) * N;
 }
 
-bool Metal::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
+bool Metal::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
     math::vector3<F> FuzzyDirection = Fuzzy * GenerateUnitSphereVector();
     math::normalized_vector3<F> reflectDirection = Reflect(Ray.direction(), N) + FuzzyDirection;
-    outScattering.set_origin(P);
-    outScattering.set_direction(reflectDirection);
-    outBrdf = math::vector3<F>::one();
+    outLightRay.isSpecular = true;
+    outLightRay.scattering.set_origin(P);
+    outLightRay.scattering.set_direction(reflectDirection);
+    outLightRay.f = math::vector3<F>::one();
     F cosTheta = math::dot(N, reflectDirection);
     return cosTheta > F(0);
-}
-
-F Power5(F Base)
-{
-    F Ret = Base * Base;
-    return Ret * Ret * Base;
 }
 
 F ReflectanceSchlick(F CosTheta, F eta1, F eta2)
@@ -151,18 +167,17 @@ F ReflectanceSchlick(F CosTheta, F eta1, F eta2)
     F F0 = (eta1 - eta2) / (eta1 + eta2);
     F R0 = F0 * F0;
     F Base = F(1) - CosTheta;
-    return R0 + (F(1) - R0) * Power5(Base);
+    return R0 + (F(1) - R0) * math::power<5>(Base);
 }
 
-bool Dielectric::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
+bool Dielectric::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
     const F AirRefractiveIndex = F(1.0003);
 
     const math::vector3<F>& InDirection = Ray.direction();
 
-    F eta1 = IsFrontFace ? AirRefractiveIndex : RefractiveIndex;
-    F eta2 = IsFrontFace ? RefractiveIndex : AirRefractiveIndex;
+    F eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
+    F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
     const F RefractionRatio = eta1 / eta2;
 
     const F IdotN = -math::dot(InDirection, N);
@@ -184,14 +199,13 @@ bool Dielectric::Scattering(F epsilon[3], const math::vector3<F>& P, const math:
         ScatteredDirection = Rprep - Rpall;
     }
 
-    outScattering.set_origin(P);
-    outScattering.set_direction(ScatteredDirection);
-    outBrdf = math::vector3<F>::one();
+    outLightRay.scattering.set_origin(P);
+    outLightRay.scattering.set_direction(ScatteredDirection);
+    outLightRay.f = math::vector3<F>::one();
     return true;
 }
 
-bool PureLight_ForTest::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
+bool PureLight_ForTest::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
     return false;
 }
@@ -200,14 +214,13 @@ math::vector3<F> PureLight_ForTest::Emitting() const
 {
     return Emission;
 }
-bool Glossy::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsFrontFace,
-    math::ray3d<F>& outScattering, math::vector3<F>& outBrdf) const
+const F AirRefractiveIndex = F(1.0003);
+bool Glossy::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
-    const F AirRefractiveIndex = F(1.0003);
 
     const math::vector3<F>& Wo = Ray.direction();
-    const F eta1 = IsFrontFace ? AirRefractiveIndex : RefractiveIndex;
-    const F eta2 = IsFrontFace ? RefractiveIndex : AirRefractiveIndex;
+    const F eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
+    const F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
     const F IdotN = -math::dot(Wo, N);
     const F cosTheta = math::clamp(IdotN);
     const F Frehnel = ReflectanceSchlick(cosTheta, eta1, eta2);
@@ -217,24 +230,48 @@ bool Glossy::Scattering(F epsilon[3], const math::vector3<F>& P, const math::vec
     if (chooseReflectRay)
     {
         math::normalized_vector3<F> Wr = Reflect(Wo, N);
-        outScattering.set_origin(P);
-        outScattering.set_direction(Wr);
-        outBrdf = math::vector3<F>(Frehnel, Frehnel, Frehnel);
+        outLightRay.scattering.set_origin(P);
+        outLightRay.scattering.set_direction(Wr);
+        outLightRay.f = math::vector3<F>(Frehnel, Frehnel, Frehnel);
+        outLightRay.isSpecular = true;
         result = math::dot(Wr, N) > F(0);
     }
     else
     {
-        result = Lambertian::Scattering(epsilon, P, N, Ray, IsFrontFace, outScattering, outBrdf);
-        outBrdf *= F(1) - Frehnel;
+        result = Lambertian::Scattering(epsilon, P, N, Ray, IsOnSurface, outLightRay);
+        outLightRay.f *= F(1) - Frehnel;
     }
     return result;
 }
 
-F Glossy::pdf(const math::normalized_vector3<F>& N,
+math::vector3<F> Glossy::f(
+    const math::normalized_vector3<F>& N,
+    const math::normalized_vector3<F>& Wo,
+    const math::normalized_vector3<F>& Wi,
+    bool IsOnSurface) const
+{
+    const math::normalized_vector3<F> H = Wo + Wi;
+    const F NdotH = math::dot(N, H);
+    const F eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
+    const F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
+    const F IdotN = -math::dot(Wo, N);
+    const F cosTheta = math::clamp(IdotN);
+    const F Frehnel = ReflectanceSchlick(cosTheta, eta1, eta2);
+
+    const math::vector3<F> S(Frehnel, Frehnel, Frehnel);
+    const math::vector3<F> D = Lambertian::f(N, Wo, Wi, IsOnSurface) * (F(1) - Frehnel);
+
+    return math::near_zero(H - N) ? S : D;
+}
+
+F Glossy::pdf(
+    const math::normalized_vector3<F>& N,
     const math::normalized_vector3<F>& Wo,
     const math::normalized_vector3<F>& Wi) const
 {
+    math::normalized_vector3<F> H = Wo + Wi;
+    F NdotH = math::clamp(math::dot(N, H));
+    F pdfSpecular = math::power<5>(NdotH);
     F pdfDiffuse = Lambertian::pdf(N, Wo, Wi);
-    F pdfSpecular = math::max2(F(0), math::dot(Wo, N));
     return (F(1) - SpecularSampleProbability) * pdfDiffuse + SpecularSampleProbability * pdfSpecular;
 }

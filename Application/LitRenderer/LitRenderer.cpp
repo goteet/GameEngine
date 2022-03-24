@@ -61,89 +61,84 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
     //Collision occurred.
     const SceneObject& shadingObject = *contactRecord.Object;
     const IMaterial& material = *shadingObject.Material;
-    const math::vector3<F>& normal = contactRecord.SurfaceNormal;
+    const math::normalized_vector3<F>& N = contactRecord.SurfaceNormal;
+    const math::normalized_vector3<F>& Wo = ray.direction();
     F biasedDistance = math::max2<F>(contactRecord.Distance, F(0));
-    math::point3d<F> shadingPoint = ray.calc_offset(biasedDistance);
+    math::point3d<F> Ps = ray.calc_offset(biasedDistance);
 
-    math::vector3<F> f = math::vector3<F>::zero();
-    math::ray3d<F> scattering;
-
-    int numLights = scene.GetLightCount();
-    F invNumLights = F(1) / (numLights + F(2));
-    F ratioLights = numLights * invNumLights;
-    F ratioBxDF = F(1) - ratioLights;
     F epsilon[3] = {
         epsilonGenerator[0].value(),
         epsilonGenerator[1].value(),
         epsilonGenerator[2].value()
     };
-    bool result = false;
-    bool chooseLightSample = epsilon[0] <= ratioLights;
-    if (chooseLightSample)
+
+    //
+    //Light Sampling
+    math::vector3<F> reflectionLight = math::vector3<F>::zero();
     {
-        int lightIndex = math::floor2<int>(epsilon[0] / invNumLights);
+        int numLights = scene.GetLightCount();
+        F invNumLights = F(1) / F(numLights);
+        int lightIndex = math::floor2<int>(epsilon[0] * numLights);
         lightIndex = math::clamp(lightIndex, 0, numLights - 1);
-        SceneObject* LightObject = scene.GetLightSourceByIndex(lightIndex);
-
-        math::vector3<F> lightN;
-        math::point3d<F> LightSampleP = LightObject->SampleRandomPoint(epsilon, lightN);
-        math::vector3<F> lightDisplacement = LightSampleP - shadingPoint;
-
-        //direct light sampling.
-        scattering.set_origin(shadingPoint);
-        scattering.set_direction(lightDisplacement);
-
-        const math::normalized_vector3<F>& lightV = scattering.direction();
-        F cosThetaPrime = math::dot(lightN, -lightV);
-
-        if (cosThetaPrime < -math::SMALL_NUM<F> && LightObject->IsDualface())
+        SceneObject* light = scene.GetLightSourceByIndex(lightIndex);
+        if (light != contactRecord.Object)
         {
-            cosThetaPrime = -cosThetaPrime;
-        }
+            math::point3d<F> Pl = light->SampleRandomPoint(epsilon);
+            math::normalized_vector3<F> Wi = Pl - Ps;
+            math::ray3d<F> scattering(Ps, Wi);
+            HitRecord lightContactRecord = scene.DetectIntersecting(scattering, nullptr, math::SMALL_NUM<F>);
 
-        f = material.Albedo / math::PI<F>;
-        result = cosThetaPrime > math::SMALL_NUM<F>;
-    }
-    else //bxdf
-    {
-        epsilon[0] = (epsilon[0] - ratioLights) / ratioBxDF;
-        result = material.Scattering(epsilon, shadingPoint, normal, ray, contactRecord.IsFrontFace, scattering, f);
-    }
-
-    if (result)
-    {
-        F pdfLight = F(0);
-        if (numLights > 0)
-        {
-            for (int lightIndex = 0; lightIndex < numLights; lightIndex++)
+            if (lightContactRecord.Object == light)
             {
-                SceneObject* light = scene.GetLightSourceByIndex(lightIndex);
-                pdfLight += light->SamplePdf(scattering);
+                light = lightContactRecord.Object;
+                math::normalized_vector3<F> Nl = lightContactRecord.SurfaceNormal;
+                F cosThetaPrime = math::dot(Nl, -Wi);
+
+                bool hit = cosThetaPrime > math::SMALL_NUM<F> ||
+                    (cosThetaPrime < -math::SMALL_NUM<F> && light->IsDualface());
+
+                if (hit)
+                {
+                    F pdf = light->SamplePdf(lightContactRecord, scattering);
+                    F pdfBSDF = material.pdf(N, Wo, Wi);
+                    F weight = PowerHeuristic(pdf, pdfBSDF) * invNumLights;
+                    F cosTheta = math::dot(N, Wi);
+                    math::vector3<F> f = material.f(N, Wo, Wi, lightContactRecord.IsOnSurface);
+                    math::vector3<F> reflectance = f * cosTheta * weight / pdf;
+                    math::vector3<F> Li = light->Material->Emitting();
+                    reflectionLight = (Li * reflectance);
+                }
             }
-            pdfLight = pdfLight / F(numLights);
         }
-
-        F pdfBxDF = material.pdf(normal, ray.direction(), scattering.direction());
-        F pdf = ratioLights * pdfLight + ratioBxDF * pdfBxDF;
-        F cosTheta = math::dot(normal, scattering.direction());
-        math::vector3<F> reflectance = f * cosTheta / pdf;
-        math::vector3<F> Li = Trace(epsilonGenerator, scene, scattering, condition.Next(reflectance));
-
-        math::vector3<F> emission = material.Emitting();
-        math::vector3<F> reflection = Li * reflectance;
-        return (emission + reflection) * condition.GetInvTerminalRatio();
     }
-    else
+
+    //
+    //BSDF Sampling
+    math::vector3<F> reflectionBSDF = math::vector3<F>::zero();
     {
-        math::vector3<F> emission = material.Emitting();
-        return emission * condition.GetInvTerminalRatio();
+        LightRay LightWi;
+        if (material.Scattering(epsilon, Ps, N, ray, contactRecord.IsOnSurface, LightWi))
+        {
+            const math::normalized_vector3<F>& Wi = LightWi.scattering.direction();
+
+            F pdf = material.pdf(N, Wo, Wi);
+            F pdfLight = LightWi.isSpecular ? 0 : scene.SampleLightPdf(LightWi.scattering);
+            F weight = PowerHeuristic(pdf, pdfLight);
+            F cosTheta = math::dot(N, Wi);
+            math::vector3<F> reflectance = LightWi.f * cosTheta * weight / pdf;
+            math::vector3<F> Li = Trace(epsilonGenerator, scene, LightWi.scattering, condition.Next(reflectance));
+            reflectionBSDF = (Li * reflectance);
+        }
     }
+
+    math::vector3<F> emission = material.Emitting();
+    math::vector3<F> reflection = reflectionLight + reflectionBSDF;
+    return (emission + reflection) * condition.GetInvTerminalRatio();
+
 }
 
-math::point3d<F> SceneRect::SampleRandomPoint(F epsilon[3], math::vector3<F>& outN) const
+math::point3d<F> SceneRect::SampleRandomPoint(F epsilon[3]) const
 {
-    outN = mWorldNormal;
-
     F e1 = epsilon[1] * Rect.width();
     F e2 = epsilon[2] * Rect.height();
 
@@ -151,9 +146,8 @@ math::point3d<F> SceneRect::SampleRandomPoint(F epsilon[3], math::vector3<F>& ou
     return math::point3d<F>(mWorldPosition + e1 * mWorldTagent + e2 * Bitangent);
 }
 
-F SceneRect::SamplePdf(const math::ray3d<F>& ray) const
+F SceneRect::SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const
 {
-    HitRecord hr = this->IntersectWithRay(ray, math::SMALL_NUM<F>);
     if (hr.Object != this)
     {
         return F(0);
@@ -455,7 +449,7 @@ void SceneSphere::UpdateWorldTransform()
 HitRecord SceneSphere::IntersectWithRay(const math::ray3d<F>& ray, F error) const
 {
     F t0, t1;
-    bool front = true;
+    bool isOnSurface = true;
     math::intersection result = math::intersect_sphere(ray, mWorldCenter, mSphere.radius_sqr(), error, t0, t1);
     if (result == math::intersection::none)
     {
@@ -464,12 +458,12 @@ HitRecord SceneSphere::IntersectWithRay(const math::ray3d<F>& ray, F error) cons
     else if (result == math::intersection::inside)
     {
         t0 = t1;
-        front = false;
+        isOnSurface = false;
     }
 
     math::point3d<F> intersectPosition = ray.calc_offset(t0);
     math::vector3<F> surfaceNormal = normalized(intersectPosition - mWorldCenter);
-    return HitRecord(const_cast<SceneSphere*>(this), front, (front ? surfaceNormal : -surfaceNormal), t0);
+    return HitRecord(const_cast<SceneSphere*>(this), isOnSurface, (isOnSurface ? surfaceNormal : -surfaceNormal), t0);
 }
 
 void SceneRect::UpdateWorldTransform()
@@ -508,7 +502,7 @@ void SceneDisk::UpdateWorldTransform()
 HitRecord SceneDisk::IntersectWithRay(const math::ray3d<F>& ray, F error) const
 {
     F t;
-    bool front = true;
+    bool isOnSurface = true;
     math::intersection result = math::intersect_disk(ray, mWorldPosition, mWorldNormal, Disk.radius(), mDualFace, error, t);
     if (result == math::intersection::none)
     {
@@ -516,8 +510,8 @@ HitRecord SceneDisk::IntersectWithRay(const math::ray3d<F>& ray, F error) const
     }
     else
     {
-        front = math::dot(mWorldNormal, ray.direction()) < 0;
-        return HitRecord(const_cast<SceneDisk*>(this), front, front ? mWorldNormal : -mWorldNormal, t);
+        isOnSurface = math::dot(mWorldNormal, ray.direction()) < 0;
+        return HitRecord(const_cast<SceneDisk*>(this), isOnSurface, isOnSurface ? mWorldNormal : -mWorldNormal, t);
     }
 }
 
@@ -554,6 +548,24 @@ HitRecord SceneCube::IntersectWithRay(const math::ray3d<F>& ray, F error) const
     return HitRecord(const_cast<SceneCube*>(this), front, n0, t0);
 }
 
+
+F Scene::SampleLightPdf(const math::ray3d<F>& ray)
+{
+    HitRecord result;
+    result.Distance = std::numeric_limits<F>::max();
+    for (SceneObject* light : mSceneLights)
+    {
+        HitRecord hr = light->IntersectWithRay(ray, math::SMALL_NUM<F>);
+        if (hr.Object == light && hr.Distance < result.Distance)
+        {
+            result = hr;
+        }
+    }
+
+    return (result.Object != nullptr)
+        ? result.Object->SamplePdf(result, ray) / F(mSceneLights.size())
+        : F(0);
+}
 
 void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
 {
