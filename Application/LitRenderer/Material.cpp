@@ -270,8 +270,8 @@ F Glossy::pdf(
     const math::normalized_vector3<F>& Wi) const
 {
     math::normalized_vector3<F> H = Wo + Wi;
-    F NdotH = math::clamp(math::dot(N, H));
-    F pdfSpecular = math::power<5>(NdotH);
+    F DiracApproxmation = math::near_zero(N - H) ? F(1) : F(0);
+    F pdfSpecular = DiracApproxmation / math::clamp(math::dot(N, Wi));
     F pdfDiffuse = Lambertian::pdf(N, Wo, Wi);
     return (F(1) - SpecularSampleProbability) * pdfDiffuse + SpecularSampleProbability * pdfSpecular;
 }
