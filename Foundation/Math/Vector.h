@@ -118,6 +118,8 @@ namespace math
     template <typename value_type> using vector4 = vector_t<value_type, EDim::_4>;
     template <typename value_type> using normalized_vector2 = normalized_vector_t<value_type, EDim::_2>;
     template <typename value_type> using normalized_vector3 = normalized_vector_t<value_type, EDim::_3>;
+    template <typename value_type> using nvector2 = normalized_vector2<value_type>;
+    template <typename value_type> using nvector3 = normalized_vector3<value_type>;
 
     using byte2 = vector2<unsigned char>;
     using byte3 = vector3<unsigned char>;
@@ -675,7 +677,7 @@ namespace math
     {
         constexpr normalized_vector_t() = default;
         constexpr normalized_vector_t(value_type _x, value_type _y, value_type _z)
-            : vector_t<value_type, EDim::_3>(_x, _y,_z) { normalize(*this); }
+            : vector_t<value_type, EDim::_3>(_x, _y, _z) { normalize(*this); }
         constexpr normalized_vector_t(const vector_t<value_type, EDim::_3>& value)
             : vector_t<value_type, EDim::_3>(value) { normalize(*this); }
 

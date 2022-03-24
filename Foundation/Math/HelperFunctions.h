@@ -77,14 +77,53 @@ namespace math
         return l + (r - l) * f;
     }
 
-    template<typename value_type>
-    constexpr value_type pow_n(value_type base, size_t iexp)
+    template<int exp, typename value_type, typename enable = std::enable_if_t<exp % 2 != 0>>
+    struct power_helper
     {
-        return iexp == 0
-            ? value_type(1)
-            : (iexp == 1
-                ? base
-                : pow_n(base, iexp - 1) * base);
+        static constexpr value_type recursive(value_type base)
+        {
+            return power_helper<exp - 1, value_type, void>::recursive(base) * base;
+        }
+    };
+
+    template<int exp, typename value_type>
+    struct power_helper<exp, value_type, std::enable_if_t<exp % 2 == 0>>
+    {
+        static constexpr value_type recursive(value_type base)
+        {
+            value_type power_expe_half = power_helper<exp / 2, value_type, void>::recursive(base);
+            return power_helper<2, value_type, void>::recursive(power_expe_half);
+        }
+    };
+
+    template<typename value_type>
+    struct power_helper<0, value_type, void>
+    {
+        static constexpr value_type recursive(value_type base) { return value_type(1); }
+    };
+
+    template<typename value_type>
+    struct power_helper<1, value_type, void>
+    {
+        static constexpr value_type recursive(value_type base) { return base; }
+    };
+
+    template<typename value_type>
+    struct power_helper<2, value_type, void>
+    {
+        static constexpr value_type recursive(value_type base) { return base * base; }
+    };
+
+    template<int exp, typename value_type>
+    constexpr value_type power(value_type base)
+    {
+        return power_helper<exp, value_type, void>::recursive(base);
+    }
+
+    template<typename value_type>
+    constexpr value_type sqr(value_type base)
+    {
+        return power<2>(base);
     }
 
     template<typename value_type>
