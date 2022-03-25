@@ -150,11 +150,6 @@ private:
     std::vector<SceneObject*> mSceneLights;
 };
 
-class SimpleScene : public Scene
-{
-    virtual void CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects) override;
-};
-
 class SimpleBackCamera
 {
     struct DegreeClampHelper

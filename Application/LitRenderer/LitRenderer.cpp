@@ -4,6 +4,159 @@
 #include "LitRenderer.h"
 
 
+namespace
+{
+    class SimpleScene : public Scene
+    {
+        virtual void CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects) override
+        {
+            const F SceneSize = 60;
+            const F SceneNear = 1;
+            const F SceneFar = SceneSize * F(2.5);
+            const F SceneBottom = -SceneSize;
+            const F SceneTop = SceneSize;
+            const F SceneLeft = -SceneSize * aspect;
+            const F SceneRight = SceneSize * aspect;
+
+            const F SceneCenterX = (SceneLeft + SceneRight) * F(0.5);
+            const F SceneCenterY = (SceneBottom + SceneTop) * F(0.5);
+            const F SceneCenterZ = (SceneNear + SceneFar) * F(0.5);
+            const F SceneExtendX = (SceneRight - SceneLeft) * F(0.5);
+            const F SceneExtendY = (SceneTop - SceneBottom) * F(0.5);
+            const F SceneExtendZ = (SceneFar - SceneNear) * F(0.5);
+
+            const F SceneDistance = 5;
+            const F SmallObjectSize = 8;
+            const F BigObjectSize = SmallObjectSize * F(1.75);
+
+            SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
+            mainSphere->SetRadius(20);
+            mainSphere->SetTranslate(
+                SceneCenterX,
+                SceneBottom + 22,
+                SceneCenterZ + 10);
+            mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 1.05);
+
+            SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
+            wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
+            wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
+            wallLeft->Material = std::make_unique<Lambertian>(F(0.75), F(0.2), F(0.2));
+
+            SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
+            wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
+            wallRight->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
+            wallRight->SetExtends(SceneExtendZ, SceneExtendY);
+            wallRight->Material = std::make_unique<Lambertian>(F(0.2), F(0.2), F(0.75));
+
+            SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
+            wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
+            wallTop->SetExtends(SceneExtendZ, SceneExtendX);
+            wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
+            wallTop->Material = std::make_unique<Lambertian>(F(0.75), F(0.75), F(0.75));
+
+            SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
+            wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
+            wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
+            wallBottom->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
+            wallBottom->Material = std::make_unique<Lambertian>(F(0.2), F(0.75), F(0.2));
+
+            SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
+            wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
+            wallFar->SetExtends(SceneExtendX, SceneExtendY);
+            wallFar->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
+            wallFar->Material = std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6));
+
+            SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
+            LightDisk->SetDualFace(true);
+            LightDisk->SetTranslate(SceneCenterX, SceneTop - F(0.01), SceneCenterZ + F(10));
+            LightDisk->SetExtends(25, 25);
+            LightDisk->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
+            F Intensity = 4.5;
+            LightDisk->Material = std::make_unique<PureLight_ForTest>(Intensity, Intensity, Intensity);
+        }
+    };
+
+    class OrenNayerComparisionScene : public Scene
+    {
+        virtual void CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects) override
+        {
+            const F SceneSize = 60;
+            const F SceneNear = 1;
+            const F SceneFar = SceneSize * F(2.5);
+            const F SceneBottom = -SceneSize;
+            const F SceneTop = SceneSize;
+            const F SceneLeft = -SceneSize * aspect;
+            const F SceneRight = SceneSize * aspect;
+
+            const F SceneCenterX = (SceneLeft + SceneRight) * F(0.5);
+            const F SceneCenterY = (SceneBottom + SceneTop) * F(0.5);
+            const F SceneCenterZ = (SceneNear + SceneFar) * F(0.5);
+            const F SceneExtendX = (SceneRight - SceneLeft) * F(0.5);
+            const F SceneExtendY = (SceneTop - SceneBottom) * F(0.5);
+            const F SceneExtendZ = (SceneFar - SceneNear) * F(0.5);
+
+            const F SceneDistance = 5;
+            const F SmallObjectSize = 8;
+            const F BigObjectSize = SmallObjectSize * F(1.75);
+
+            SceneSphere* LambertianShere = new SceneSphere(); OutSceneObjects.push_back(LambertianShere);
+            LambertianShere->SetRadius(20);
+            LambertianShere->SetTranslate(
+                SceneCenterX + 30,
+                SceneBottom + 22,
+                SceneCenterZ + 10);
+            LambertianShere->Material = std::make_unique<Lambertian>(1, 1, 1);
+
+
+            SceneSphere* orenNayerSphere = new SceneSphere(); OutSceneObjects.push_back(orenNayerSphere);
+            orenNayerSphere->SetRadius(20);
+            orenNayerSphere->SetTranslate(
+                SceneCenterX - 30,
+                SceneBottom + 22,
+                SceneCenterZ + 10);
+            orenNayerSphere->Material = std::make_unique<OrenNayer>(1, 1, 1, math::radian<F>(0.25));
+
+            SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
+            wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
+            wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
+            wallLeft->Material = std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6));
+
+            SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
+            wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
+            wallRight->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
+            wallRight->SetExtends(SceneExtendZ, SceneExtendY);
+            wallRight->Material = std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6));
+
+            SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
+            wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
+            wallTop->SetExtends(SceneExtendZ, SceneExtendX);
+            wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
+            wallTop->Material = std::make_unique<Lambertian>(F(0.75), F(0.75), F(0.75));
+
+            SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
+            wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
+            wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
+            wallBottom->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
+            wallBottom->Material = std::make_unique<Lambertian>(F(0.2), F(0.2), F(0.75));
+
+            SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
+            wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
+            wallFar->SetExtends(SceneExtendX, SceneExtendY);
+            wallFar->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
+            wallFar->Material = std::make_unique<Lambertian>(F(0.75), F(0.2), F(0.2));
+
+            SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
+            LightDisk->SetDualFace(true);
+            LightDisk->SetTranslate(SceneCenterX, SceneTop - F(0.01), SceneCenterZ + F(10));
+            LightDisk->SetExtends(25, 25);
+            LightDisk->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
+            F Intensity = 4.5;
+            LightDisk->Material = std::make_unique<PureLight_ForTest>(Intensity, Intensity, Intensity);
+        }
+    };
+
+}
+
 const F InitialTerminalRatio = F(0.95);
 const int MinRecursiveDepth = 5;
 
@@ -265,7 +418,7 @@ LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canv
     , mClearColor(0, 0, 0)
     , mCamera(math::degree<F>(50))
     , mSampleArrayCount(canvasWidth* canvasHeight)
-    , mScene(std::make_unique<SimpleScene>())
+    , mScene(std::make_unique<OrenNayerComparisionScene>())
 
 {
     mScene->Create(F(canvasWidth) / F(canvasHeight));
@@ -672,74 +825,5 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
     LightDisk->SetExtends(25, 25);
     LightDisk->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
     F Intensity = 1;
-    LightDisk->Material = std::make_unique<PureLight_ForTest>(Intensity, Intensity, Intensity);
-}
-
-
-
-void SimpleScene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
-{
-    const F SceneSize = 60;
-    const F SceneNear = 1;
-    const F SceneFar = SceneSize * F(2.5);
-    const F SceneBottom = -SceneSize;
-    const F SceneTop = SceneSize;
-    const F SceneLeft = -SceneSize * aspect;
-    const F SceneRight = SceneSize * aspect;
-
-    const F SceneCenterX = (SceneLeft + SceneRight) * F(0.5);
-    const F SceneCenterY = (SceneBottom + SceneTop) * F(0.5);
-    const F SceneCenterZ = (SceneNear + SceneFar) * F(0.5);
-    const F SceneExtendX = (SceneRight - SceneLeft) * F(0.5);
-    const F SceneExtendY = (SceneTop - SceneBottom) * F(0.5);
-    const F SceneExtendZ = (SceneFar - SceneNear) * F(0.5);
-
-    const F SceneDistance = 5;
-    const F SmallObjectSize = 8;
-    const F BigObjectSize = SmallObjectSize * F(1.75);
-
-    SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
-    mainSphere->SetRadius(20);
-    mainSphere->SetTranslate(
-        SceneCenterX + 20,
-        SceneBottom + 22,
-        SceneCenterZ + 10);
-    mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 1.7);
-
-    SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
-    wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
-    wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
-    wallLeft->Material = std::make_unique<Lambertian>(F(0.75), F(0.2), F(0.2));
-
-    SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
-    wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
-    wallRight->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
-    wallRight->SetExtends(SceneExtendZ, SceneExtendY);
-    wallRight->Material = std::make_unique<Lambertian>(F(0.2), F(0.2), F(0.75));
-
-    SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
-    wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
-    wallTop->SetExtends(SceneExtendZ, SceneExtendX);
-    wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
-    wallTop->Material = std::make_unique<Lambertian>(F(0.75), F(0.75), F(0.75));
-
-    SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
-    wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
-    wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
-    wallBottom->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
-    wallBottom->Material = std::make_unique<Lambertian>(F(0.2), F(0.75), F(0.2));
-
-    SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
-    wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
-    wallFar->SetExtends(SceneExtendX, SceneExtendY);
-    wallFar->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
-    wallFar->Material = std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6));
-
-    SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
-    LightDisk->SetDualFace(true);
-    LightDisk->SetTranslate(SceneCenterX, SceneTop - F(0.01), SceneCenterZ + F(10));
-    LightDisk->SetExtends(25, 25);
-    LightDisk->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
-    F Intensity = 2.5;
     LightDisk->Material = std::make_unique<PureLight_ForTest>(Intensity, Intensity, Intensity);
 }

@@ -68,7 +68,6 @@ struct IMaterial
 
 struct Lambertian : public virtual IMaterial
 {
-
     Lambertian() = default;
     Lambertian(F r, F g, F b) : IMaterial(r, g, b) { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::vector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
@@ -81,6 +80,21 @@ struct Lambertian : public virtual IMaterial
         const math::normalized_vector3<F>& N,
         const math::normalized_vector3<F>& Wo,
         const math::normalized_vector3<F>& Wi) const override;
+};
+
+struct OrenNayer : public virtual Lambertian
+{
+    math::radian<F> Sigma = math::radian<F>(0);
+    math::radian<F> SigmaSqr = math::radian<F>(0);
+    F A = F(1);
+    F B = F(0);
+    OrenNayer() = default;
+    OrenNayer(F r, F g, F b, math::radian<F> sigma = math::radian<F>(0));
+    virtual math::vector3<F> f(
+        const math::normalized_vector3<F>& N,
+        const math::normalized_vector3<F>& Wo,
+        const math::normalized_vector3<F>& Wi,
+        bool IsOnSurface) const override;
 };
 
 struct Metal : public IMaterial

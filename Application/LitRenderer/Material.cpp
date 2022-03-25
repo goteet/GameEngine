@@ -118,7 +118,7 @@ bool Lambertian::Scattering(F epsilon[3], const math::vector3<F>& P, const math:
     math::normalized_vector3<F> Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
-    outLightRay.f = Albedo / math::PI<F>;
+    outLightRay.f = f(N, Ray.direction(), Wi, IsOnSurface);
     return math::dot(Wi, N) > F(0);
 }
 
@@ -128,7 +128,7 @@ math::vector3<F> Lambertian::f(
     const math::normalized_vector3<F>& Wi,
     bool IsOnSurface) const
 {
-    return Albedo / math::PI<F>;
+    return Albedo * math::InvPI<F>;
 }
 
 F Lambertian::pdf(
@@ -141,10 +141,48 @@ F Lambertian::pdf(
     return pdfLambertian;
 }
 
+
+
+OrenNayer::OrenNayer(F r, F g, F b, math::radian<F> sigma)
+    : IMaterial(r, g, b)
+    , Sigma(sigma)
+    , SigmaSqr(math::sqr(sigma.value))
+{
+    A = F(1) - F(0.5) * SigmaSqr.value / (SigmaSqr.value + F(0.33));
+    B = F(0.45) * SigmaSqr.value / (SigmaSqr.value + F(0.09));
+}
+
+
+math::vector3<F> OrenNayer::f(
+    const math::normalized_vector3<F>& N,
+    const math::normalized_vector3<F>& Wo,
+    const math::normalized_vector3<F>& Wi,
+    bool IsOnSurface) const
+{
+    F cosWi = math::clamp(math::dot(N, Wi)); F sinWi = sqrt(F(1) - math::sqr(cosWi));
+    F cosWo = math::clamp(math::dot(N, Wo)); F sinWo = sqrt(F(1) - math::sqr(cosWo));
+
+    F sinAlpha, tanBeta;
+    bool IsWiGreater = cosWi < cosWo;
+    if (IsWiGreater)
+    {
+        sinAlpha = sinWi;
+        tanBeta = sinWo / cosWo;
+    }
+    else
+    {
+        sinAlpha = sinWo;
+        tanBeta = sinWi / cosWi;
+    }
+
+    F maxWi_Wo = math::max2(F(0), cosWi * cosWo + sinWi * sinWo);
+    F factor = A + B * maxWi_Wo * sinAlpha * tanBeta;
+    return Albedo * math::InvPI<F> *factor;
+}
+
 math::normalized_vector3<F> Reflect(
     const math::normalized_vector3<F>& In,
-    const math::normalized_vector3<F>& N
-)
+    const math::normalized_vector3<F>& N)
 {
     return In - F(2) * math::dot(In, N) * N;
 }
