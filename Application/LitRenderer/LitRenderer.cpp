@@ -214,8 +214,8 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
     //Collision occurred.
     const SceneObject& shadingObject = *contactRecord.Object;
     const IMaterial& material = *shadingObject.Material;
-    const math::normalized_vector3<F>& N = contactRecord.SurfaceNormal;
-    const math::normalized_vector3<F> Wo = -ray.direction();
+    const math::nvector3<F>& N = contactRecord.SurfaceNormal;
+    const math::nvector3<F> Wo = -ray.direction();
     F biasedDistance = math::max2<F>(contactRecord.Distance, F(0));
     math::point3d<F> Ps = ray.calc_offset(biasedDistance);
 
@@ -237,14 +237,14 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
         if (light != contactRecord.Object)
         {
             math::point3d<F> Pl = light->SampleRandomPoint(epsilon);
-            math::normalized_vector3<F> Wi = Pl - Ps;
+            math::nvector3<F> Wi = Pl - Ps;
             math::ray3d<F> scattering(Ps, Wi);
             HitRecord lightContactRecord = scene.DetectIntersecting(scattering, nullptr, math::SMALL_NUM<F>);
 
             if (lightContactRecord.Object == light)
             {
                 light = lightContactRecord.Object;
-                math::normalized_vector3<F> Nl = lightContactRecord.SurfaceNormal;
+                math::nvector3<F> Nl = lightContactRecord.SurfaceNormal;
                 F cosThetaPrime = math::dot(Nl, -Wi);
 
                 bool hit = cosThetaPrime > math::SMALL_NUM<F> ||
@@ -272,12 +272,12 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
         LightRay LightWi;
         if (material.Scattering(epsilon, Ps, N, ray, contactRecord.IsOnSurface, LightWi))
         {
-            const math::normalized_vector3<F>& Wi = LightWi.scattering.direction();
+            const math::nvector3<F>& Wi = LightWi.scattering.direction();
 
             F pdf = material.pdf(N, Wo, Wi);
             F pdfLight = scene.SampleLightPdf(LightWi.scattering);
             F weight = PowerHeuristic(pdf, pdfLight);
-            F cosTheta = math::dot(N, Wi);
+            F cosTheta = math::saturate(math::dot(N, Wi));
             math::vector3<F> reflectance = weight * LightWi.f * cosTheta / pdf;
             math::vector3<F> Li = Trace(epsilonGenerator, scene, LightWi.scattering, condition.Next(reflectance));
             reflectionBSDF = Li * reflectance;
@@ -308,8 +308,8 @@ F SceneRect::SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const
 
     //calculate pdf(w) = pdf(x') * dist_sqr / cos_theta'
     // pdf(x') = 1 / area = > pdf(w) = dist_sqr / (area * cos_theta')
-    const math::normalized_vector3<F> Wo = -ray.direction();
-    const math::normalized_vector3<F>& N = this->mWorldNormal;
+    const math::nvector3<F> Wo = -ray.direction();
+    const math::nvector3<F>& N = this->mWorldNormal;
     F cosThetaPrime = math::dot(N, Wo);
 
     if (cosThetaPrime < -math::SMALL_NUM<F> && IsDualface())

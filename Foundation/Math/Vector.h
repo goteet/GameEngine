@@ -858,7 +858,7 @@ namespace math
     bool almost_same(const vector_t<value_type, EDim::_3>& a, const vector_t<value_type, EDim::_3>& b, value_type epsilon = SMALL_NUM<value_type>)
     {
         vector_t<value_type, EDim::_3> d = a - b;
-        return dot(d, d) < epsilon * epsilon;
+        return dot(d, d) < square(epsilon);
     }
 
 }

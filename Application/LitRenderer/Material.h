@@ -104,6 +104,10 @@ struct Metal : public IMaterial
     Metal() = default;
     Metal(F f) : Fuzzy(f) { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
+    virtual F pdf(
+        const math::nvector3<F>& N,
+        const math::nvector3<F>& Wo,
+        const math::nvector3<F>& Wi) const override;
 };
 
 struct Glossy : public Lambertian

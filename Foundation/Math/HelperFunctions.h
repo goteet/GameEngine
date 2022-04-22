@@ -21,7 +21,7 @@ namespace math
     template<typename value_type, typename = std::enable_if_t<std::is_floating_point_v<value_type>>>
     constexpr bool near_zero(value_type v, value_type small_number = SMALL_NUM<value_type>)
     {
-        return v <= small_number && v >= -small_number;
+        return std::fabs(v) <= small_number;
     }
 
 
@@ -50,7 +50,7 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr value_type clamp(value_type value, scaler_t<value_type> minValue, scaler_t<value_type> maxValue)
+    constexpr value_type clamp(scaler_t <value_type> value, value_type minValue, scaler_t<value_type> maxValue)
     {
         return value < minValue
             ? minValue
@@ -60,9 +60,17 @@ namespace math
     }
 
     template<typename value_type>
-    constexpr value_type clamp(value_type value)
+    constexpr value_type saturate(value_type value)
     {
         return clamp(value, value_type(0), value_type(1));
+    }
+
+    template<typename value_type>
+    constexpr value_type range(scaler_t <value_type> value, value_type maxValue)
+    {
+        return maxValue < 0
+            ? clamp(value, +maxValue, -maxValue)
+            : clamp(value, -maxValue, +maxValue);
     }
 
     template<typename value_type>
@@ -77,51 +85,54 @@ namespace math
         return l + (r - l) * f;
     }
 
-    template<int exp, typename value_type, typename enable = std::enable_if_t<exp % 2 != 0>>
-    struct power_helper
+    namespace power_impl
     {
-        static constexpr value_type recursive(value_type base)
+        template<int exp, typename value_type, typename enable = std::enable_if_t<exp % 2 != 0>>
+        struct term
         {
-            return power_helper<exp - 1, value_type, void>::recursive(base) * base;
-        }
-    };
+            static constexpr value_type eval(value_type base)
+            {
+                return term<exp - 1, value_type, void>::eval(base) * base;
+            }
+        };
 
-    template<int exp, typename value_type>
-    struct power_helper<exp, value_type, std::enable_if_t<exp % 2 == 0>>
-    {
-        static constexpr value_type recursive(value_type base)
+        template<typename value_type>
+        struct term<0, value_type, void>
         {
-            value_type power_expe_half = power_helper<exp / 2, value_type, void>::recursive(base);
-            return power_helper<2, value_type, void>::recursive(power_expe_half);
-        }
-    };
+            static constexpr value_type eval(value_type base) { return value_type(1); }
+        };
 
-    template<typename value_type>
-    struct power_helper<0, value_type, void>
-    {
-        static constexpr value_type recursive(value_type base) { return value_type(1); }
-    };
+        template<typename value_type>
+        struct term<1, value_type, void>
+        {
+            static constexpr value_type eval(value_type base) { return base; }
+        };
 
-    template<typename value_type>
-    struct power_helper<1, value_type, void>
-    {
-        static constexpr value_type recursive(value_type base) { return base; }
-    };
+        template<typename value_type>
+        struct term<2, value_type, void>
+        {
+            static constexpr value_type eval(value_type base) { return base * base; }
+        };
 
-    template<typename value_type>
-    struct power_helper<2, value_type, void>
-    {
-        static constexpr value_type recursive(value_type base) { return base * base; }
-    };
+        template<int exp, typename value_type>
+        struct term<exp, value_type, std::enable_if_t<exp % 2 == 0>>
+        {
+            static constexpr value_type eval(value_type base)
+            {
+                value_type sqrt_value = term<exp / 2, value_type, void>::eval(base);
+                return term<2, value_type, void>::eval(sqrt_value);
+            }
+        };
+    }
 
     template<int exp, typename value_type>
     constexpr value_type power(value_type base)
     {
-        return power_helper<exp, value_type, void>::recursive(base);
+        return power_impl::term<exp, value_type, void>::eval(base);
     }
 
     template<typename value_type>
-    constexpr value_type sqr(value_type base)
+    constexpr value_type square(value_type base)
     {
         return power<2>(base);
     }

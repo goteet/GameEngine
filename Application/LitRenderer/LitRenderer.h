@@ -155,7 +155,7 @@ class SimpleBackCamera
     struct DegreeClampHelper
     {
         DegreeClampHelper(math::degree<F> degree)
-            : value(math::clamp(degree.value, 1.0f, 179.0f)) { }
+            : value(math::clamp(degree.value, F(1), F(179))) { }
         const F value;
     };
 public:
