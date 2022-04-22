@@ -202,8 +202,8 @@ bool Lambertian::Scattering(F epsilon[3], const math::vector3<F>& P, const math:
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
     outLightRay.cos = math::dot(Wi, N);
-    outLightRay.f = Lambertian::f(N, Ray.direction(), Wi, IsOnSurface) * outLightRay.cos;
-    return outLightRay.cos > F(0);
+    outLightRay.f = Lambertian::f(N, Ray.direction(), Wi, IsOnSurface) * math::saturate(outLightRay.cos);
+    return outLightRay.cos >= F(0);
 }
 
 math::vector3<F> Lambertian::f(
@@ -307,7 +307,7 @@ bool IsReflectionDirection(const math::nvector3<F>& N, const math::nvector3<F>& 
 
 bool Metal::IsSpecular(const math::nvector3<F>& N, const math::nvector3<F>& Wo, const math::nvector3<F>& Wi) const
 {
-    return IsReflectionDirection(N,Wo,Wi);
+    return IsReflectionDirection(N, Wo, Wi);
 }
 
 bool Dielectric::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
@@ -386,7 +386,7 @@ bool Glossy::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nve
         const F NdotV = math::dot(Wo, N);
         const F Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
         const F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
-        outLightRay.f *= (F(1) - Fi) * (F(1) - Fr);
+        outLightRay.f *= math::saturate(F(1) - Fi) * math::saturate((F(1) - Fr));
     }
     return result;
 }
@@ -410,7 +410,7 @@ math::vector3<F> Glossy::f(
     const F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
     const F NdotL = math::dot(Wi, N);
     const F NdotV = math::dot(Wo, N);
-   
+
     F Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
     F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
     F DiracApproxmation = IsSpecular(N, Wo, Wi) ? F(1) : F(0);
@@ -440,27 +440,31 @@ math::nvector3<F> SampleGGXVNDF(
     F e1, F e2                              // Input U1, U2: uniform random numbers
 )
 {
-    // Section 3.2: transforming the view direction to the hemisphere configuration
-    math::nvector3<F> H = Wo * math::vector3<F>(alpha_x, alpha_y, F(1));
-    // Section 4.1: orthonormal basis (with special case if cross product is zero)
-    F lensq = H.x * H.x + H.y * H.y;
-    math::vector3<F> T1 = lensq > 0 ? math::vector3<F>(-H.y, H.x, 0) * math::inverse_sqrt(lensq) : math::vector3<F>(F(1), 0, 0);
-    math::vector3<F> T2 = math::cross(H, T1);
-    // Section 4.2: parameterization of the projected area
+    // stretch view
+    math::nvector3<F> V = Wo * math::vector3<F>(alpha_x, alpha_y, F(1));
+
+    // orthonormal basis
+    math::nvector3<F> T1 = V.z < F(0.99999)
+        ? math::cross(V, math::nvector3<F>::unit_z())
+        : math::nvector3<F>::unit_x();
+    math::nvector3<F> T2 = math::cross(V, T1);
+
+    // sample point with polar coordinates (r, phi)
+    F a = F(1) / (F(1) + V.z);
     F r = sqrt(e1);
-    math::radian<F> phi(F(2.0) * math::PI<F> *e2);
+    math::radian<F> phi = (e2 < a)
+        ? math::radian<F>(e2 / a * math::PI<F>)
+        : math::radian<F>(math::PI<F> +(e2 - a) / (F(1) - a) * math::PI<F>);
+
     F t1 = r * cos(phi);
-    F t2 = r * sin(phi);
-    F s = 0.5 * (1.0 + H.z);
-    F t1_sqr = math::square(t1);
-    t2 = (F(1.0) - s) * sqrt(F(1.0) - t1_sqr) + s * t2;
-    F t2_sqr = math::square(t2);
-    // Section 4.3: reprojection onto hemisphere
-    math::vector3<F> Nh = t1 * T1 + t2 * T2 + sqrt(math::max2(F(0), F(1) - t1_sqr - t2_sqr)) * H;
-    // Section 3.4: transforming the normal back to the ellipsoid configuration
-    // Output Ne: normal sampled with PDF D_Ve(Ne) = G1(Ve) * max(0, dot(Ve, Ne)) * D(Ne) / Ve.z
-    math::nvector3<F> Ne = math::vector3<F>(alpha_x * Nh.x, alpha_y * Nh.y, math::max2(F(0), Nh.z));
-    return Ne;
+    F t2 = r * sin(phi) * ((e2 < a) ? F(1) : V.z);
+
+    // compute normal
+    math::vector3<F> N = T1 * t1 + T2 * t2 + V * sqrt(math::max2(F(0), F(1) - math::square(t1) - math::square(t2)));
+
+    // unstretch
+    math::nvector3<F> Wm = math::vector3<F>(alpha_x* N.x, alpha_y*N.y, math::max2(F(0), N.z));
+    return Wm;
 }
 
 bool Disney::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
@@ -470,33 +474,31 @@ bool Disney::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nve
     const F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
 
     bool result = false;
-    bool chooseReflectRay = epsilon[0] < F(1);
+    bool chooseReflectRay = epsilon[0] < F(0.5);
     if (chooseReflectRay)
     {
-        UVW uvw(N);
         F alpha = math::square(Roughness);
-        math::nvector3<F> Wm = SampleGGXVNDF(Wo, alpha, alpha, epsilon[1], epsilon[2]);
-        math::nvector3<F> Wi = math::reflection(Wo, Wm);
+        UVW uvw(N);
+        math::nvector3<F> Wm = SampleGGXVNDF(uvw.world_to_local(-Wo), alpha, alpha, epsilon[1], epsilon[2]);
+        math::nvector3<F> Wi = math::reflection(Wo, uvw.local_to_world(Wm));
         const F NdotL = math::dot(Wi, N);
-        if (NdotL > 0)
-        {
-            const F Frehnel = FresnelSchlick(NdotL, eta1, eta2);
-            outLightRay.scattering.set_origin(P);
-            outLightRay.scattering.set_direction(Wi);
-            outLightRay.f = math::vector3<F>::one() * (Frehnel / NdotL);
-            outLightRay.specular = true;
-            result = true;
-        }
+        const F Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
+        outLightRay.scattering.set_origin(P);
+        outLightRay.scattering.set_direction(Wi);
+        outLightRay.f = math::vector3<F>::one() * Frehnel;
+        outLightRay.cos = NdotL;
+        outLightRay.specular = true;
+        result = NdotL > 0;
     }
     else
     {
         result = Lambertian::Scattering(epsilon, P, N, Ray, IsOnSurface, outLightRay);
         const math::nvector3<F>& Wi = outLightRay.scattering.direction();
-        const F NdotL = math::dot(Wi, N);
+        const F NdotL = outLightRay.cos;
         const F NdotV = math::dot(Wo, N);
-        const F FrehnelI = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-        const F FrehnelO = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
-        outLightRay.f *= (F(1) - FrehnelI) * (F(1) - FrehnelO);
+        const F Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
+        const F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
+        outLightRay.f *= (F(1) - Fi) * (F(1) - Fr);
     }
     return result;
 }
@@ -514,13 +516,13 @@ math::vector3<F> Disney::f(
     const F NdotH = math::dot(N, H);
     const F NdotV = math::dot(N, Wo);
     const F Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-    const F Fo = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
+    const F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
     const F D = DistributionGGX(Roughness, NdotH);
     const F G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
-    F TermS = F(0.25) * Fi * D * G / (math::dot(N, Wo) * math::dot(N, Wi));
-    math::vector3<F> s(TermS, TermS, TermS);
-    math::vector3<F> d = Lambertian::f(N, Wo, Wi, IsOnSurface) * (F(1) - Fi) * (F(1) - Fo);
-    return F(0.5) * (s);// +d);
+    F S = F(0.25) * Fi * D * G / (NdotV);
+    math::vector3<F> s = math::vector3<F>::one() * S;
+    math::vector3<F> d = Lambertian::f(N, Wo, Wi, IsOnSurface);
+    return NdotL > F(0) ? F(0.5) *(d + s) : math::vector3<F>::zero();
 }
 
 F Disney::pdf(
@@ -528,9 +530,8 @@ F Disney::pdf(
     const math::nvector3<F>& Wo,
     const math::nvector3<F>& Wi) const
 {
-    const math::nvector3<F> Wr = math::reflection(Wo, N);
-    F DiracApproxmation = math::almost_same(Wr, Wi, F(0.1)) ? F(1) : F(0);
-    F pdfSpecular = 1;
-    F pdfDiffuse = 0;  Lambertian::pdf(N, Wo, Wi);
-    return F(0.5)* (pdfSpecular + pdfDiffuse);
+    const math::nvector3<F> H = Wi + Wo;
+    F pdfSpecular = math::power<5>(math::dot(H, N));
+    F pdfDiffuse = Lambertian::pdf(N, Wo, Wi);
+    return F(0.5) * (pdfSpecular + pdfDiffuse);
 }
