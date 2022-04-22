@@ -35,7 +35,7 @@ namespace
                 SceneCenterX,
                 SceneBottom + 22,
                 SceneCenterZ + 10);
-            mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 2.0);
+            mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 1.5);
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
@@ -225,9 +225,12 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
         epsilonGenerator[2].value()
     };
 
+    const bool bSampleLight = true;
+    const bool bSampleBrdf = true;
     //
     //Light Sampling
     math::vector3<F> reflectionLight = math::vector3<F>::zero();
+    if(bSampleLight)
     {
         int numLights = scene.GetLightCount();
         F invNumLights = F(1) / F(numLights);
@@ -246,18 +249,14 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
                 light = lightContactRecord.Object;
                 math::nvector3<F> Nl = lightContactRecord.SurfaceNormal;
                 F cosThetaPrime = math::dot(Nl, -Wi);
-
-                bool hit = cosThetaPrime > math::SMALL_NUM<F> ||
-                    (cosThetaPrime < -math::SMALL_NUM<F> && light->IsDualface());
-
-                if (hit)
+                if (cosThetaPrime > math::SMALL_NUM<F> || (cosThetaPrime < -math::SMALL_NUM<F> && light->IsDualface()))
                 {
                     F pdf = light->SamplePdf(lightContactRecord, scattering);
-                    F pdfBSDF = material.pdf(N, Wo, Wi);
-                    F weight = PowerHeuristic(pdf, pdfBSDF) * invNumLights;
+                    F pdfBSDF = bSampleBrdf ? material.pdf(N, Wo, Wi) : F(0);
+                    F weight = (bSampleBrdf ? F(0.5) : F(1)) * PowerHeuristic(pdf, pdfBSDF);
                     F cosTheta = math::dot(N, Wi);
                     math::vector3<F> f = material.f(N, Wo, Wi, lightContactRecord.IsOnSurface);
-                    math::vector3<F> reflectance = weight * f * cosTheta / pdf;
+                    math::vector3<F> reflectance = weight * f / pdf;
                     math::vector3<F> Li = light->Material->Emitting();
                     reflectionLight = Li * reflectance;
                 }
@@ -268,18 +267,18 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
     //
     //BSDF Sampling
     math::vector3<F> reflectionBSDF = math::vector3<F>::zero();
+    if(bSampleBrdf)
     {
-        LightRay LightWi;
-        if (material.Scattering(epsilon, Ps, N, ray, contactRecord.IsOnSurface, LightWi))
+        LightRay scatterLight;
+        if (material.Scattering(epsilon, Ps, N, ray, contactRecord.IsOnSurface, scatterLight))
         {
-            const math::nvector3<F>& Wi = LightWi.scattering.direction();
+            const math::nvector3<F>& Wi = scatterLight.scattering.direction();
 
             F pdf = material.pdf(N, Wo, Wi);
-            F pdfLight = scene.SampleLightPdf(LightWi.scattering);
-            F weight = PowerHeuristic(pdf, pdfLight);
-            F cosTheta = math::saturate(math::dot(N, Wi));
-            math::vector3<F> reflectance = weight * LightWi.f * cosTheta / pdf;
-            math::vector3<F> Li = Trace(epsilonGenerator, scene, LightWi.scattering, condition.Next(reflectance));
+            F pdfLight = bSampleLight ? scene.SampleLightPdf(scatterLight.scattering) : F(0);
+            F weight = (bSampleLight ? F(0.5) : F(1)) * PowerHeuristic(pdf, pdfLight);
+            math::vector3<F> reflectance = weight * scatterLight.f / pdf;
+            math::vector3<F> Li = Trace(epsilonGenerator, scene, scatterLight.scattering, condition.Next(reflectance));
             reflectionBSDF = Li * reflectance;
         }
     }

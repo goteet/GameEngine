@@ -32,7 +32,8 @@ F PowerHeuristic(F pdfA, F pdfB);
 
 struct LightRay
 {
-    bool isSpecular = false;
+    bool specular = false;
+    F cos = F(1);
     math::ray3d<F> scattering;
     math::vector3<F> f = math::vector3<F>::zero();
 };
@@ -85,7 +86,7 @@ struct Lambertian : public virtual IMaterial
 struct OrenNayer : public virtual Lambertian
 {
     math::radian<F> Sigma = math::radian<F>(0);
-    math::radian<F> SigmaSqr = math::radian<F>(0);
+    math::radian<F> SigmaSquare = math::radian<F>(0);
     F A = F(1);
     F B = F(0);
     OrenNayer() = default;
@@ -104,10 +105,21 @@ struct Metal : public IMaterial
     Metal() = default;
     Metal(F f) : Fuzzy(f) { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
+    virtual math::vector3<F> f(
+        const math::nvector3<F>& N,
+        const math::nvector3<F>& Wo,
+        const math::nvector3<F>& Wi,
+        bool IsOnSurface) const override;
     virtual F pdf(
         const math::nvector3<F>& N,
         const math::nvector3<F>& Wo,
         const math::nvector3<F>& Wi) const override;
+
+private:
+    bool IsSpecular(
+        const math::nvector3<F>& N,
+        const math::nvector3<F>& Wo,
+        const math::nvector3<F>& Wi) const;
 };
 
 struct Glossy : public Lambertian
@@ -128,6 +140,12 @@ struct Glossy : public Lambertian
         const math::nvector3<F>& N,
         const math::nvector3<F>& Wo,
         const math::nvector3<F>& Wi) const override;
+
+private:
+    bool IsSpecular(
+        const math::nvector3<F>& N,
+        const math::nvector3<F>& Wo,
+        const math::nvector3<F>& Wi) const;
 };
 
 struct Disney : public Lambertian
