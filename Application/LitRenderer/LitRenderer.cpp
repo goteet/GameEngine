@@ -35,7 +35,7 @@ namespace
                 SceneCenterX,
                 SceneBottom + 22,
                 SceneCenterZ + 10);
-            mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 1.05);
+            mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 2.0);
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
@@ -215,7 +215,7 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
     const SceneObject& shadingObject = *contactRecord.Object;
     const IMaterial& material = *shadingObject.Material;
     const math::normalized_vector3<F>& N = contactRecord.SurfaceNormal;
-    const math::normalized_vector3<F>& Wo = ray.direction();
+    const math::normalized_vector3<F> Wo = -ray.direction();
     F biasedDistance = math::max2<F>(contactRecord.Distance, F(0));
     math::point3d<F> Ps = ray.calc_offset(biasedDistance);
 
@@ -257,9 +257,9 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
                     F weight = PowerHeuristic(pdf, pdfBSDF) * invNumLights;
                     F cosTheta = math::dot(N, Wi);
                     math::vector3<F> f = material.f(N, Wo, Wi, lightContactRecord.IsOnSurface);
-                    math::vector3<F> reflectance = f * cosTheta * weight / pdf;
+                    math::vector3<F> reflectance = weight * f * cosTheta / pdf;
                     math::vector3<F> Li = light->Material->Emitting();
-                    reflectionLight = (Li * reflectance);
+                    reflectionLight = Li * reflectance;
                 }
             }
         }
@@ -275,12 +275,12 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
             const math::normalized_vector3<F>& Wi = LightWi.scattering.direction();
 
             F pdf = material.pdf(N, Wo, Wi);
-            F pdfLight = LightWi.isSpecular ? 0 : scene.SampleLightPdf(LightWi.scattering);
+            F pdfLight = scene.SampleLightPdf(LightWi.scattering);
             F weight = PowerHeuristic(pdf, pdfLight);
             F cosTheta = math::dot(N, Wi);
-            math::vector3<F> reflectance = LightWi.f * cosTheta * weight / pdf;
+            math::vector3<F> reflectance = weight * LightWi.f * cosTheta / pdf;
             math::vector3<F> Li = Trace(epsilonGenerator, scene, LightWi.scattering, condition.Next(reflectance));
-            reflectionBSDF = (Li * reflectance);
+            reflectionBSDF = Li * reflectance;
         }
     }
 
@@ -308,9 +308,9 @@ F SceneRect::SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const
 
     //calculate pdf(w) = pdf(x') * dist_sqr / cos_theta'
     // pdf(x') = 1 / area = > pdf(w) = dist_sqr / (area * cos_theta')
-    const math::normalized_vector3<F>& V = ray.direction();
+    const math::normalized_vector3<F> Wo = -ray.direction();
     const math::normalized_vector3<F>& N = this->mWorldNormal;
-    F cosThetaPrime = math::dot(N, -V);
+    F cosThetaPrime = math::dot(N, Wo);
 
     if (cosThetaPrime < -math::SMALL_NUM<F> && IsDualface())
     {
@@ -418,7 +418,7 @@ LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canv
     , mClearColor(0, 0, 0)
     , mCamera(math::degree<F>(50))
     , mSampleArrayCount(canvasWidth* canvasHeight)
-    , mScene(std::make_unique<OrenNayerComparisionScene>())
+    , mScene(std::make_unique<SimpleScene>())
 
 {
     mScene->Create(F(canvasWidth) / F(canvasHeight));
@@ -631,7 +631,7 @@ void SceneRect::UpdateWorldTransform()
 HitRecord SceneRect::IntersectWithRay(const math::ray3d<F>& ray, F error) const
 {
     F t;
-    bool front = true;
+    bool isOnSurface = true;
     math::intersection result = math::intersect_rect(ray, mWorldPosition, mWorldNormal, mWorldTagent, Rect.extends(), mDualFace, error, t);
     if (result == math::intersection::none)
     {
@@ -639,8 +639,8 @@ HitRecord SceneRect::IntersectWithRay(const math::ray3d<F>& ray, F error) const
     }
     else
     {
-        front = math::dot(mWorldNormal, ray.direction()) < 0;
-        return HitRecord(const_cast<SceneRect*>(this), front, front ? mWorldNormal : -mWorldNormal, t);
+        isOnSurface = math::dot(mWorldNormal, ray.direction()) < 0;
+        return HitRecord(const_cast<SceneRect*>(this), isOnSurface, isOnSurface ? mWorldNormal : -mWorldNormal, t);
     }
 }
 
