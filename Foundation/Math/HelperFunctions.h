@@ -21,7 +21,7 @@ namespace math
     template<typename value_type, typename = std::enable_if_t<std::is_floating_point_v<value_type>>>
     constexpr bool near_zero(value_type v, value_type small_number = SMALL_NUM<value_type>)
     {
-        return v < small_number && -v > -small_number;
+        return v <= small_number && v >= -small_number;
     }
 
 
@@ -124,6 +124,12 @@ namespace math
     constexpr value_type sqr(value_type base)
     {
         return power<2>(base);
+    }
+
+    template<typename value_type>
+    constexpr value_type inverse_sqrt(value_type v)
+    {
+        return value_type(1) / sqrt(v);
     }
 
     template<typename value_type>

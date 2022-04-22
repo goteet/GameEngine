@@ -666,7 +666,10 @@ namespace math
             : vector_t<value_type, EDim::_2>(_x, _y) { normalize(*this); }
         constexpr normalized_vector_t(const vector_t<value_type, EDim::_2>& value)
             : vector_t<value_type, EDim::_2>(value) { normalize(*this); }
-
+        enum class ehint { norm };
+        constexpr normalized_vector_t(value_type _x, value_type _y, ehint h)
+            : vector_t<value_type, EDim::_2>(_x, _y) { }
+        constexpr normalized_vector_t operator-() const { return normalized_vector_t(-x, -y, ehint::norm); }
         static constexpr normalized_vector_t unit_x() { return normalized_vector_t(value_type(1), value_type(0)); }
         static constexpr normalized_vector_t unit_y() { return normalized_vector_t(value_type(0), value_type(1)); }
     };
@@ -680,7 +683,10 @@ namespace math
             : vector_t<value_type, EDim::_3>(_x, _y, _z) { normalize(*this); }
         constexpr normalized_vector_t(const vector_t<value_type, EDim::_3>& value)
             : vector_t<value_type, EDim::_3>(value) { normalize(*this); }
-
+        enum class ehint { norm };
+        constexpr normalized_vector_t(value_type _x, value_type _y, value_type _z, ehint h)
+            : vector_t<value_type, EDim::_3>(_x, _y, _z) { }
+        constexpr normalized_vector_t operator-() const { return normalized_vector_t(-x, -y, -z, ehint::norm); }
         static constexpr normalized_vector_t unit_x() { return normalized_vector_t(value_type(1), value_type(0), value_type(0)); }
         static constexpr normalized_vector_t unit_y() { return normalized_vector_t(value_type(0), value_type(1), value_type(0)); }
         static constexpr normalized_vector_t unit_z() { return normalized_vector_t(value_type(0), value_type(0), value_type(1)); }
@@ -688,6 +694,26 @@ namespace math
         static constexpr normalized_vector_t unit_y_neg() { return normalized_vector_t(value_type(0), -value_type(1), value_type(0)); }
         static constexpr normalized_vector_t unit_z_neg() { return normalized_vector_t(value_type(0), value_type(0), -value_type(1)); }
     };
+
+
+    template<typename value_type>
+    constexpr vector_t<value_type, EDim::_3> projection(const vector_t<value_type, EDim::_3>& l, const normalized_vector_t<value_type, EDim::_3>& onto)
+    {
+        return dot(l, onto) * onto;
+    }
+
+    template<typename value_type>
+    constexpr normalized_vector_t<value_type, EDim::_3> reflection(const normalized_vector_t<value_type, EDim::_3>& w, const normalized_vector_t<value_type, EDim::_3>& n)
+    {
+        return value_type(2) * projection(w, n) - w;
+    }
+
+    template<typename value_type>
+    constexpr normalized_vector_t<value_type, EDim::_3> reflection(vector_t<value_type, EDim::_3> w, const normalized_vector_t<value_type, EDim::_3>& n)
+    {
+        normalized_vector_t<value_type, EDim::_3> wnorm = w;
+        return reflection(wnorm, n);
+    }
 
     template<typename value_type> constexpr value_type min_component(const vector_t<value_type, EDim::_2>& v) { return min2(v.x, v.y); }
     template<typename value_type> constexpr value_type max_component(const vector_t<value_type, EDim::_2>& v) { return max2(v.x, v.y); }
@@ -826,6 +852,13 @@ namespace math
             && near_zero<value_type>(v.y)
             && near_zero<value_type>(v.z)
             && near_zero<value_type>(v.w);
+    }
+
+    template<typename value_type>
+    bool almost_same(const vector_t<value_type, EDim::_3>& a, const vector_t<value_type, EDim::_3>& b, value_type epsilon = SMALL_NUM<value_type>)
+    {
+        vector_t<value_type, EDim::_3> d = a - b;
+        return dot(d, d) < epsilon * epsilon;
     }
 
 }
