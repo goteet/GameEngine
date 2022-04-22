@@ -292,8 +292,8 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
 
 math::point3d<F> SceneRect::SampleRandomPoint(F epsilon[3]) const
 {
-    F e1 = epsilon[1] * Rect.width();
-    F e2 = epsilon[2] * Rect.height();
+    F e1 = (F(2) * epsilon[1] - F(1)) * Rect.width();
+    F e2 = (F(2) * epsilon[2] - F(1)) * Rect.height();
 
     math::vector3<F> Bitangent = math::cross(mWorldNormal, mWorldTagent);
     return math::point3d<F>(mWorldPosition + e1 * mWorldTagent + e2 * Bitangent);
@@ -322,8 +322,8 @@ F SceneRect::SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const
         return F(0);
     }
 
-    F area = Rect.width() * Rect.height();
-    return (hr.Distance * hr.Distance) / (area * cosThetaPrime);
+    F area = F(4) * Rect.width() * Rect.height();
+    return math::square(hr.Distance) / (area * cosThetaPrime);
 
 }
 
