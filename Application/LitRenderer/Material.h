@@ -148,13 +148,13 @@ private:
         const math::nvector3<F>& Wi) const;
 };
 
-struct Disney : public Lambertian
+struct GGX : public IMaterial
 {
     F Roughness = F(0.5);
     F RefractiveIndex = F(2.5);
 
-    Disney() = default;
-    Disney(F r, F g, F b, F rf, F ior = F(1.5)) : IMaterial(r, g, b), Roughness(rf), RefractiveIndex(ior) { }
+    GGX() = default;
+    GGX(F rf, F ior = F(1.5)) : Roughness(rf), RefractiveIndex(ior) { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual math::vector3<F> f(
         const math::nvector3<F>& N,

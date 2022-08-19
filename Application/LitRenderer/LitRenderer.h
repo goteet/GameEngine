@@ -24,7 +24,7 @@ public:
     int GetmSampleCount() const { return mSampleCount; }
 
 private:
-    void FlushLinearColorToGammaCorrectedCanvasData();
+    void FlushLinearColorToGammaCorrectedCanvasDataBuffer();
 
     bool mNeedUpdateWindowRect = false;
     unsigned char* mOutCanvasDataPtr;

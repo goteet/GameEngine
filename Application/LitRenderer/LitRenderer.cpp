@@ -35,7 +35,8 @@ namespace
                 SceneCenterX,
                 SceneBottom + 22,
                 SceneCenterZ + 10);
-            mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 1.5);
+            //mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 2.5);
+            mainSphere->Material = std::make_unique<GGX>(0.1);
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
@@ -253,7 +254,7 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
                 {
                     F pdf = light->SamplePdf(lightContactRecord, scattering);
                     F pdfBSDF = bSampleBrdf ? material.pdf(N, Wo, Wi) : F(0);
-                    F weight = (bSampleBrdf ? F(0.5) : F(1)) * PowerHeuristic(pdf, pdfBSDF);
+                    F weight = PowerHeuristic(pdf, pdfBSDF);
                     F cosTheta = math::dot(N, Wi);
                     math::vector3<F> f = material.f(N, Wo, Wi, lightContactRecord.IsOnSurface);
                     math::vector3<F> reflectance = weight * f / pdf;
@@ -276,7 +277,7 @@ math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::
 
             F pdf = material.pdf(N, Wo, Wi);
             F pdfLight = bSampleLight ? scene.SampleLightPdf(scatterLight.scattering) : F(0);
-            F weight = (bSampleLight ? F(0.5) : F(1)) * PowerHeuristic(pdf, pdfLight);
+            F weight = PowerHeuristic(pdf, pdfLight);
             math::vector3<F> reflectance = weight * scatterLight.f / pdf;
             math::vector3<F> Li = Trace(epsilonGenerator, scene, scatterLight.scattering, condition.Next(reflectance));
             reflectionBSDF = Li * reflectance;
@@ -379,7 +380,7 @@ bool RenderCanvas::NeedUpdate()
 {
     if (NeedFlushBackbuffer)
     {
-        FlushLinearColorToGammaCorrectedCanvasData();
+        FlushLinearColorToGammaCorrectedCanvasDataBuffer();
         if (!NeedFlushBackbuffer)
         {
             mNeedUpdateWindowRect = true;
@@ -388,7 +389,7 @@ bool RenderCanvas::NeedUpdate()
     return mNeedUpdateWindowRect;
 }
 
-void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasData()
+void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasDataBuffer()
 {
     F invSampleCout = F(1) / mSampleCount;
     for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
@@ -506,14 +507,14 @@ void LitRenderer::ResolveSamples()
     const math::vector3<F> StartReflectance = math::vector3<F>::one();
 
     TerminalCondition condition(mRandomGeneratorTracingTermination);
-    math::vector3<F>* canvasDataPtr = mCanvas.GetBackbufferPtr();
+    math::vector3<F>* accumulatedBufferPtr = mCanvas.GetBackbufferPtr();
     for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
     {
         int rowOffset = rowIndex * mCanvas.CanvasWidth;
         for (int colIndex = 0; colIndex < mCanvas.CanvasWidth; colIndex++)
         {
             Sample& sample = mImageSamples[colIndex + rowOffset];
-            math::vector3<F>& canvasPixel = canvasDataPtr[colIndex + rowOffset];
+            math::vector3<F>& canvasPixel = accumulatedBufferPtr[colIndex + rowOffset];
             canvasPixel += Trace(mRandomGeneratorEpsilon, *mScene, sample.ray, condition);
         }
     }

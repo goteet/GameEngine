@@ -1,17 +1,24 @@
 #include "Material.h"
 #include "LitRenderer.h"
 
+template<int E> F Ws(F p1, F p2)
+{
+    return Ws<1>(math::power<E>(p1), math::power<E>(p2));
+}
+
+template<> F Ws<1>(F p1, F p2)
+{
+    return p1 / (p1 + p2);
+}
 
 F PowerHeuristic(F pdfA, F pdfB)
 {
-    pdfA *= pdfA;
-    pdfB *= pdfB;
-    return pdfA / (pdfA + pdfB);
+    return Ws<2>(pdfA, pdfB);
 }
 
 F BalanceHeuristic(F pdfA, F pdfB)
 {
-    return pdfA / (pdfA + pdfB);
+    return Ws<1>(pdfA, pdfB);
 }
 
 F FresnelSchlick(F CosTheta, F eta1, F eta2)
@@ -77,10 +84,10 @@ F ShadowingGGX(F roughness, F VdotH, F NdotH)
     return numerator / denominator;
 }
 
-F GeometryGGX(F roughness, F NdotH, F VdotH, F IdotH)
+F GeometryGGX(F roughness, F NdotH, F VdotH, F LdotH)
 {
     F G1 = ShadowingGGX(roughness, VdotH, NdotH);
-    F G2 = ShadowingGGX(roughness, IdotH, NdotH);
+    F G2 = ShadowingGGX(roughness, LdotH, NdotH);
     return math::min2(G1, G2);
 }
 
@@ -467,43 +474,27 @@ math::nvector3<F> SampleGGXVNDF(
     return Wm;
 }
 
-bool Disney::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
+bool GGX::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
     const math::nvector3<F> Wo = -Ray.direction();
     const F eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
     const F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
 
-    bool result = false;
-    bool chooseReflectRay = epsilon[0] < F(0.5);
-    if (chooseReflectRay)
-    {
-        F alpha = math::square(Roughness);
-        UVW uvw(N);
-        math::nvector3<F> Wm = SampleGGXVNDF(uvw.world_to_local(-Wo), alpha, alpha, epsilon[1], epsilon[2]);
-        math::nvector3<F> Wi = math::reflection(Wo, uvw.local_to_world(Wm));
-        const F NdotL = math::dot(Wi, N);
-        const F Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-        outLightRay.scattering.set_origin(P);
-        outLightRay.scattering.set_direction(Wi);
-        outLightRay.f = math::vector3<F>::one() * Frehnel;
-        outLightRay.cos = NdotL;
-        outLightRay.specular = true;
-        result = NdotL > 0;
-    }
-    else
-    {
-        result = Lambertian::Scattering(epsilon, P, N, Ray, IsOnSurface, outLightRay);
-        const math::nvector3<F>& Wi = outLightRay.scattering.direction();
-        const F NdotL = outLightRay.cos;
-        const F NdotV = math::dot(Wo, N);
-        const F Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-        const F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
-        outLightRay.f *= (F(1) - Fi) * (F(1) - Fr);
-    }
-    return result;
+    F alpha = math::square(Roughness);
+    UVW uvw(N);
+    math::nvector3<F> Wm = SampleGGXVNDF(uvw.world_to_local(-Wo), alpha, alpha, epsilon[1], epsilon[2]);
+    math::nvector3<F> Wi = math::reflection(Wo, uvw.local_to_world(Wm));
+    const F NdotL = math::dot(Wi, N);
+    const F Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
+    outLightRay.scattering.set_origin(P);
+    outLightRay.scattering.set_direction(Wi);
+    outLightRay.f = math::vector3<F>::one() * Frehnel;
+    outLightRay.cos = NdotL;
+    outLightRay.specular = true;
+    return NdotL > 0;
 }
 
-math::vector3<F> Disney::f(
+math::vector3<F> GGX::f(
     const math::nvector3<F>& N,
     const math::nvector3<F>& Wo,
     const math::nvector3<F>& Wi,
@@ -519,19 +510,16 @@ math::vector3<F> Disney::f(
     const F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
     const F D = DistributionGGX(Roughness, NdotH);
     const F G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
-    F S = F(0.25) * Fi * D * G / (NdotV);
-    math::vector3<F> s = math::vector3<F>::one() * S;
-    math::vector3<F> d = Lambertian::f(N, Wo, Wi, IsOnSurface);
-    return NdotL > F(0) ? F(0.5) *(d + s) : math::vector3<F>::zero();
+    F brdf = F(0.25) * Fi * D * G / (NdotV);
+    return NdotL > F(0) ? math::vector3<F>::one() * brdf : math::vector3<F>::zero();
 }
 
-F Disney::pdf(
+F GGX::pdf(
     const math::nvector3<F>& N,
     const math::nvector3<F>& Wo,
     const math::nvector3<F>& Wi) const
 {
     const math::nvector3<F> H = Wi + Wo;
     F pdfSpecular = math::power<5>(math::dot(H, N));
-    F pdfDiffuse = Lambertian::pdf(N, Wo, Wi);
-    return F(0.5) * (pdfSpecular + pdfDiffuse);
+    return pdfSpecular;
 }
