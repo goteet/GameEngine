@@ -40,11 +40,6 @@ void Uninitialize(HWND)
     SafeDelete(Renderer);
 }
 
-bool NeedUpdate()
-{
-    return Renderer->NeedUpdate();
-}
-
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
 
@@ -89,9 +84,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             generate = false;
         }
 
-        if (NeedUpdate())
+        if (Renderer->NeedUpdate())
         {
             ::RedrawWindow(hWindow, NULL, NULL, RDW_INVALIDATE);
+            Renderer->ClearUpdate();
             generate = true;
         }
 
@@ -233,7 +229,7 @@ bool Initialize(HWND hWindow)
     ::ReleaseDC(hWindow, hdcWindowDC);
 
     Renderer = new LitRenderer(canvasDIBDataPtr, BitmapCanvasWidth, BitmapCanvasHeight, BitmapCanvasLinePitch);
-    Renderer->InitialSceneTransforms();
+    Renderer->Initialize();
     Renderer->GenerateImageProgressive();
     return true;
 }

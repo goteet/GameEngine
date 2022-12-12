@@ -33,7 +33,7 @@ F PowerHeuristic(F pdfA, F pdfB);
 struct LightRay
 {
     bool specular = false;
-    F cos = F(1);
+    F cosine = F(1);
     math::ray3d<F> scattering;
     math::vector3<F> f = math::vector3<F>::zero();
 };

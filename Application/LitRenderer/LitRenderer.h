@@ -5,32 +5,8 @@
 #include <Foundation/Math/Matrix.h>
 #include <Foundation/Math/Rotation.h>
 #include <Foundation/Math/Geometry.h>
+#include "LDRFilm.h"
 #include "Material.h"
-
-class RenderCanvas
-{
-public:
-    RenderCanvas(unsigned char* canvasDataPtr, int width, int height, int linePitch);
-    ~RenderCanvas();
-
-    bool NeedUpdate();
-
-    math::vector3<F>* GetBackbufferPtr() { return mBackbuffer; }
-    bool NeedFlushBackbuffer = true;
-    const int CanvasWidth;
-    const int CanvasHeight;
-    const int CanvasLinePitch;
-    void IncreaseSampleCount() { mSampleCount++; }
-    int GetmSampleCount() const { return mSampleCount; }
-
-private:
-    void FlushLinearColorToGammaCorrectedCanvasDataBuffer();
-
-    bool mNeedUpdateWindowRect = false;
-    unsigned char* mOutCanvasDataPtr;
-    math::vector3<F>* mBackbuffer = nullptr;
-    int mSampleCount = 0;
-};
 
 struct SceneObject;
 
@@ -42,6 +18,8 @@ struct HitRecord
     {
 
     }
+
+    operator bool() const { return Object != nullptr; }
 
     SceneObject* Object = nullptr;
     bool IsOnSurface = true;
@@ -171,31 +149,36 @@ public:
     LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canvasHeight, int canvasLinePitch);
     ~LitRenderer();
 
-    void InitialSceneTransforms();
+    void Initialize();
     void GenerateImageProgressive();
     bool NeedUpdate();
+    void ClearUpdate() { mNeedUpdateSystemWindowRect = false; }
 
 private:
-    void GenerateSamples();
+    void InitialSceneTransforms();
+    void GenerateCameraRays();
     void ResolveSamples();
+
+    static const int MaxCameraRaySampleCount = 16;
+    static const int MaxLightRaySampleCount = 256;
+    static const int MaxSampleCount = -1;// MaxCameraRaySampleCount* MaxLightRaySampleCount;
 
     struct Sample
     {
-        math::ray3d<F> ray;
-        int pixelRow, pixelCol;
+        math::ray3d<F> Ray;
+        int PixelRow, PixelCol;
     };
 
-    const int mMaxSampleCount = 4096;
-    const int mSampleArrayCount;
+    const int mCanvasLinePitch;
+    unsigned char* mSystemCanvasDataPtr;
+
+
     math::vector3<F> mClearColor;
-    RenderCanvas mCanvas;
+    LDRFilm mFilm;
     SimpleBackCamera mCamera;
     std::unique_ptr<Scene> mScene;
-
-    Sample* mImageSamples = nullptr;
-
-
-    random<F> mRandomGeneratorPickingPixel;
-    random<F> mRandomGeneratorTracingTermination;
-    random<F> mRandomGeneratorEpsilon[3];
+    Sample* mCameraRaySamples[MaxCameraRaySampleCount];
+    int  mCurrentCameraRayIndex = 0;
+    bool mNeedFlushBackbuffer = true;
+    bool mNeedUpdateSystemWindowRect = false;
 };

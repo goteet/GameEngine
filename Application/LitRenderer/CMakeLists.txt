@@ -6,6 +6,10 @@ project(LitRenderer)
 if(MSVC)
 
 set(LitRenderer_SourceFiles
+    ${CMAKE_CURRENT_SOURCE_DIR}/Integrator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Integrator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/LDRFilm.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/LDRFilm.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LitRenderer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/LitRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Material.h

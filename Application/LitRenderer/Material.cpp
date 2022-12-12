@@ -208,9 +208,9 @@ bool Lambertian::Scattering(F epsilon[3], const math::vector3<F>& P, const math:
     math::nvector3<F> Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
-    outLightRay.cos = math::dot(Wi, N);
-    outLightRay.f = Lambertian::f(N, Ray.direction(), Wi, IsOnSurface) * math::saturate(outLightRay.cos);
-    return outLightRay.cos >= F(0);
+    outLightRay.cosine = math::dot(Wi, N);
+    outLightRay.f = Lambertian::f(N, Ray.direction(), Wi, IsOnSurface);
+    return outLightRay.cosine >= F(0);
 }
 
 math::vector3<F> Lambertian::f(
@@ -278,9 +278,9 @@ bool Metal::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvec
     outLightRay.specular = true;
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
-    outLightRay.cos = math::dot(N, Wi);
+    outLightRay.cosine = math::dot(N, Wi);
     outLightRay.f = math::vector3<F>::one();
-    return outLightRay.cos > 0;
+    return outLightRay.cosine > 0;
 }
 
 math::vector3<F> Metal::f(
@@ -381,7 +381,7 @@ bool Glossy::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nve
         outLightRay.scattering.set_origin(P);
         outLightRay.scattering.set_direction(Wi);
         outLightRay.f = math::vector3<F>::one() * Fi;
-        outLightRay.cos = NdotL;
+        outLightRay.cosine = NdotL;
         result = NdotL > F(0);
     }
     else
@@ -389,7 +389,7 @@ bool Glossy::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nve
         const math::nvector3<F> Wo = -Ray.direction();
         result = Lambertian::Scattering(epsilon, P, N, Ray, IsOnSurface, outLightRay);
         const math::nvector3<F>& Wi = outLightRay.scattering.direction();
-        const F NdotL = outLightRay.cos;
+        const F NdotL = outLightRay.cosine;
         const F NdotV = math::dot(Wo, N);
         const F Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
         const F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
@@ -489,7 +489,7 @@ bool GGX::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvecto
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
     outLightRay.f = math::vector3<F>::one() * Frehnel;
-    outLightRay.cos = NdotL;
+    outLightRay.cosine = NdotL;
     outLightRay.specular = true;
     return NdotL > 0;
 }

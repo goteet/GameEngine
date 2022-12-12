@@ -2,7 +2,7 @@
 #include <Foundation/Base/MemoryHelper.h>
 #include <Foundation/Math/PredefinedConstantValues.h>
 #include "LitRenderer.h"
-
+#include "Integrator.h"
 
 namespace
 {
@@ -36,7 +36,8 @@ namespace
                 SceneBottom + 22,
                 SceneCenterZ + 10);
             //mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 2.5);
-            mainSphere->Material = std::make_unique<GGX>(0.1);
+            //mainSphere->Material = std::make_unique<GGX>(0.1);
+            mainSphere->Material = std::make_unique<Lambertian>(F(0.5), F(0.5), F(0.5));
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
@@ -158,138 +159,6 @@ namespace
 
 }
 
-const F InitialTerminalRatio = F(0.95);
-const int MinRecursiveDepth = 5;
-
-struct TerminalCondition
-{
-
-    TerminalCondition(random<F>& generator)
-        : mRandomGeneratorRef(generator)
-    {   }
-
-    TerminalCondition Next(const math::vector3<F>& reflectance) const
-    {
-        unsigned int nextDepth = mCurrentRecursiveDepth == 0 ? 0 : mCurrentRecursiveDepth - 1;
-        F nextRatio = mCurrentRecursiveDepth > 1 ? F(1)
-            : (mCurrentRecursiveDepth == 1 ? InitialTerminalRatio : mTerminalRatio * mTerminalRatio);
-        return TerminalCondition(mOuterReflectance * reflectance, nextRatio, nextDepth, mRandomGeneratorRef);
-    }
-
-    bool IsTerminal() const
-    {
-        const F RussiaRoulette = F(0.9);
-        return (mCurrentRecursiveDepth == 0 && mRandomGeneratorRef() > mTerminalRatio)
-            || math::near_zero(mOuterReflectance);
-    };
-
-    F  GetInvTerminalRatio() const { return F(1) / mTerminalRatio; }
-
-private:
-    TerminalCondition(const math::vector3<F>& reflectance, F ratio, int depth, random<F>& generator)
-        : mOuterReflectance(reflectance)
-        , mTerminalRatio(ratio)
-        , mCurrentRecursiveDepth(depth)
-        , mRandomGeneratorRef(generator)
-    {   }
-
-    const F mTerminalRatio = F(1);
-    const math::vector3<F> mOuterReflectance = math::vector3<F>::one();
-    const unsigned int mCurrentRecursiveDepth = MinRecursiveDepth;
-    random<F>& mRandomGeneratorRef;
-};
-
-math::vector3<F> Trace(random<F> epsilonGenerator[3], Scene& scene, const math::ray3d<F>& ray, const TerminalCondition& condition)
-{
-    if (condition.IsTerminal())
-    {
-        return math::vector3<F>::zero();
-    }
-
-    HitRecord contactRecord = scene.DetectIntersecting(ray, nullptr, math::SMALL_NUM<F>);
-    if (contactRecord.Object == nullptr)
-    {
-        return math::vector3<F>::zero();
-    }
-
-    //Collision occurred.
-    const SceneObject& shadingObject = *contactRecord.Object;
-    const IMaterial& material = *shadingObject.Material;
-    const math::nvector3<F>& N = contactRecord.SurfaceNormal;
-    const math::nvector3<F> Wo = -ray.direction();
-    F biasedDistance = math::max2<F>(contactRecord.Distance, F(0));
-    math::point3d<F> Ps = ray.calc_offset(biasedDistance);
-
-    F epsilon[3] = {
-        epsilonGenerator[0].value(),
-        epsilonGenerator[1].value(),
-        epsilonGenerator[2].value()
-    };
-
-    const bool bSampleLight = true;
-    const bool bSampleBrdf = true;
-    //
-    //Light Sampling
-    math::vector3<F> reflectionLight = math::vector3<F>::zero();
-    if(bSampleLight)
-    {
-        int numLights = scene.GetLightCount();
-        F invNumLights = F(1) / F(numLights);
-        int lightIndex = math::floor2<int>(epsilon[0] * numLights);
-        lightIndex = math::clamp(lightIndex, 0, numLights - 1);
-        SceneObject* light = scene.GetLightSourceByIndex(lightIndex);
-        if (light != contactRecord.Object)
-        {
-            math::point3d<F> Pl = light->SampleRandomPoint(epsilon);
-            math::nvector3<F> Wi = Pl - Ps;
-            math::ray3d<F> scattering(Ps, Wi);
-            HitRecord lightContactRecord = scene.DetectIntersecting(scattering, nullptr, math::SMALL_NUM<F>);
-
-            if (lightContactRecord.Object == light)
-            {
-                light = lightContactRecord.Object;
-                math::nvector3<F> Nl = lightContactRecord.SurfaceNormal;
-                F cosThetaPrime = math::dot(Nl, -Wi);
-                if (cosThetaPrime > math::SMALL_NUM<F> || (cosThetaPrime < -math::SMALL_NUM<F> && light->IsDualface()))
-                {
-                    F pdf = light->SamplePdf(lightContactRecord, scattering);
-                    F pdfBSDF = bSampleBrdf ? material.pdf(N, Wo, Wi) : F(0);
-                    F weight = PowerHeuristic(pdf, pdfBSDF);
-                    F cosTheta = math::dot(N, Wi);
-                    math::vector3<F> f = material.f(N, Wo, Wi, lightContactRecord.IsOnSurface);
-                    math::vector3<F> reflectance = weight * f / pdf;
-                    math::vector3<F> Li = light->Material->Emitting();
-                    reflectionLight = Li * reflectance;
-                }
-            }
-        }
-    }
-
-    //
-    //BSDF Sampling
-    math::vector3<F> reflectionBSDF = math::vector3<F>::zero();
-    if(bSampleBrdf)
-    {
-        LightRay scatterLight;
-        if (material.Scattering(epsilon, Ps, N, ray, contactRecord.IsOnSurface, scatterLight))
-        {
-            const math::nvector3<F>& Wi = scatterLight.scattering.direction();
-
-            F pdf = material.pdf(N, Wo, Wi);
-            F pdfLight = bSampleLight ? scene.SampleLightPdf(scatterLight.scattering) : F(0);
-            F weight = PowerHeuristic(pdf, pdfLight);
-            math::vector3<F> reflectance = weight * scatterLight.f / pdf;
-            math::vector3<F> Li = Trace(epsilonGenerator, scene, scatterLight.scattering, condition.Next(reflectance));
-            reflectionBSDF = Li * reflectance;
-        }
-    }
-
-    math::vector3<F> emission = material.Emitting();
-    math::vector3<F> reflection = reflectionLight + reflectionBSDF;
-    return (emission + reflection) * condition.GetInvTerminalRatio();
-
-}
-
 math::point3d<F> SceneRect::SampleRandomPoint(F epsilon[3]) const
 {
     F e1 = (F(2) * epsilon[1] - F(1)) * Rect.width();
@@ -327,107 +196,28 @@ F SceneRect::SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const
 
 }
 
-template<typename value_type>
-value_type LinearToGammaCorrected22(value_type value)
-{
-    const value_type DisplayGamma = value_type(2.2);
-    const value_type InvDisplayGamma = value_type(1.0) / DisplayGamma;
-    const value_type Inv2_4 = value_type(1.0) / value_type(2.4);
-
-    if (value < value_type(0))
-    {
-        return value_type(0);
-    }
-    else if (value <= value_type(0.0031308))
-    {
-        return value_type(12.92) * value;
-    }
-    else if (value < value_type(1.0))
-    {
-        return value_type(1.055) * pow(value, Inv2_4) - value_type(0.055);
-    }
-    else
-    {
-        return pow(value, InvDisplayGamma);
-    }
-}
-
-
-RenderCanvas::RenderCanvas(unsigned char* canvasDataPtr, int width, int height, int linePitch)
-    : mOutCanvasDataPtr(canvasDataPtr)
-    , CanvasWidth(width)
-    , CanvasHeight(height)
-    , CanvasLinePitch(linePitch)
-{
-    mBackbuffer = new math::vector3<F>[CanvasWidth * CanvasHeight];
-
-    for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
-    {
-        for (int colIndex = 0; colIndex < CanvasWidth; colIndex++)
-        {
-            int pixelIndex = colIndex + rowIndex * CanvasWidth;
-            mBackbuffer[pixelIndex].set(F(0.0), F(0.0), F(0.0));
-        }
-    }
-}
-
-RenderCanvas::~RenderCanvas()
-{
-    SafeDeleteArray(mBackbuffer);
-}
-
-bool RenderCanvas::NeedUpdate()
-{
-    if (NeedFlushBackbuffer)
-    {
-        FlushLinearColorToGammaCorrectedCanvasDataBuffer();
-        if (!NeedFlushBackbuffer)
-        {
-            mNeedUpdateWindowRect = true;
-        }
-    }
-    return mNeedUpdateWindowRect;
-}
-
-void RenderCanvas::FlushLinearColorToGammaCorrectedCanvasDataBuffer()
-{
-    F invSampleCout = F(1) / mSampleCount;
-    for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
-    {
-        int bufferRowOffset = rowIndex * CanvasWidth;
-        int canvasRowOffset = rowIndex * CanvasLinePitch;
-        for (int colIndex = 0; colIndex < CanvasWidth; colIndex++)
-        {
-            int bufferIndex = colIndex + bufferRowOffset;
-            int canvasIndex = colIndex * 3 + canvasRowOffset;
-
-            const math::vector3<F>& buffer = mBackbuffer[bufferIndex];
-            for (int compIndex = 2; compIndex >= 0; compIndex--)
-            {
-                F c = LinearToGammaCorrected22(buffer[compIndex] * invSampleCout);
-                c = math::clamp(c, F(0.0), F(0.9999));
-                mOutCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(c * F(256.0));
-            }
-        }
-    }
-    NeedFlushBackbuffer = false;
-}
-
 LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canvasHeight, int canvasLinePitch)
-    : mCanvas(canvasDataPtr, canvasWidth, canvasHeight, canvasLinePitch)
+    : mCanvasLinePitch(canvasLinePitch)
+    , mSystemCanvasDataPtr(canvasDataPtr)
+    , mFilm(canvasWidth, canvasHeight)
     , mClearColor(0, 0, 0)
     , mCamera(math::degree<F>(50))
-    , mSampleArrayCount(canvasWidth* canvasHeight)
     , mScene(std::make_unique<SimpleScene>())
-
 {
     mScene->Create(F(canvasWidth) / F(canvasHeight));
-    mImageSamples = new Sample[canvasWidth * canvasHeight];
+    int sampleCount = canvasWidth * canvasHeight;
+    for (int index = 0; index < MaxCameraRaySampleCount; index++)
+    {
+        mCameraRaySamples[index] = new Sample[sampleCount];
+    }
 }
 
 LitRenderer::~LitRenderer()
 {
-    SafeDeleteArray(mImageSamples);
+    for (int index = 0; index < MaxCameraRaySampleCount; index++)
+    {
+        SafeDeleteArray(mCameraRaySamples[index]);
+    }
 }
 
 void LitRenderer::InitialSceneTransforms()
@@ -435,27 +225,12 @@ void LitRenderer::InitialSceneTransforms()
     mScene->UpdateWorldTransform();
 }
 
-void LitRenderer::GenerateImageProgressive()
-{
-    if (mCanvas.GetmSampleCount() <= mMaxSampleCount || mMaxSampleCount <= 0)
-    {
-        GenerateSamples();
-        ResolveSamples();
-        mCanvas.NeedFlushBackbuffer = true;
-    }
-}
-
-bool LitRenderer::NeedUpdate()
-{
-    return mCanvas.NeedUpdate();
-}
-
-void LitRenderer::GenerateSamples()
+void LitRenderer::GenerateCameraRays()
 {
     const F PixelSize = F(0.1);
     const F HalfPixelSize = PixelSize * F(0.5);
-    F halfWidth = mCanvas.CanvasWidth * F(0.5) * PixelSize;
-    F halfHeight = mCanvas.CanvasHeight * F(0.5) * PixelSize;
+    F halfWidth = mFilm.CanvasWidth * F(0.5) * PixelSize;
+    F halfHeight = mFilm.CanvasHeight * F(0.5) * PixelSize;
     //     <---> (half height)
     //  .  o----. (o=origin)
     //  |  |  /   Asumed canvas is at origin(0,0,0),
@@ -464,9 +239,6 @@ void LitRenderer::GenerateSamples()
     // (z) .      tan(half_fov) = halfHeight / cameraZ.
     F cameraZ = halfHeight / mCamera.HalfVerticalFovTangent;
     mCamera.Position.z = -cameraZ;
-
-
-
 
     auto canvasPositionToRay = [&cameraZ](F x, F y) -> math::vector3<F> {
         //vector3<float>(x,y,0) - camera.position;
@@ -477,48 +249,74 @@ void LitRenderer::GenerateSamples()
     };
 
     const F QuaterPixelSize = F(0.5) * HalfPixelSize;
-    math::vector3<F>* canvasDataPtr = mCanvas.GetBackbufferPtr();
-
-    for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
+    math::vector3<F>* canvasDataPtr = mFilm.GetBackbufferPtr();
+    random<F> RandomGeneratorPickingPixel;
+    for (int rowIndex = 0; rowIndex < mFilm.CanvasHeight; rowIndex++)
     {
-        int rowOffset = rowIndex * mCanvas.CanvasWidth;
-        for (int colIndex = 0; colIndex < mCanvas.CanvasWidth; colIndex++)
+        int rowOffset = rowIndex * mFilm.CanvasWidth;
+        for (int colIndex = 0; colIndex < mFilm.CanvasWidth; colIndex++)
         {
-            math::vector3<F>& pixel = canvasDataPtr[colIndex + rowOffset];
-
-
             const F pixelCenterX = colIndex * PixelSize + HalfPixelSize - halfWidth;
             const F pixelCenterY = rowIndex * PixelSize + HalfPixelSize - halfHeight;
 
-            Sample& sample = mImageSamples[colIndex + rowOffset];
-            F x = F(2) * mRandomGeneratorPickingPixel.value() - F(1);
-            F y = F(2) * mRandomGeneratorPickingPixel.value() - F(1);
+            for (int index = 0; index < MaxCameraRaySampleCount; ++index)
+            {
+                Sample& samples = mCameraRaySamples[index][colIndex + rowOffset];
+                samples.PixelRow = rowIndex;
+                samples.PixelCol = colIndex;
 
-            sample.pixelCol = colIndex;
-            sample.pixelRow = rowIndex;
-
-            sample.ray.set_origin(mCamera.Position);
-            sample.ray.set_direction(canvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
+                F x = F(2) * RandomGeneratorPickingPixel.value() - F(1);
+                F y = F(2) * RandomGeneratorPickingPixel.value() - F(1);
+                samples.Ray.set_origin(mCamera.Position);
+                samples.Ray.set_direction(canvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
+            }
         }
     }
 }
+
+void LitRenderer::Initialize()
+{
+    InitialSceneTransforms();
+    GenerateCameraRays();
+}
+
+void LitRenderer::GenerateImageProgressive()
+{
+    if (MaxSampleCount <= 0 || (mFilm.GetSampleCount() <= MaxSampleCount))
+    {
+        ResolveSamples();
+        mNeedFlushBackbuffer = true;
+    }
+}
+
+bool LitRenderer::NeedUpdate()
+{
+    if (mNeedFlushBackbuffer)
+    {
+        mFilm.FlushTo(mSystemCanvasDataPtr, mCanvasLinePitch);// LinearColorToGammaCorrectedCanvasDataBuffer();
+        mNeedFlushBackbuffer = false;
+        mNeedUpdateSystemWindowRect = true;
+    }
+    return mNeedUpdateSystemWindowRect;
+}
+
 void LitRenderer::ResolveSamples()
 {
-    const math::vector3<F> StartReflectance = math::vector3<F>::one();
-
-    TerminalCondition condition(mRandomGeneratorTracingTermination);
-    math::vector3<F>* accumulatedBufferPtr = mCanvas.GetBackbufferPtr();
-    for (int rowIndex = 0; rowIndex < mCanvas.CanvasHeight; rowIndex++)
+    const Sample* Samples = mCameraRaySamples[mCurrentCameraRayIndex];
+    mCurrentCameraRayIndex = (mCurrentCameraRayIndex + 1) % MaxCameraRaySampleCount;
+    math::vector3<F>* accumulatedBufferPtr = mFilm.GetBackbufferPtr();
+    PathIntegrator integrator;
+    for (int rowIndex = 0; rowIndex < mFilm.CanvasHeight; rowIndex++)
     {
-        int rowOffset = rowIndex * mCanvas.CanvasWidth;
-        for (int colIndex = 0; colIndex < mCanvas.CanvasWidth; colIndex++)
+        int rowOffset = rowIndex * mFilm.CanvasWidth;
+        for (int colIndex = 0; colIndex < mFilm.CanvasWidth; colIndex++)
         {
-            Sample& sample = mImageSamples[colIndex + rowOffset];
+            const Sample& sample = Samples[colIndex + rowOffset];
             math::vector3<F>& canvasPixel = accumulatedBufferPtr[colIndex + rowOffset];
-            canvasPixel += Trace(mRandomGeneratorEpsilon, *mScene, sample.ray, condition);
+            canvasPixel += integrator.EvaluateLi(*mScene, sample.Ray);
         }
     }
-    mCanvas.IncreaseSampleCount();
+    mFilm.IncreaseSampleCount();
 }
 
 SimpleBackCamera::SimpleBackCamera(math::degree<F> verticalFov)
