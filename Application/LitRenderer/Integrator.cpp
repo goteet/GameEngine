@@ -1,9 +1,14 @@
 #include "Integrator.h"
 #include "Integrator.h"
 
-math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& cameraRay)
+math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& cameraRay, const HitRecord& recordP1)
 {
-    const math::vector3<F> BackgroundColor = math::vector3<F>::zero();
+    if (!recordP1)
+    {
+        const math::vector3<F> BackgroundColor = math::vector3<F>::zero();
+        return BackgroundColor;
+    }
+
     const unsigned int MaxBounces = 10;
     float rrContinueProbability = 1.0f;
     auto CheckRussiaRoulette = [&](float prob) { return TerminateSampler.value() > prob; };
@@ -12,14 +17,8 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
     math::vector3<F> beta = math::vector3<F>::one();
     math::ray3d<F> ray = cameraRay;
 
-    HitRecord hitRecord = scene.DetectIntersecting(ray, nullptr, math::SMALL_NUM<F>);
-
     // First hit, on p_1
-    if (!hitRecord)
-    {
-        return BackgroundColor;
-    }
-
+    HitRecord hitRecord = recordP1;
     for (int Bounce = 0; hitRecord && !math::near_zero(beta) && Bounce < MaxBounces; ++Bounce)
     {
         const SceneObject& surface = *hitRecord.Object;

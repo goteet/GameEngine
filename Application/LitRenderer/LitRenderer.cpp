@@ -274,10 +274,27 @@ void LitRenderer::GenerateCameraRays()
     }
 }
 
+void LitRenderer::QueryP1Records()
+{
+    for (int rowIndex = 0; rowIndex < mFilm.CanvasHeight; rowIndex++)
+    {
+        int rowOffset = rowIndex * mFilm.CanvasWidth;
+        for (int colIndex = 0; colIndex < mFilm.CanvasWidth; colIndex++)
+        {
+            for (int index = 0; index < MaxCameraRaySampleCount; ++index)
+            {
+                Sample& samples = mCameraRaySamples[index][colIndex + rowOffset];
+                samples.RecordP1 = mScene->DetectIntersecting(samples.Ray, nullptr, math::SMALL_NUM<F>);
+            }
+        }
+    }
+}
+
 void LitRenderer::Initialize()
 {
     InitialSceneTransforms();
     GenerateCameraRays();
+    QueryP1Records();
 }
 
 void LitRenderer::GenerateImageProgressive()
@@ -313,7 +330,7 @@ void LitRenderer::ResolveSamples()
         {
             const Sample& sample = Samples[colIndex + rowOffset];
             math::vector3<F>& canvasPixel = accumulatedBufferPtr[colIndex + rowOffset];
-            canvasPixel += integrator.EvaluateLi(*mScene, sample.Ray);
+            canvasPixel += integrator.EvaluateLi(*mScene, sample.Ray, sample.RecordP1);
         }
     }
     mFilm.IncreaseSampleCount();

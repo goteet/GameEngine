@@ -157,15 +157,17 @@ public:
 private:
     void InitialSceneTransforms();
     void GenerateCameraRays();
+    void QueryP1Records();
     void ResolveSamples();
 
     static const int MaxCameraRaySampleCount = 16;
     static const int MaxLightRaySampleCount = 256;
-    static const int MaxSampleCount = -1;// MaxCameraRaySampleCount* MaxLightRaySampleCount;
+    static const int MaxSampleCount = MaxCameraRaySampleCount* MaxLightRaySampleCount;
 
     struct Sample
     {
         math::ray3d<F> Ray;
+        HitRecord RecordP1;
         int PixelRow, PixelCol;
     };
 
