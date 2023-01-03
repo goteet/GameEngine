@@ -240,7 +240,7 @@ void LitRenderer::GenerateCameraRays()
     F cameraZ = halfHeight / mCamera.HalfVerticalFovTangent;
     mCamera.Position.z = -cameraZ;
 
-    auto canvasPositionToRay = [&cameraZ](F x, F y) -> math::vector3<F> {
+    auto CanvasPositionToRay = [&cameraZ](F x, F y) -> math::vector3<F> {
         //vector3<float>(x,y,0) - camera.position;
         //  x = x - 0;
         //  y = y - 0;
@@ -268,7 +268,7 @@ void LitRenderer::GenerateCameraRays()
                 F x = F(2) * RandomGeneratorPickingPixel.value() - F(1);
                 F y = F(2) * RandomGeneratorPickingPixel.value() - F(1);
                 samples.Ray.set_origin(mCamera.Position);
-                samples.Ray.set_direction(canvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
+                samples.Ray.set_direction(CanvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
             }
         }
     }

@@ -19,14 +19,14 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
 
     // First hit, on p_1
     SurfaceIntersection hitRecord = recordP1;
-    for (int Bounce = 0; hitRecord && !math::near_zero(beta) && Bounce < MaxBounces; ++Bounce)
+    for (int bounce = 0; hitRecord && !math::near_zero(beta) && bounce < MaxBounces; ++bounce)
     {
         const SceneObject& surface = *hitRecord.Object;
         const IMaterial& material = *surface.Material;
         const math::nvector3<F>& N = hitRecord.SurfaceNormal;
-        const math::nvector3<F> w_o = -ray.direction();
+        const math::nvector3<F> W_o = -ray.direction();
         F biasedDistance = math::max2<F>(hitRecord.Distance, F(0));
-        math::point3d<F> p_i = ray.calc_offset(biasedDistance);
+        math::point3d<F> P_i = ray.calc_offset(biasedDistance);
         F epsilon[3] =
         {
             mEpsilonSamplers[0].value(),
@@ -41,18 +41,18 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
         //Sampling BSDF
         {
             LightRay scatterLight;
-            if (!material.Scattering(epsilon, p_i, N, ray, hitRecord.IsOnSurface, scatterLight))
+            if (!material.Scattering(epsilon, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
             {
                 break;
             }
 
             ray = scatterLight.scattering;
-            const math::nvector3<F>& w_i = ray.direction();
-            F pdf = material.pdf(N, w_o, w_i);
+            const math::nvector3<F>& W_i = ray.direction();
+            F pdf = material.pdf(N, W_o, W_i);
             beta *= scatterLight.f * math::saturate(scatterLight.cosine) / pdf;
         }
 
-        if (Bounce > 3)
+        if (bounce > 3)
         {
             rrContinueProbability *= 0.95f;
             if (CheckRussiaRoulette(rrContinueProbability))
