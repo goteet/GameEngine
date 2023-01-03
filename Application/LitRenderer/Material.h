@@ -2,10 +2,10 @@
 
 #include <random>
 #include <Foundation/Math/Vector.h>
+#include <Foundation/Math/Rotation.h>
 #include <Foundation/Math/Geometry.h>
 
 using F = double;
-class Scene;
 
 template<typename T>
 struct random
