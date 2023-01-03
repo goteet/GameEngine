@@ -42,8 +42,8 @@ private:
     void QueryP1Records();
     void ResolveSamples();
 
-    static const int MaxCameraRaySampleCount = 16;
-    static const int MaxLightRaySampleCount = 256;
+    static const int MaxCameraRaySampleCount = 8;
+    static const int MaxLightRaySampleCount = 8;
     static const int MaxSampleCount = MaxCameraRaySampleCount* MaxLightRaySampleCount;
 
     struct Sample
