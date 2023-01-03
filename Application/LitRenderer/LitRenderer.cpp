@@ -168,7 +168,7 @@ math::point3d<F> SceneRect::SampleRandomPoint(F epsilon[3]) const
     return math::point3d<F>(mWorldPosition + e1 * mWorldTagent + e2 * Bitangent);
 }
 
-F SceneRect::SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const
+F SceneRect::SamplePdf(const SurfaceIntersection& hr, const math::ray3d<F>& ray) const
 {
     if (hr.Object != this)
     {
@@ -360,14 +360,14 @@ void Scene::UpdateWorldTransform()
     }
 }
 
-HitRecord Scene::DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject, F epsilon)
+SurfaceIntersection Scene::DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject, F epsilon)
 {
-    HitRecord result;
+    SurfaceIntersection result;
     for (const SceneObject* obj : mSceneObjects)
     {
         if (excludeObject != obj)
         {
-            HitRecord info = obj->IntersectWithRay(ray, epsilon);
+            SurfaceIntersection info = obj->IntersectWithRay(ray, epsilon);
             if (info.Object != nullptr)
             {
                 if (result.Object == nullptr || result.Distance > info.Distance)
@@ -414,14 +414,14 @@ void SceneSphere::UpdateWorldTransform()
     mWorldCenter = transform(Transform.TransformMatrix, mSphere.center());
 }
 
-HitRecord SceneSphere::IntersectWithRay(const math::ray3d<F>& ray, F error) const
+SurfaceIntersection SceneSphere::IntersectWithRay(const math::ray3d<F>& ray, F error) const
 {
     F t0, t1;
     bool isOnSurface = true;
     math::intersection result = math::intersect_sphere(ray, mWorldCenter, mSphere.radius_sqr(), error, t0, t1);
     if (result == math::intersection::none)
     {
-        return HitRecord();
+        return SurfaceIntersection();
     }
     else if (result == math::intersection::inside)
     {
@@ -431,7 +431,7 @@ HitRecord SceneSphere::IntersectWithRay(const math::ray3d<F>& ray, F error) cons
 
     math::point3d<F> intersectPosition = ray.calc_offset(t0);
     math::vector3<F> surfaceNormal = normalized(intersectPosition - mWorldCenter);
-    return HitRecord(const_cast<SceneSphere*>(this), isOnSurface, (isOnSurface ? surfaceNormal : -surfaceNormal), t0);
+    return SurfaceIntersection(const_cast<SceneSphere*>(this), isOnSurface, (isOnSurface ? surfaceNormal : -surfaceNormal), t0);
 }
 
 void SceneRect::UpdateWorldTransform()
@@ -443,19 +443,19 @@ void SceneRect::UpdateWorldTransform()
     mWorldTagent = transform(Transform.TransformMatrix, Rect.tangent());
 }
 
-HitRecord SceneRect::IntersectWithRay(const math::ray3d<F>& ray, F error) const
+SurfaceIntersection SceneRect::IntersectWithRay(const math::ray3d<F>& ray, F error) const
 {
     F t;
     bool isOnSurface = true;
     math::intersection result = math::intersect_rect(ray, mWorldPosition, mWorldNormal, mWorldTagent, Rect.extends(), mDualFace, error, t);
     if (result == math::intersection::none)
     {
-        return HitRecord();
+        return SurfaceIntersection();
     }
     else
     {
         isOnSurface = math::dot(mWorldNormal, ray.direction()) < 0;
-        return HitRecord(const_cast<SceneRect*>(this), isOnSurface, isOnSurface ? mWorldNormal : -mWorldNormal, t);
+        return SurfaceIntersection(const_cast<SceneRect*>(this), isOnSurface, isOnSurface ? mWorldNormal : -mWorldNormal, t);
     }
 }
 
@@ -467,19 +467,19 @@ void SceneDisk::UpdateWorldTransform()
     mWorldNormal = transform(Transform.TransformMatrix, Disk.normal()); // no scale so there...
 }
 
-HitRecord SceneDisk::IntersectWithRay(const math::ray3d<F>& ray, F error) const
+SurfaceIntersection SceneDisk::IntersectWithRay(const math::ray3d<F>& ray, F error) const
 {
     F t;
     bool isOnSurface = true;
     math::intersection result = math::intersect_disk(ray, mWorldPosition, mWorldNormal, Disk.radius(), mDualFace, error, t);
     if (result == math::intersection::none)
     {
-        return HitRecord();
+        return SurfaceIntersection();
     }
     else
     {
         isOnSurface = math::dot(mWorldNormal, ray.direction()) < 0;
-        return HitRecord(const_cast<SceneDisk*>(this), isOnSurface, isOnSurface ? mWorldNormal : -mWorldNormal, t);
+        return SurfaceIntersection(const_cast<SceneDisk*>(this), isOnSurface, isOnSurface ? mWorldNormal : -mWorldNormal, t);
     }
 }
 
@@ -492,7 +492,7 @@ void SceneCube::UpdateWorldTransform()
     mWorldAxisZ = transform(Transform.TransformMatrix, Cube.axis_z());
 }
 
-HitRecord SceneCube::IntersectWithRay(const math::ray3d<F>& ray, F error) const
+SurfaceIntersection SceneCube::IntersectWithRay(const math::ray3d<F>& ray, F error) const
 {
     F t0, t1;
     bool front = true;
@@ -504,7 +504,7 @@ HitRecord SceneCube::IntersectWithRay(const math::ray3d<F>& ray, F error) const
         error, t0, t1, n0, n1);
     if (result == math::intersection::none)
     {
-        return HitRecord();
+        return SurfaceIntersection();
     }
     else if (result == math::intersection::inside)
     {
@@ -513,17 +513,17 @@ HitRecord SceneCube::IntersectWithRay(const math::ray3d<F>& ray, F error) const
         front = false;
     }
 
-    return HitRecord(const_cast<SceneCube*>(this), front, n0, t0);
+    return SurfaceIntersection(const_cast<SceneCube*>(this), front, n0, t0);
 }
 
 
 F Scene::SampleLightPdf(const math::ray3d<F>& ray)
 {
-    HitRecord result;
+    SurfaceIntersection result;
     result.Distance = std::numeric_limits<F>::max();
     for (SceneObject* light : mSceneLights)
     {
-        HitRecord hr = light->IntersectWithRay(ray, math::SMALL_NUM<F>);
+        SurfaceIntersection hr = light->IntersectWithRay(ray, math::SMALL_NUM<F>);
         if (hr.Object == light && hr.Distance < result.Distance)
         {
             result = hr;

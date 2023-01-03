@@ -1,7 +1,7 @@
 #include "Integrator.h"
 #include "Integrator.h"
 
-math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& cameraRay, const HitRecord& recordP1)
+math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& cameraRay, const SurfaceIntersection& recordP1)
 {
     if (!recordP1)
     {
@@ -18,7 +18,7 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
     math::ray3d<F> ray = cameraRay;
 
     // First hit, on p_1
-    HitRecord hitRecord = recordP1;
+    SurfaceIntersection hitRecord = recordP1;
     for (int Bounce = 0; hitRecord && !math::near_zero(beta) && Bounce < MaxBounces; ++Bounce)
     {
         const SceneObject& surface = *hitRecord.Object;

@@ -10,10 +10,10 @@
 
 struct SceneObject;
 
-struct HitRecord
+struct SurfaceIntersection
 {
-    HitRecord() = default;
-    HitRecord(SceneObject* o, bool f, math::vector3<F> n, F d)
+    SurfaceIntersection() = default;
+    SurfaceIntersection(SceneObject* o, bool f, math::vector3<F> n, F d)
         : Object(o), SurfaceNormal(n), Distance(d), IsOnSurface(f)
     {
 
@@ -39,11 +39,11 @@ struct SceneObject
 {
     virtual ~SceneObject() { }
     virtual void UpdateWorldTransform();
-    virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const = 0;
+    virtual SurfaceIntersection IntersectWithRay(const math::ray3d<F>& ray, F error) const = 0;
     void SetTranslate(F x, F y, F z) { Transform.Translate.set(x, y, z); }
     void SetRotation(const math::quaternion<F>& q) { Transform.Rotation = q; }
     virtual math::point3d<F> SampleRandomPoint(F epsilon[3]) const { return math::vector3<F>::zero(); }
-    virtual F SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const { return F(0); }
+    virtual F SamplePdf(const SurfaceIntersection& hr, const math::ray3d<F>& ray) const { return F(0); }
     virtual bool IsDualface() const { return false; }
     Transform Transform;
     std::unique_ptr<IMaterial> Material;
@@ -54,7 +54,7 @@ struct SceneSphere : SceneObject
 {
     SceneSphere() : mSphere(math::point3d<F>(), 1) { }
     virtual void UpdateWorldTransform() override;
-    virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
+    virtual SurfaceIntersection IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
     void SetRadius(F radius) { mSphere.set_radius(radius); }
 private:
     math::sphere<F> mSphere;
@@ -68,11 +68,11 @@ struct SceneRect : SceneObject
         math::normalized_vector3<F>::unit_z(),
         math::vector2<F>::one()) { }
     virtual void UpdateWorldTransform() override;
-    virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
+    virtual SurfaceIntersection IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
     void SetExtends(F x, F y) { Rect.set_extends(x, y); }
     void SetDualFace(bool dual) { mDualFace = dual; }
     virtual math::point3d<F> SampleRandomPoint(F epsilon[3]) const override;
-    virtual F SamplePdf(const HitRecord& hr, const math::ray3d<F>& ray) const override;
+    virtual F SamplePdf(const SurfaceIntersection& hr, const math::ray3d<F>& ray) const override;
     virtual bool IsDualface() const override { return mDualFace; }
 private:
     bool mDualFace = false;
@@ -86,7 +86,7 @@ struct SceneDisk : SceneObject
 {
     SceneDisk() : Disk(math::point3d<F>(), math::normalized_vector3<F>::unit_x(), F(1)) { }
     virtual void UpdateWorldTransform() override;
-    virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
+    virtual SurfaceIntersection IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
     void SetRadius(F r) { Disk.set_radius(r); }
     void SetDualFace(bool dual) { mDualFace = dual; }
     virtual bool IsDualface() const override { return mDualFace; }
@@ -101,7 +101,7 @@ struct SceneCube : SceneObject
 {
     SceneCube() : Cube(math::point3d<F>(), math::vector3<F>::one()) { }
     virtual void UpdateWorldTransform() override;
-    virtual HitRecord IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
+    virtual SurfaceIntersection IntersectWithRay(const math::ray3d<F>& ray, F error) const override;
     void SetExtends(F x, F y, F z) { Cube.set_extends(x, y, z); }
 private:
     math::cube<F> Cube;
@@ -116,7 +116,7 @@ class Scene
 public:
     virtual ~Scene();
     void UpdateWorldTransform();
-    HitRecord DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject, F epsilon);
+    SurfaceIntersection DetectIntersecting(const math::ray3d<F>& ray, const SceneObject* excludeObject, F epsilon);
     void Create(F aspect);
     int GetLightCount() const { return (int)mSceneLights.size(); }
     SceneObject* GetLightSourceByIndex(int index) { return mSceneLights[index]; }
@@ -167,7 +167,7 @@ private:
     struct Sample
     {
         math::ray3d<F> Ray;
-        HitRecord RecordP1;
+        SurfaceIntersection RecordP1;
         int PixelRow, PixelCol;
     };
 
