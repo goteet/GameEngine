@@ -41,6 +41,7 @@ namespace math
         ray() = default;
         ray(const point<value_type, dimension>& o, const normalized_vector_t<value_type, dimension>& d) : _origin(o), _direction(d) { _inv_direction = inversed(_direction); }
         ray(const vector_t<value_type, (EDim)(dimension + 1)>& o, const normalized_vector_t<value_type, dimension>& d) : _origin(o), _direction(d) { _inv_direction = inversed(_direction); }
+        ray(const point<value_type, dimension>& o, const point<value_type, dimension>& e) : _origin(o), _direction(e - o) { _inv_direction = inversed(_direction); }
         constexpr const point<value_type, dimension>& origin() const { return _origin; }
         constexpr point<value_type, dimension>& origin() { return _origin; }
         constexpr const normalized_vector_t<value_type, dimension>& direction() const { return _direction; }
