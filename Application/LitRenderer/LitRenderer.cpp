@@ -35,38 +35,38 @@ namespace
                 SceneCenterX,
                 SceneBottom + 22,
                 SceneCenterZ + 10);
-            //mainSphere->Material = std::make_unique<Glossy>(1, 0.85, 0.5, 2.5);
-            //mainSphere->Material = std::make_unique<GGX>(0.1);
-            mainSphere->Material = std::make_unique<Lambertian>(F(0.5), F(0.5), F(0.5));
+            //mainSphere->Material.AddBSDFComponent(std::make_unique<Glossy>(1, 0.85, 0.5, 2.5));
+            //mainSphere->Material.AddBSDFComponent(std::make_unique<GGX>(0.1));
+            mainSphere->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.5), F(0.5), F(0.5)));
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
             wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
-            wallLeft->Material = std::make_unique<Lambertian>(F(0.75), F(0.2), F(0.2));
+            wallLeft->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.75), F(0.2), F(0.2)));
 
             SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
             wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
             wallRight->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
             wallRight->SetExtends(SceneExtendZ, SceneExtendY);
-            wallRight->Material = std::make_unique<Lambertian>(F(0.2), F(0.2), F(0.75));
+            wallRight->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.2), F(0.2), F(0.75)));
 
             SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
             wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
             wallTop->SetExtends(SceneExtendZ, SceneExtendX);
             wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
-            wallTop->Material = std::make_unique<Lambertian>(F(0.75), F(0.75), F(0.75));
+            wallTop->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.75), F(0.75), F(0.75)));
 
             SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
             wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
             wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
             wallBottom->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
-            wallBottom->Material = std::make_unique<Lambertian>(F(0.2), F(0.75), F(0.2));
+            wallBottom->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.2), F(0.75), F(0.2)));
 
             SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
             wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
             wallFar->SetExtends(SceneExtendX, SceneExtendY);
             wallFar->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
-            wallFar->Material = std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6));
+            wallFar->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6)));
 
             SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
             LightDisk->SetDualFace(true);
@@ -74,7 +74,8 @@ namespace
             LightDisk->SetExtends(25, 25);
             LightDisk->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
             F Intensity = 4.5;
-            LightDisk->Material = std::make_unique<PureLight_ForTest>(Intensity, Intensity, Intensity);
+
+            LightDisk->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
         }
     };
 
@@ -107,7 +108,7 @@ namespace
                 SceneCenterX + 30,
                 SceneBottom + 22,
                 SceneCenterZ + 10);
-            LambertianShere->Material = std::make_unique<Lambertian>(1, 1, 1);
+            LambertianShere->Material.AddBSDFComponent(std::make_unique<Lambertian>(1, 1, 1));
 
 
             SceneSphere* orenNayerSphere = new SceneSphere(); OutSceneObjects.push_back(orenNayerSphere);
@@ -116,36 +117,36 @@ namespace
                 SceneCenterX - 30,
                 SceneBottom + 22,
                 SceneCenterZ + 10);
-            orenNayerSphere->Material = std::make_unique<OrenNayer>(1, 1, 1, math::radian<F>(0.25));
+            orenNayerSphere->Material.AddBSDFComponent(std::make_unique<OrenNayer>(1, 1, 1, math::radian<F>(0.25)));
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
             wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
-            wallLeft->Material = std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6));
+            wallLeft->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6)));
 
             SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
             wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
             wallRight->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
             wallRight->SetExtends(SceneExtendZ, SceneExtendY);
-            wallRight->Material = std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6));
+            wallRight->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6)));
 
             SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
             wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
             wallTop->SetExtends(SceneExtendZ, SceneExtendX);
             wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
-            wallTop->Material = std::make_unique<Lambertian>(F(0.75), F(0.75), F(0.75));
+            wallTop->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.75), F(0.75), F(0.75)));
 
             SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
             wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
             wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
             wallBottom->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
-            wallBottom->Material = std::make_unique<Lambertian>(F(0.2), F(0.2), F(0.75));
+            wallBottom->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.2), F(0.2), F(0.75)));
 
             SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
             wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
             wallFar->SetExtends(SceneExtendX, SceneExtendY);
             wallFar->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
-            wallFar->Material = std::make_unique<Lambertian>(F(0.75), F(0.2), F(0.2));
+            wallFar->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.75), F(0.2), F(0.2)));
 
             SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
             LightDisk->SetDualFace(true);
@@ -153,7 +154,7 @@ namespace
             LightDisk->SetExtends(25, 25);
             LightDisk->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
             F Intensity = 4.5;
-            LightDisk->Material = std::make_unique<PureLight_ForTest>(Intensity, Intensity, Intensity);
+            LightDisk->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
         }
     };
 

@@ -234,7 +234,7 @@ F Lambertian::pdf(
 
 
 OrenNayer::OrenNayer(F r, F g, F b, math::radian<F> sigma)
-    : IMaterial(r, g, b)
+    : BSDF(Material::BSDFMask::Diffuse, r, g, b)
     , Sigma(sigma)
     , SigmaSquare(math::square(sigma.value))
 {
@@ -351,16 +351,6 @@ bool Dielectric::Scattering(F epsilon[3], const math::vector3<F>& P, const math:
     outLightRay.scattering.set_direction(Wi);
     outLightRay.f = math::vector3<F>::one();
     return true;
-}
-
-bool PureLight_ForTest::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
-{
-    return false;
-}
-
-math::vector3<F> PureLight_ForTest::Emitting() const
-{
-    return Emission;
 }
 
 const F AirRefractiveIndex = F(1.0003);
@@ -522,4 +512,30 @@ F GGX::pdf(
     const math::nvector3<F> H = Wi + Wo;
     F pdfSpecular = math::power<5>(math::dot(H, N));
     return pdfSpecular;
+}
+
+ void Material::AddBSDFComponent(std::unique_ptr<BSDF> component)
+{
+     mBSDFMask |= component->BSDFMask;
+     mBSDFComponents.emplace_back(std::move(component));
+}
+
+ const std::unique_ptr<BSDF>& Material::GetBSDFComponentByMask(uint32_t mask) const
+ {
+     static std::unique_ptr<BSDF> dummy = nullptr;
+     for (const auto& comp : mBSDFComponents)
+     {
+         if (comp->BSDFMask & mask)
+         {
+             return comp;
+         }
+     }
+     return dummy;
+ }
+
+ const std::unique_ptr<BSDF>& Material::GetRandomBSDFComponent(F u) const
+{
+    uint32_t length = (uint32_t)mBSDFComponents.size();
+    uint32_t index = math::min2<uint32_t>(math::floor2<uint32_t>(u * length), length - 1);
+    return GetBSDFComponentByIndex(index);
 }

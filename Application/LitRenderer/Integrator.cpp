@@ -21,9 +21,10 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
     for (int bounce = 0; hitRecord && !math::near_zero(beta) && bounce < MaxBounces; ++bounce)
     {
         const SceneObject& surface = *hitRecord.Object;
-        const IMaterial& material = *surface.Material;
+        const Material& material = surface.Material;
         const math::nvector3<F>& N = hitRecord.SurfaceNormal;
         const math::nvector3<F> W_o = -ray.direction();
+        const bool isLightSource = surface.LightSource != nullptr;
         F biasedDistance = math::max2<F>(hitRecord.Distance, F(0));
         math::point3d<F> P_i = ray.calc_offset(biasedDistance);
         F u[3] =
@@ -34,55 +35,64 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
         };
 
 
-        if (bounce == 0)
+        if (isLightSource)
         {
-            math::vector3<F> Le = material.Emitting();
-            Lo += beta * Le;
+            if (bounce == 0)
+            {
+                math::vector3<F> Le = surface.LightSource->Le();
+                Lo += beta * Le;
+            }
         }
 
-        //Sampling Light Source
-        SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
-        if (lightSource != nullptr && lightSource != hitRecord.Object)
+
+        if (material.IsValid())
         {
-            math::point3d<F> P_i_1 = lightSource->SampleRandomPoint(u);
-            math::ray3d<F> lightRay(P_i, P_i_1);
-            const math::nvector3<F>& W_i = lightRay.direction();
+            const BSDF& bsdf = *material.GetRandomBSDFComponent(u[0]);
 
-            SurfaceIntersection lightSI = scene.DetectIntersecting(lightRay, nullptr, math::SMALL_NUM<F>);
-            bool bIsVisible = lightSI.Object == lightSource;
-            if (bIsVisible)
+            //Sampling Light Source
+            SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
+            if (!isLightSource && lightSource != nullptr && lightSource != hitRecord.Object)
             {
-                math::nvector3<F> N_light = lightSI.SurfaceNormal;
-                F cosThetaPrime = math::dot(N_light, -W_i);
-                bIsVisible = cosThetaPrime > math::SMALL_NUM<F> || (cosThetaPrime < -math::SMALL_NUM<F> && lightSource->IsDualface());
+                math::point3d<F> P_i_1 = lightSource->SampleRandomPoint(u);
+                math::ray3d<F> lightRay(P_i, P_i_1);
+                const math::nvector3<F>& W_i = lightRay.direction();
 
+                SurfaceIntersection lightSI = scene.DetectIntersecting(lightRay, nullptr, math::SMALL_NUM<F>);
+                bool bIsVisible = lightSI.Object == lightSource;
                 if (bIsVisible)
                 {
-                    F pdf_light = lightSource->SamplePdf(lightSI, lightRay);
-                    F pdf_bsdf = material.pdf(N, W_o, W_i);
-                    F weight = PowerHeuristic(pdf_light, pdf_bsdf);
-                    math::vector3<F> f = material.f(N, W_o, W_i, true);
+                    math::nvector3<F> N_light = lightSI.SurfaceNormal;
+                    F cosThetaPrime = math::dot(N_light, -W_i);
+                    bIsVisible = cosThetaPrime > math::SMALL_NUM<F> || (cosThetaPrime < -math::SMALL_NUM<F> && lightSource->IsDualface());
 
-                    math::vector3<F> Le = lightSource->Material->Emitting();
-                    Lo += weight * beta * f * Le / pdf_light;
+                    if (bIsVisible)
+                    {
+                        F pdf_light = lightSource->SamplePdf(lightSI, lightRay);
+                        F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
+                        F weight = PowerHeuristic(pdf_light, pdf_bsdf);
+                        math::vector3<F> f = bsdf.f(N, W_o, W_i, true);
+
+                        const math::vector3<F>& Le = lightSource->LightSource->Le();
+                        Lo += weight * beta * f * Le / pdf_light;
+                    }
                 }
             }
-        }
 
-        //Sampling BSDF
-        {
-            LightRay scatterLight;
-            if (!material.Scattering(u, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
+            //Sampling BSDF
             {
-                break;
-            }
+                LightRay scatterLight;
+                if (!bsdf.Scattering(u, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
+                {
+                    break;
+                }
 
-            ray = scatterLight.scattering;
-            const math::nvector3<F>& W_i = ray.direction();
-            F pdf_light = scene.SampleLightPdf(scatterLight.scattering);
-            F pdf_bsdf = material.pdf(N, W_o, W_i);
-            F weight = PowerHeuristic(pdf_bsdf, pdf_light);
-            beta *= weight * scatterLight.f * math::saturate(scatterLight.cosine) / pdf_bsdf;
+                ray = scatterLight.scattering;
+                const math::nvector3<F>& W_i = ray.direction();
+                F pdf_light = scene.SampleLightPdf(scatterLight.scattering);
+                F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
+                F weight = PowerHeuristic(pdf_bsdf, pdf_light);
+                beta *= weight * scatterLight.f * math::saturate(scatterLight.cosine) / pdf_bsdf;
+            }
         }
 
         if (bounce > 3)

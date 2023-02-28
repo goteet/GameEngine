@@ -32,6 +32,17 @@ struct Transform
     math::matrix4x4<F> TransformMatrix = math::matrix4x4<F>::identity();
 };
 
+
+struct LightSource
+{
+    LightSource(F r, F g, F b) : Emission(r,g,b) { }
+
+    const math::vector3<F>& Le() const { return Emission; }
+
+private:
+    math::vector3<F> Emission = math::vector3<F>::one();
+};
+
 struct SceneObject
 {
     virtual ~SceneObject() { }
@@ -43,7 +54,8 @@ struct SceneObject
     virtual F SamplePdf(const SurfaceIntersection& hr, const math::ray3d<F>& ray) const { return F(0); }
     virtual bool IsDualface() const { return false; }
     Transform Transform;
-    std::unique_ptr<IMaterial> Material;
+    Material Material;
+    std::unique_ptr<LightSource> LightSource = nullptr;
 };
 
 
