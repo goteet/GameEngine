@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include "PreIncludeFiles.h"
 #include "GfxInterface.h"
 #include "TransientBufferRegistry.h"
