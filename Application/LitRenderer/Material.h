@@ -48,10 +48,6 @@ struct BSDF
     BSDF(uint32_t mask, F r, F g, F b) : BSDFMask(mask), Albedo(r, g, b) { }
     virtual ~BSDF() { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const = 0;
-    virtual math::vector3<F> Emitting() const
-    {
-        return math::vector3<F>::zero();
-    }
     virtual math::vector3<F> f(
         const math::nvector3<F>& N,
         const math::nvector3<F>& Wo,
