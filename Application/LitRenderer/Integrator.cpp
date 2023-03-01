@@ -21,7 +21,7 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
     for (int bounce = 0; hitRecord && !math::near_zero(beta) && bounce < MaxBounces; ++bounce)
     {
         const SceneObject& surface = *hitRecord.Object;
-        const Material& material = surface.Material;
+        const std::unique_ptr<Material>& material = surface.Material;
         const math::nvector3<F>& N = hitRecord.SurfaceNormal;
         const math::nvector3<F> W_o = -ray.direction();
         const bool isLightSource = surface.LightSource != nullptr;
@@ -45,9 +45,9 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
         }
 
 
-        if (material.IsValid())
+        if (material)
         {
-            const BSDF& bsdf = *material.GetRandomBSDFComponent(u[0]);
+            const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
 
             //Sampling Light Source
             SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);

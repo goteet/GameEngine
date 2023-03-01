@@ -75,7 +75,7 @@ struct Material
 
     Material() = default;
 
-    void AddBSDFComponent(std::unique_ptr<BSDF> component);
+    void AddBSDFComponent(std::unique_ptr<BSDF>&& component);
 
     bool IsValid() const { return mBSDFComponents.size() > 0; }
 
@@ -199,3 +199,22 @@ struct Dielectric : public BSDF
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
 };
 
+inline std::unique_ptr<Material> MakeMatteMaterial(F albedoR = F(1), F albedoG = F(1), F albedoB = F(1))
+{
+    std::unique_ptr<Material> material = std::make_unique<Material>();
+    std::unique_ptr<Lambertian> compLambertian = std::make_unique<Lambertian>(albedoR, albedoG, albedoB);
+
+    material->AddBSDFComponent(std::move(compLambertian));
+
+    return material;
+}
+
+inline std::unique_ptr<Material> MakeMatteMaterial(F albedoR, F albedoG, F albedoB, math::radian<F> sigma)
+{
+    std::unique_ptr<Material> material = std::make_unique<Material>();
+    std::unique_ptr<Lambertian> compLambertian = std::make_unique<OrenNayer>(albedoR, albedoG, albedoB, sigma);
+
+    material->AddBSDFComponent(std::move(compLambertian));
+
+    return material;
+}

@@ -514,7 +514,7 @@ F GGX::pdf(
     return pdfSpecular;
 }
 
- void Material::AddBSDFComponent(std::unique_ptr<BSDF> component)
+ void Material::AddBSDFComponent(std::unique_ptr<BSDF>&& component)
 {
      mBSDFMask |= component->BSDFMask;
      mBSDFComponents.emplace_back(std::move(component));

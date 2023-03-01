@@ -220,7 +220,7 @@ SceneObject* Scene::UniformSampleLightSource(F u)
     }
     else
     {
-        return nullptr; 
+        return nullptr;
     }
 }
 
@@ -269,7 +269,7 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneCenterX - 20,
         SceneBottom + SmallObjectSize,
         SceneCenterZ - 5);
-    lSphere->Material.AddBSDFComponent(std::make_unique<Lambertian>());
+    lSphere->Material = MakeMatteMaterial();
 
     SceneSphere* metalSphere = new SceneSphere(); OutSceneObjects.push_back(metalSphere);
     metalSphere->SetRadius(16);
@@ -277,7 +277,8 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneCenterX,
         SceneCenterY,
         SceneCenterZ + 10);
-    metalSphere->Material.AddBSDFComponent(std::make_unique<Metal>(F(0.08)));
+    metalSphere->Material = std::make_unique<Material>();
+    metalSphere->Material->AddBSDFComponent(std::make_unique<Metal>(F(0.08)));
 
     SceneSphere* dielectricSphereFloat = new SceneSphere(); OutSceneObjects.push_back(dielectricSphereFloat);
     dielectricSphereFloat->SetRadius(15);
@@ -285,7 +286,8 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneCenterX + 40,
         SceneCenterY,
         SceneCenterZ + 10);
-    dielectricSphereFloat->Material.AddBSDFComponent(std::make_unique<Dielectric>(F(1.5)));
+    dielectricSphereFloat->Material = std::make_unique<Material>();
+    dielectricSphereFloat->Material->AddBSDFComponent(std::make_unique<Dielectric>(F(1.5)));
 
     SceneSphere* dielectricSphere = new SceneSphere(); OutSceneObjects.push_back(dielectricSphere);
     dielectricSphere->SetRadius(20);
@@ -293,7 +295,8 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneLeft + 30,
         SceneBottom + 20,
         SceneFar - 30);
-    dielectricSphere->Material.AddBSDFComponent(std::make_unique<Dielectric>(F(1.4)));
+    dielectricSphere->Material = std::make_unique<Material>();
+    dielectricSphere->Material->AddBSDFComponent(std::make_unique<Dielectric>(F(1.4)));
 
     SceneCube* lCube = new SceneCube(); OutSceneObjects.push_back(lCube);
     lCube->SetExtends(SmallObjectSize, BigObjectSize, SmallObjectSize);
@@ -302,7 +305,7 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneBottom + BigObjectSize,
         SceneCenterZ + 30);
     lCube->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(-30)));
-    lCube->Material.AddBSDFComponent(std::make_unique<Lambertian>());
+    lCube->Material = MakeMatteMaterial();
 
     SceneCube* rCube = new SceneCube(); OutSceneObjects.push_back(rCube);
     rCube->SetExtends(SmallObjectSize, SmallObjectSize, SmallObjectSize);
@@ -311,36 +314,36 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneBottom + SmallObjectSize,
         SceneCenterZ + 5);
     rCube->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(60)));
-    rCube->Material.AddBSDFComponent(std::make_unique<Lambertian>());
+    rCube->Material = MakeMatteMaterial();
 
     SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
     wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
     wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
-    wallLeft->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.75), F(0.2), F(0.2)));
+    wallLeft->Material = MakeMatteMaterial(F(0.75), F(0.2), F(0.2));
 
     SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
     wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
     wallRight->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(180)));
     wallRight->SetExtends(SceneExtendZ, SceneExtendY);
-    wallRight->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.2), F(0.2), F(0.75)));
+    wallRight->Material = MakeMatteMaterial(F(0.2), F(0.2), F(0.75));
 
     SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
     wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
     wallTop->SetExtends(SceneExtendZ, SceneExtendX);
     wallTop->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(-90)));
-    wallTop->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.75), F(0.75), F(0.75)));
+    wallTop->Material = MakeMatteMaterial(F(0.75), F(0.75), F(0.75));
 
     SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
     wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
     wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
     wallBottom->SetRotation(math::make_rotation_z_axis<F>(math::degree<F>(90)));
-    wallBottom->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.2), F(0.75), F(0.2)));
+    wallBottom->Material = MakeMatteMaterial(F(0.2), F(0.75), F(0.2));
 
     SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
     wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
     wallFar->SetExtends(SceneExtendX, SceneExtendY);
     wallFar->SetRotation(math::make_rotation_y_axis<F>(math::degree<F>(90)));
-    wallFar->Material.AddBSDFComponent(std::make_unique<Lambertian>(F(0.6), F(0.6), F(0.6)));
+    wallFar->Material = MakeMatteMaterial(F(0.6), F(0.6), F(0.6));
 
     SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
     LightDisk->SetTranslate(SceneCenterX, SceneTop - F(0.01), SceneCenterZ + F(10));

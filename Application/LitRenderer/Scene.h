@@ -54,7 +54,7 @@ struct SceneObject
     virtual F SamplePdf(const SurfaceIntersection& hr, const math::ray3d<F>& ray) const { return F(0); }
     virtual bool IsDualface() const { return false; }
     Transform Transform;
-    Material Material;
+    std::unique_ptr<Material> Material;
     std::unique_ptr<LightSource> LightSource = nullptr;
 };
 
