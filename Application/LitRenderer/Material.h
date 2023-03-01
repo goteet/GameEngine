@@ -41,10 +41,11 @@ struct LightRay
 
 struct BSDF
 {
+    const std::string DebugName;
     const uint32_t BSDFMask;
     F Weight = F(1);
 
-    BSDF(uint32_t mask, F weight) : BSDFMask(mask), Weight(weight) { }
+    BSDF(const std::string& debugName, uint32_t mask, F weight) : DebugName(debugName), BSDFMask(mask), Weight(weight) { }
     virtual ~BSDF() { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const = 0;
     virtual math::vector3<F> f(
@@ -119,9 +120,8 @@ private:
 struct Lambertian : public BSDF
 {
     math::vector3<F> Albedo = math::vector3<F>::one();
-    Lambertian(F weight = F(1)) : BSDF(Material::BSDFMask::Diffuse, weight) { }
-    Lambertian(F r, F g, F b, F weight = F(1)) : BSDF(Material::BSDFMask::Diffuse, weight), Albedo(r, g, b) { }
-
+    Lambertian(F weight = F(1)) : BSDF("Lambertian", Material::BSDFMask::Diffuse, weight) { }
+    Lambertian(F r, F g, F b, F weight = F(1)) : BSDF("Lambertian", Material::BSDFMask::Diffuse, weight), Albedo(r, g, b) { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual math::vector3<F> f(
         const math::nvector3<F>& N,
@@ -134,29 +134,36 @@ struct Lambertian : public BSDF
         const math::nvector3<F>& Wi) const override;
 };
 
-struct OrenNayer : public Lambertian
+struct OrenNayer : public BSDF
 {
+    math::vector3<F> Albedo = math::vector3<F>::one();
     math::radian<F> Sigma = math::radian<F>(0);
     math::radian<F> SigmaSquare = math::radian<F>(0);
     F A = F(1);
     F B = F(0);
-    OrenNayer() = default;
+    OrenNayer(F weight = F(1)) : BSDF("Oren-Nayer", Material::BSDFMask::Diffuse, weight) { }; ;
     OrenNayer(F r, F g, F b, math::radian<F> sigma = math::radian<F>(0), F weight = F(1));
+    virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual math::vector3<F> f(
         const math::nvector3<F>& N,
         const math::nvector3<F>& Wo,
         const math::nvector3<F>& Wi,
         bool IsOnSurface) const override;
+    virtual F pdf(
+        const math::nvector3<F>& N,
+        const math::nvector3<F>& Wo,
+        const math::nvector3<F>& Wi) const override;
 };
 
-struct Glossy : public Lambertian
+struct Glossy : public BSDF
 {
+    math::vector3<F> Albedo = math::vector3<F>::one();
     F RefractiveIndex = F(2.5);
     F SpecularSamplingProbability = F(0.5);
     F DiffuseSamplingProbability = F(1) - SpecularSamplingProbability;
 
-    Glossy() : Lambertian(Material::BSDFMask::Specular) { }
-    Glossy(F r, F g, F b, F ior = F(1.5)) : Lambertian(Material::BSDFMask::Specular, r, g, b), RefractiveIndex(ior) { }
+    Glossy(F weight = F(1)) : BSDF("Glossy-legacy", Material::BSDFMask::Specular, weight) { }
+    Glossy(F r, F g, F b, F ior = F(1.5)) : BSDF("Glossy-legacy", Material::BSDFMask::Specular, F(1)), Albedo(r, g, b), RefractiveIndex(ior) { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual math::vector3<F> f(
         const math::nvector3<F>& N,
@@ -180,8 +187,8 @@ struct GGX : public BSDF
     F Roughness = F(0.5);
     F RefractiveIndex = F(2.5);
 
-    GGX(F weight = F(1)) : BSDF(Material::BSDFMask::Specular, weight) { }
-    GGX(F roughness, F IoR, F weight = F(1)) : BSDF(Material::BSDFMask::Specular, weight), Roughness(roughness), RefractiveIndex(IoR) { }
+    GGX(F weight = F(1)) : BSDF("GGX Microfacet", Material::BSDFMask::Specular, weight) { }
+    GGX(F roughness, F IoR, F weight = F(1)) : BSDF("GGX Microfacet", Material::BSDFMask::Specular, weight), Roughness(roughness), RefractiveIndex(IoR) { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual math::vector3<F> f(
         const math::nvector3<F>& N,
@@ -207,7 +214,7 @@ inline std::unique_ptr<Material> MakeMatteMaterial(F albedoR = F(1), F albedoG =
 inline std::unique_ptr<Material> MakeMatteMaterial(F albedoR, F albedoG, F albedoB, math::radian<F> sigma)
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
-    std::unique_ptr<Lambertian> compLambertian = std::make_unique<OrenNayer>(albedoR, albedoG, albedoB, sigma);
+    std::unique_ptr<OrenNayer> compLambertian = std::make_unique<OrenNayer>(albedoR, albedoG, albedoB, sigma);
 
     material->AddBSDFComponent(std::move(compLambertian));
 
