@@ -277,8 +277,7 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneCenterX,
         SceneCenterY,
         SceneCenterZ + 10);
-    metalSphere->Material = std::make_unique<Material>();
-    metalSphere->Material->AddBSDFComponent(std::make_unique<Metal>(F(0.08)));
+    metalSphere->Material = MakeMatteMaterial();
 
     SceneSphere* dielectricSphereFloat = new SceneSphere(); OutSceneObjects.push_back(dielectricSphereFloat);
     dielectricSphereFloat->SetRadius(15);
@@ -286,8 +285,7 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneCenterX + 40,
         SceneCenterY,
         SceneCenterZ + 10);
-    dielectricSphereFloat->Material = std::make_unique<Material>();
-    dielectricSphereFloat->Material->AddBSDFComponent(std::make_unique<Dielectric>(F(1.5)));
+    dielectricSphereFloat->Material = MakeMatteMaterial();
 
     SceneSphere* dielectricSphere = new SceneSphere(); OutSceneObjects.push_back(dielectricSphere);
     dielectricSphere->SetRadius(20);
@@ -295,8 +293,7 @@ void Scene::CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects)
         SceneLeft + 30,
         SceneBottom + 20,
         SceneFar - 30);
-    dielectricSphere->Material = std::make_unique<Material>();
-    dielectricSphere->Material->AddBSDFComponent(std::make_unique<Dielectric>(F(1.4)));
+    dielectricSphere->Material = MakeMatteMaterial();
 
     SceneCube* lCube = new SceneCube(); OutSceneObjects.push_back(lCube);
     lCube->SetExtends(SmallObjectSize, BigObjectSize, SmallObjectSize);

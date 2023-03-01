@@ -43,7 +43,7 @@ private:
     void ResolveSamples();
 
     static const int MaxCameraRaySampleCount = 8;
-    static const int MaxLightRaySampleCount = 8;
+    static const int MaxLightRaySampleCount = -1;
     static const int MaxSampleCount = MaxCameraRaySampleCount* MaxLightRaySampleCount;
 
     struct Sample

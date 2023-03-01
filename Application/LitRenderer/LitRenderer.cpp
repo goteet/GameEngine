@@ -35,9 +35,11 @@ namespace
                 SceneCenterX,
                 SceneBottom + 22,
                 SceneCenterZ + 10);
-            //mainSphere->Material.AddBSDFComponent(std::make_unique<Glossy>(1, 0.85, 0.5, 2.5));
-            //mainSphere->Material.AddBSDFComponent(std::make_unique<GGX>(0.1));
-            mainSphere->Material = MakeMatteMaterial(F(0.5), F(0.5), F(0.5));
+
+            //mainSphere->Material = MakeMatteMaterial(F(0.5), F(0.5), F(0.5));
+            F Kd = F(0.5);
+            F Ks = F(0.5);
+            mainSphere->Material = MakePlasticMaterial(Kd, F(0.5), F(0.5), F(0.5), Ks, F(0.1), F(1.5));
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);

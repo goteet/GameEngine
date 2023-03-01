@@ -233,8 +233,8 @@ F Lambertian::pdf(
 
 
 
-OrenNayer::OrenNayer(F r, F g, F b, math::radian<F> sigma)
-    : BSDF(Material::BSDFMask::Diffuse, r, g, b)
+OrenNayer::OrenNayer(F r, F g, F b, math::radian<F> sigma, F weight)
+    : Lambertian(r, g, b, weight)
     , Sigma(sigma)
     , SigmaSquare(math::square(sigma.value))
 {
@@ -270,87 +270,12 @@ math::vector3<F> OrenNayer::f(
     return Albedo * math::InvPI<F> *factor * cosWi;
 }
 
-bool Metal::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
-{
-    const math::nvector3<F> Wo = -Ray.direction();
-    const math::vector3<F> FuzzyDirection = Fuzzy * GenerateUnitSphereVector();
-    const math::nvector3<F> Wi = math::reflection(Wo, N) + FuzzyDirection;
-    outLightRay.specular = true;
-    outLightRay.scattering.set_origin(P);
-    outLightRay.scattering.set_direction(Wi);
-    outLightRay.cosine = math::dot(N, Wi);
-    outLightRay.f = math::vector3<F>::one();
-    return outLightRay.cosine > 0;
-}
-
-math::vector3<F> Metal::f(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi,
-    bool IsOnSurface) const
-{
-    F NdotL = math::dot(N, Wi);
-    const math::nvector3<F> Wr = math::reflection(Wo, N);
-    const math::nvector3<F> a = math::cross(N, Wo);
-    const math::nvector3<F> b = math::cross(Wr, N);
-    return (NdotL > 0 && math::almost_same(Wr, Wi, F(0.01)) && math::almost_same(a, b))
-        ? math::vector3<F>::one()
-        : math::vector3<F>::zero();
-}
-
-F Metal::pdf(const math::nvector3<F>& N, const math::nvector3<F>& Wo, const math::nvector3<F>& Wi) const
-{
-    F NdotL = math::dot(N, Wi);
-    return (NdotL > 0 && IsSpecular(N, Wo, Wi)) ? F(1) : F(0);
-}
-
 bool IsReflectionDirection(const math::nvector3<F>& N, const math::nvector3<F>& Wo, const math::nvector3<F>& Wi)
 {
     const math::nvector3<F> Wr = math::reflection(Wo, N);
     const math::nvector3<F> a = math::cross(N, Wo);
     const math::nvector3<F> b = math::cross(Wr, N);
     return math::almost_same(Wr, Wi, F(0.05)) && math::almost_same(a, b, F(0.01));
-}
-
-bool Metal::IsSpecular(const math::nvector3<F>& N, const math::nvector3<F>& Wo, const math::nvector3<F>& Wi) const
-{
-    return IsReflectionDirection(N, Wo, Wi);
-}
-
-bool Dielectric::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
-{
-    //TODO: totally wrong!
-    const F AirRefractiveIndex = F(1.0003);
-
-    const math::nvector3<F> Wo = -Ray.direction();
-
-    F eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
-    F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
-    const F RefractionRatio = eta1 / eta2;
-
-    const F NdotO = math::dot(Wo, N);
-    F CosTheta = math::saturate(NdotO);
-    F SinThetaSquare = math::saturate(F(1) - math::square(CosTheta));
-    F Det = F(1) - SinThetaSquare * math::square(RefractionRatio);
-    bool RefractRay = Det >= F(0);
-
-    bool ReflectRay = epsilon[0] < FresnelSchlick(CosTheta, eta1, eta2);
-    math::nvector3<F> Wi;
-    if (!RefractRay || ReflectRay)
-    {
-        Wi = math::reflection(Wo, N);
-    }
-    else
-    {
-        math::vector3<F> Rprep = RefractionRatio * (Wo + CosTheta * N);
-        math::vector3<F> Rpall = N * sqrt(Det);
-        Wi = Rprep - Rpall;
-    }
-
-    outLightRay.scattering.set_origin(P);
-    outLightRay.scattering.set_direction(Wi);
-    outLightRay.f = math::vector3<F>::one();
-    return true;
 }
 
 const F AirRefractiveIndex = F(1.0003);
@@ -460,7 +385,7 @@ math::nvector3<F> SampleGGXVNDF(
     math::vector3<F> N = T1 * t1 + T2 * t2 + V * sqrt(math::max2(F(0), F(1) - math::square(t1) - math::square(t2)));
 
     // unstretch
-    math::nvector3<F> Wm = math::vector3<F>(alpha_x* N.x, alpha_y*N.y, math::max2(F(0), N.z));
+    math::nvector3<F> Wm = math::vector3<F>(alpha_x * N.x, alpha_y * N.y, math::max2(F(0), N.z));
     return Wm;
 }
 
@@ -514,26 +439,26 @@ F GGX::pdf(
     return pdfSpecular;
 }
 
- void Material::AddBSDFComponent(std::unique_ptr<BSDF>&& component)
+void Material::AddBSDFComponent(std::unique_ptr<BSDF> component)
 {
-     mBSDFMask |= component->BSDFMask;
-     mBSDFComponents.emplace_back(std::move(component));
+    mBSDFMask |= component->BSDFMask;
+    mBSDFComponents.emplace_back(std::move(component));
 }
 
- const std::unique_ptr<BSDF>& Material::GetBSDFComponentByMask(uint32_t mask) const
- {
-     static std::unique_ptr<BSDF> dummy = nullptr;
-     for (const auto& comp : mBSDFComponents)
-     {
-         if (comp->BSDFMask & mask)
-         {
-             return comp;
-         }
-     }
-     return dummy;
- }
+const std::unique_ptr<BSDF>& Material::GetBSDFComponentByMask(uint32_t mask) const
+{
+    static std::unique_ptr<BSDF> dummy = nullptr;
+    for (const auto& comp : mBSDFComponents)
+    {
+        if (comp->BSDFMask & mask)
+        {
+            return comp;
+        }
+    }
+    return dummy;
+}
 
- const std::unique_ptr<BSDF>& Material::GetRandomBSDFComponent(F u) const
+const std::unique_ptr<BSDF>& Material::GetRandomBSDFComponent(F u) const
 {
     uint32_t length = (uint32_t)mBSDFComponents.size();
     uint32_t index = math::min2<uint32_t>(math::floor2<uint32_t>(u * length), length - 1);

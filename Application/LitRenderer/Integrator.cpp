@@ -68,9 +68,12 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
                     if (bIsVisible)
                     {
                         F pdf_light = lightSource->SamplePdf(lightSI, lightRay);
-                        F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
+                        //F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
+                        F pdf_bsdf = material->SamplePdf(N, W_o, W_i);
                         F weight = PowerHeuristic(pdf_light, pdf_bsdf);
-                        math::vector3<F> f = bsdf.f(N, W_o, W_i, true);
+                        //math::vector3<F> f = bsdf.f(N, W_o, W_i, true);
+
+                        math::vector3<F> f = material->SampleF(N, W_o, W_i, true);
 
                         const math::vector3<F>& Le = lightSource->LightSource->Le();
                         Lo += weight * beta * f * Le / pdf_light;
@@ -91,7 +94,7 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
                 F pdf_light = scene.SampleLightPdf(scatterLight.scattering);
                 F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
                 F weight = PowerHeuristic(pdf_bsdf, pdf_light);
-                beta *= weight * scatterLight.f * math::saturate(scatterLight.cosine) / pdf_bsdf;
+                beta *= weight * bsdf.Weight * scatterLight.f * math::saturate(scatterLight.cosine) / pdf_bsdf;
             }
         }
 
