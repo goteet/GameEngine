@@ -71,6 +71,7 @@ struct Material
     {
         Diffuse = 1 << 0,
         Specular = 1 << 1,
+        Reflection = 1 << 15
     };
 
     Material() = default;
@@ -188,7 +189,14 @@ struct GGX : public BSDF
     F RefractiveIndex = F(2.5);
 
     GGX(F weight = F(1)) : BSDF("GGX Microfacet", Material::BSDFMask::Specular, weight) { }
-    GGX(F roughness, F IoR, F weight = F(1)) : BSDF("GGX Microfacet", Material::BSDFMask::Specular, weight), Roughness(roughness), RefractiveIndex(IoR) { }
+    GGX(F roughness, F IoR, F weight = F(1))
+        : BSDF("GGX Microfacet"
+            , (roughness < 0.05)
+            ? (Material::BSDFMask::Reflection | Material::BSDFMask::Specular)
+            : Material::BSDFMask::Specular
+            , weight)
+        , Roughness(roughness)
+        , RefractiveIndex(IoR) { }
     virtual bool Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual math::vector3<F> f(
         const math::nvector3<F>& N,

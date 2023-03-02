@@ -32,16 +32,30 @@ F FresnelSchlick(F CosTheta, F eta1, F eta2)
 
 F DistributionGTR2(F roughness, F NdotH)
 {
-    F alpha = math::square(roughness);
-    F X = NdotH > 0 ? F(1) : F(0);
+    //F alpha = math::square(roughness);
+    F alpha2 = math::power<4>(roughness);
     //      alpha^2 * X(n.m)           sqrt           alpha * X                    0.5 * alpha * X
     //--------------------------------- = -------------------------------- = ----------------------------
-    // 4 * cos^4 * (alpha^2 + tan^2)^2      2 * (alpha^2 * cos^2 + sin^2)      cos^2 * (alpha^2 - 1) + 1
+    // 4 * cos^4 * (alpha^2 + tan^2)^2      2 * (alpha^2 * cos^2 + sin^2)      cos^2 * (alpha^2 - 1) + 1     //<----should replace 4 with PI.
     //
+    // Note: Naty-Hoffman-2015 show that there is PI in the demoninator.
+    // it should be:
+    //                  a^2                                               a2
+    //  Dtr = -------------------------- = InversePi * ----------------------------------------
+    //         PI * ((n.h)^2(a^2-1)+1)^2                 (NdotH^2 * (a2 - 1) + 1)^2
+    F cos = math::saturate(NdotH); //<--hidden X(x) -> x>0?1:0; here
+    F denominator = math::square(cos) * (alpha2 - 1) + 1;
+    return alpha2 * math::square(denominator) * math::InvPI<F>;
+}
+
+//still error with GTR2, so I copy this from filament's description
+F DistributionGGX_FromFilament(F roughness, F NdotH)
+{
+    F a = NdotH * roughness;
     F cos = math::saturate(NdotH);
-    F numerator = F(0.5) * alpha * X;
-    F denominator = math::square(cos) * (math::square(alpha) - F(1)) + 1;
-    return math::square(numerator / denominator);
+    F numerator = roughness;
+    F denominator = F(1) - math::square(cos) + math::square(a);
+    return math::square(numerator / denominator) * math::InvPI<F>;
 }
 
 F DistributionGTR1(F roughness, F HdotN)
@@ -429,12 +443,19 @@ bool GGX::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvecto
     F alpha = math::square(Roughness);
     UVW uvw(N);
     math::nvector3<F> Wm = SampleGGXVNDF(uvw.world_to_local(-Wo), alpha, alpha, epsilon[1], epsilon[2]);
-    math::nvector3<F> Wi = math::reflection(Wo, uvw.local_to_world(Wm));
+    math::nvector3<F> H = uvw.local_to_world(Wm);
+    math::nvector3<F> Wi = math::reflection(Wo, H);
     const F NdotL = math::dot(Wi, N);
+    const F NdotH = math::dot(N, H);
+    const F HdotV = math::dot(H, Wo);
     const F Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
-    outLightRay.f = math::vector3<F>::one() * Frehnel;
+    //const F D = DistributionGGX(Roughness, NdotH);
+    const F G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
+    //const F BRDF = F(0.25) * Frehnel * D * G / NdotV;
+    const F BRDF = Frehnel * G / HdotV;
+    outLightRay.f = math::vector3<F>::one() * BRDF;
     outLightRay.cosine = NdotL;
     outLightRay.specular = true;
     return NdotL > 0;
@@ -452,11 +473,11 @@ math::vector3<F> GGX::f(
     const F NdotL = math::dot(N, Wi);
     const F NdotH = math::dot(N, H);
     const F NdotV = math::dot(N, Wo);
-    const F Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-    const F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
+    const F HdotV = math::dot(H, Wo);
+    const F Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
     const F D = DistributionGGX(Roughness, NdotH);
     const F G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
-    F brdf = F(0.25) * Fi * D * G / (NdotV);
+    const F brdf = Frehnel * G / HdotV;
     return NdotL > F(0) ? math::vector3<F>::one() * brdf : math::vector3<F>::zero();
 }
 
@@ -465,9 +486,19 @@ F GGX::pdf(
     const math::nvector3<F>& Wo,
     const math::nvector3<F>& Wi) const
 {
+#if true
+    //copy from UE4.
     const math::nvector3<F> H = Wi + Wo;
+    const F NdotH = math::dot(N, H);
+    const F VdotH = math::dot(Wo, H);
+    const F D = DistributionGGX(Roughness, NdotH);
+    return NdotH / VdotH;
+    //return D * NdotH * 0.25 / VdotH;
+#else
+	const math::nvector3<F> H = Wi + Wo;
     F pdfSpecular = math::power<5>(math::dot(H, N));
     return pdfSpecular;
+#endif
 }
 
 void Material::AddBSDFComponent(std::unique_ptr<BSDF> component)

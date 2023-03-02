@@ -18,6 +18,7 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
 
     // First hit, on p_1
     SurfaceIntersection hitRecord = recordP1;
+    bool bIsReflectionTrace = false;
     for (int bounce = 0; hitRecord && !math::near_zero(beta) && bounce < MaxBounces; ++bounce)
     {
         const SceneObject& surface = *hitRecord.Object;
@@ -27,6 +28,18 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
         const bool bIsLightSource = surface.LightSource != nullptr;
         F biasedDistance = math::max2<F>(hitRecord.Distance, F(0));
         math::point3d<F> P_i = ray.calc_offset(biasedDistance);
+
+
+        if (bIsLightSource)
+        {
+            if (bounce == 0 || bIsReflectionTrace)
+            {
+                math::vector3<F> Le = surface.LightSource->Le();
+                Lo += beta * Le;
+            }
+            break;
+        }
+
         F u[3] =
         {
             mUniformSamplers[0].value(),
@@ -34,24 +47,14 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
             mUniformSamplers[2].value()
         };
 
+        const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
+        bIsReflectionTrace = (bsdf.BSDFMask & Material::BSDFMask::Reflection) != 0;
 
-        if (bIsLightSource)
+        //Sampling Light Source
+        if (!bIsReflectionTrace)
         {
-            if (bounce == 0)
-            {
-                math::vector3<F> Le = surface.LightSource->Le();
-                Lo += beta * Le;
-            }
-        }
-
-
-        if (material)
-        {
-            const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
-
-            //Sampling Light Source
             SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
-            if (!bIsLightSource && lightSource != nullptr && lightSource != hitRecord.Object)
+            if (lightSource != nullptr && lightSource != hitRecord.Object)
             {
                 math::point3d<F> P_i_1 = lightSource->SampleRandomPoint(u);
                 math::ray3d<F> lightRay(P_i, P_i_1);
@@ -80,22 +83,22 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
                     }
                 }
             }
+        }
 
-            //Sampling BSDF
+        //Sampling BSDF
+        {
+            LightRay scatterLight;
+            if (!bsdf.Scattering(u, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
             {
-                LightRay scatterLight;
-                if (!bsdf.Scattering(u, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
-                {
-                    break;
-                }
-
-                ray = scatterLight.scattering;
-                const math::nvector3<F>& W_i = ray.direction();
-                F pdf_light = scene.SampleLightPdf(scatterLight.scattering);
-                F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
-                F weight = PowerHeuristic(pdf_bsdf, pdf_light);
-                beta *= weight * bsdf.Weight * scatterLight.f * math::saturate(scatterLight.cosine) / pdf_bsdf;
+                break;
             }
+
+            ray = scatterLight.scattering;
+            const math::nvector3<F>& W_i = ray.direction();
+            F pdf_light = scene.SampleLightPdf(scatterLight.scattering);
+            F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
+            F weight = PowerHeuristic(pdf_bsdf, pdf_light);
+            beta *= weight * bsdf.Weight * scatterLight.f * math::saturate(scatterLight.cosine) / pdf_bsdf;
         }
 
         if (bounce > 3)
@@ -127,7 +130,7 @@ math::vector3<F> DebugIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>&
     float rrContinueProbability = 1.0f;
     auto CheckRussiaRoulette = [&](float prob) { return TerminateSampler.value() > prob; };
 
-    
+
     const SurfaceIntersection& hitRecord = recordP1;
     const math::ray3d<F>& ray = cameraRay;
 
@@ -161,7 +164,11 @@ math::vector3<F> DebugIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>&
             {
                 const math::ray3d<F>& scatteringRay = scatterLight.scattering;
                 const math::nvector3<F>& W_i = scatteringRay.direction();
-                return W_i * 0.5 + 0.5;
+                return W_i;
+
+                const math::nvector3<F> Half = (W_i + W_o);
+                return Half * 0.5 + 0.5;
+                return math::vector3<F>(1, 0, 0) * (math::dot(N, Half));
             }
         }
     }
