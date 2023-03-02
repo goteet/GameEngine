@@ -24,7 +24,7 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
         const std::unique_ptr<Material>& material = surface.Material;
         const math::nvector3<F>& N = hitRecord.SurfaceNormal;
         const math::nvector3<F> W_o = -ray.direction();
-        const bool isLightSource = surface.LightSource != nullptr;
+        const bool bIsLightSource = surface.LightSource != nullptr;
         F biasedDistance = math::max2<F>(hitRecord.Distance, F(0));
         math::point3d<F> P_i = ray.calc_offset(biasedDistance);
         F u[3] =
@@ -35,7 +35,7 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
         };
 
 
-        if (isLightSource)
+        if (bIsLightSource)
         {
             if (bounce == 0)
             {
@@ -51,7 +51,7 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
 
             //Sampling Light Source
             SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
-            if (!isLightSource && lightSource != nullptr && lightSource != hitRecord.Object)
+            if (!bIsLightSource && lightSource != nullptr && lightSource != hitRecord.Object)
             {
                 math::point3d<F> P_i_1 = lightSource->SampleRandomPoint(u);
                 math::ray3d<F> lightRay(P_i, P_i_1);
@@ -113,4 +113,58 @@ math::vector3<F> PathIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& 
     }
 
     return Lo;
+}
+
+math::vector3<F> DebugIntegrator::EvaluateLi(Scene& scene, const math::ray3d<F>& cameraRay, const SurfaceIntersection& recordP1)
+{
+    if (!recordP1)
+    {
+        const math::vector3<F> BackgroundColor = math::vector3<F>::zero();
+        return BackgroundColor;
+    }
+
+    const unsigned int MaxBounces = 10;
+    float rrContinueProbability = 1.0f;
+    auto CheckRussiaRoulette = [&](float prob) { return TerminateSampler.value() > prob; };
+
+    
+    const SurfaceIntersection& hitRecord = recordP1;
+    const math::ray3d<F>& ray = cameraRay;
+
+    const SceneObject& surface = *hitRecord.Object;
+    const std::unique_ptr<Material>& material = surface.Material;
+    const math::nvector3<F>& N = hitRecord.SurfaceNormal;
+    const math::nvector3<F> W_o = -ray.direction();
+
+    const bool bIsLightSource = surface.LightSource != nullptr;
+    if (bIsLightSource)
+    {
+        math::vector3<F> Le = surface.LightSource->Le();
+        return Le;
+    }
+    else //Sampling BSDF
+    {
+        F biasedDistance = math::max2<F>(hitRecord.Distance, F(0));
+        math::point3d<F> P_i = ray.calc_offset(biasedDistance);
+        F u[3] =
+        {
+            mUniformSamplers[0].value(),
+            mUniformSamplers[1].value(),
+            mUniformSamplers[2].value()
+        };
+
+        if (material)
+        {
+            const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
+            LightRay scatterLight;
+            if (bsdf.Scattering(u, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
+            {
+                const math::ray3d<F>& scatteringRay = scatterLight.scattering;
+                const math::nvector3<F>& W_i = scatteringRay.direction();
+                return W_i * 0.5 + 0.5;
+            }
+        }
+    }
+
+    return math::vector3<F>::zero();
 }

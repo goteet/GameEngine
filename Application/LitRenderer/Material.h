@@ -232,3 +232,12 @@ inline std::unique_ptr<Material> MakePlasticMaterial(F Kd, F albedoR, F albedoG,
 
     return material;
 }
+
+inline std::unique_ptr<Material> MakeGGXMaterialForDebug(F roughness, F IoR = F(1.5))
+{
+    std::unique_ptr<Material> material = std::make_unique<Material>();
+    std::unique_ptr<GGX> compGGX = std::make_unique<GGX>(roughness, IoR);
+    material->AddBSDFComponent(std::move(compGGX));
+
+    return material;
+}

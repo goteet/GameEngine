@@ -6,6 +6,7 @@
 
 namespace
 {
+    const bool DEBUG = false;
     class SimpleScene : public Scene
     {
         virtual void CreateScene(F aspect, std::vector<SceneObject*>& OutSceneObjects) override
@@ -36,10 +37,18 @@ namespace
                 SceneBottom + 22,
                 SceneCenterZ + 10);
 
-            //mainSphere->Material = MakeMatteMaterial(F(0.5), F(0.5), F(0.5));
-            F Kd = F(0.5);
-            F Ks = F(0.5);
-            mainSphere->Material = MakePlasticMaterial(Kd, F(0.5), F(0.5), F(0.5), Ks, F(0.1), F(1.5));
+            const F roughness = F(0.01);
+            const F IoR = F(1.5);
+            if (DEBUG)
+            {
+                mainSphere->Material = MakeGGXMaterialForDebug(roughness, IoR);
+            }
+            else
+            {
+                F Ks = F(0.5);
+                F Kd = F(1) - Ks;
+                mainSphere->Material = MakePlasticMaterial(Kd, F(0.5), F(0.5), F(0.5), Ks, roughness, IoR);
+            }
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
@@ -288,7 +297,11 @@ void LitRenderer::ResolveSamples()
     const Sample* Samples = mCameraRaySamples[mCurrentCameraRayIndex];
     mCurrentCameraRayIndex = (mCurrentCameraRayIndex + 1) % MaxCameraRaySampleCount;
     math::vector3<F>* accumulatedBufferPtr = mFilm.GetBackbufferPtr();
-    PathIntegrator integrator;
+
+    PathIntegrator pathIntegrator;
+    DebugIntegrator debugIntegrator;
+    Integrator& integrator = DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
+
     for (int rowIndex = 0; rowIndex < mFilm.CanvasHeight; rowIndex++)
     {
         int rowOffset = rowIndex * mFilm.CanvasWidth;
