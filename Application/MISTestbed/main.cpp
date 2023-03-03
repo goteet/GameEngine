@@ -10,8 +10,8 @@ const float kUpperBound = kPI * 0.5f;
 const float kLowerBound = 0.0f;
 const int kSamples = 500;
 
-template<typename F>
-float Trapezoid(F f)
+template<typename Float>
+float Trapezoid(Float f)
 {
     float sum = 0.0f;
     const float dx = 0.001f;
@@ -23,8 +23,8 @@ float Trapezoid(F f)
     return sum;
 }
 
-template<typename F>
-float UniformSampling(F f)
+template<typename Float>
+float UniformSampling(Float f)
 {
     std::uniform_real_distribution<float> distribution(kLowerBound, kUpperBound);
 
@@ -38,8 +38,8 @@ float UniformSampling(F f)
     return sum / (kSamples * pdf);
 }
 
-template<typename F, typename PDF, typename Distribution>
-float ImportanceSampling(F f, PDF pdf, Distribution distrib)
+template<typename Float, typename PDF, typename Distribution>
+float ImportanceSampling(Float f, PDF pdf, Distribution distrib)
 {
     std::uniform_real_distribution<float> u(0.0f, 1.0f);
 
@@ -54,10 +54,10 @@ float ImportanceSampling(F f, PDF pdf, Distribution distrib)
     return sum / kSamples;
 }
 
-template<typename F
+template<typename Float
     , typename PDF1, typename Distribution1
     , typename PDF2, typename Distribution2>
-    float MultipleImportanceSampling(F f,
+    float MultipleImportanceSampling(Float f,
         PDF1 pdf1, Distribution1 distrib1,
         PDF2 pdf2, Distribution2 distrib2)
 {

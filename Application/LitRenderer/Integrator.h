@@ -1,26 +1,28 @@
 #pragma once
+#include "PreInclude.h"
 #include "LitRenderer.h"
+
 
 struct Integrator
 {
     virtual ~Integrator() { };
-    virtual math::vector3<F> EvaluateLi(Scene& scene, const math::ray3d<F>& cameraRay, const SurfaceIntersection& recordP1) = 0;
+    virtual Spectrum EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1) = 0;
 };
 
 class PathIntegrator : public Integrator
 {
-    random<F> TerminateSampler;
-    random<F> mUniformSamplers[3];
+    random<Float> TerminateSampler;
+    random<Float> mUniformSamplers[3];
 public:
-    virtual math::vector3<F> EvaluateLi(Scene& scene, const math::ray3d<F>& cameraRay, const SurfaceIntersection& recordP1) override;
+    virtual Spectrum EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1) override;
 };
 
 
 class DebugIntegrator : public Integrator
 {
-    random<F> TerminateSampler;
-    random<F> mUniformSamplers[3];
+    random<Float> TerminateSampler;
+    random<Float> mUniformSamplers[3];
 public:
-    virtual math::vector3<F> EvaluateLi(Scene& scene, const math::ray3d<F>& cameraRay, const SurfaceIntersection& recordP1) override;
+    virtual Spectrum EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1) override;
 
 };

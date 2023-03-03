@@ -450,7 +450,7 @@ namespace math
         float det = dot(v1v0, pv);
         if (det > value_type(0))
         {
-            float invDet = F(1) / det;
+            float invDet = Float(1) / det;
 
             vector_t<value_type, EDim::_3> tv = ray.origin() - v0;
             u = dot(tv, pv) * invDet;

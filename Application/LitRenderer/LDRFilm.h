@@ -9,7 +9,7 @@ public:
     LDRFilm(int width, int height);
     ~LDRFilm();
 
-    math::vector3<F>* GetBackbufferPtr() { return mBackbuffer; }
+    Spectrum* GetBackbufferPtr() { return mBackbuffer; }
     const int CanvasWidth;
     const int CanvasHeight;
     void Clear();
@@ -18,6 +18,6 @@ public:
     int GetSampleCount() const { return mSampleCount; }
 
 private:
-    math::vector3<F>* mBackbuffer = nullptr;
+    Spectrum* mBackbuffer = nullptr;
     int mSampleCount = 0;
 };

@@ -1,10 +1,7 @@
 #pragma once
 #include <memory>
 #include <vector>
-#include <Foundation/Math/Vector.h>
-#include <Foundation/Math/Matrix.h>
-#include <Foundation/Math/Rotation.h>
-#include <Foundation/Math/Geometry.h>
+#include "PreInclude.h"
 #include "LDRFilm.h"
 #include "Material.h"
 #include "Scene.h"
@@ -14,15 +11,15 @@ class SimpleBackCamera
 {
     struct DegreeClampHelper
     {
-        DegreeClampHelper(math::degree<F> degree)
-            : value(math::clamp(degree.value, F(1), F(179))) { }
-        const F value;
+        DegreeClampHelper(Degree degree)
+            : value(math::clamp(degree.value, Float(1), Float(179))) { }
+        const Float value;
     };
 public:
-    SimpleBackCamera(math::degree<F> verticalFov);
-    math::point3d<F> Position;
-    const math::radian<F> HalfVerticalFov;
-    const F HalfVerticalFovTangent;
+    SimpleBackCamera(Degree verticalFov);
+    Point Position;
+    const Radian HalfVerticalFov;
+    const Float HalfVerticalFovTangent;
 };
 
 class LitRenderer
@@ -48,7 +45,7 @@ private:
 
     struct Sample
     {
-        math::ray3d<F> Ray;
+        Ray Ray;
         SurfaceIntersection RecordP1;
         int PixelRow, PixelCol;
     };
@@ -57,7 +54,7 @@ private:
     unsigned char* mSystemCanvasDataPtr;
 
 
-    math::vector3<F> mClearColor;
+    Spectrum mClearColor;
     LDRFilm mFilm;
     SimpleBackCamera mCamera;
     std::unique_ptr<Scene> mScene;

@@ -1,39 +1,39 @@
 #include "Material.h"
 #include "LitRenderer.h"
 
-template<int E> F Ws(F p1, F p2)
+template<int E> Float Ws(Float p1, Float p2)
 {
     return Ws<1>(math::power<E>(p1), math::power<E>(p2));
 }
 
-template<> F Ws<1>(F p1, F p2)
+template<> Float Ws<1>(Float p1, Float p2)
 {
     return p1 / (p1 + p2);
 }
 
-F PowerHeuristic(F pdfA, F pdfB)
+Float PowerHeuristic(Float pdfA, Float pdfB)
 {
     return Ws<2>(pdfA, pdfB);
 }
 
-F BalanceHeuristic(F pdfA, F pdfB)
+Float BalanceHeuristic(Float pdfA, Float pdfB)
 {
     return Ws<1>(pdfA, pdfB);
 }
 
-F FresnelSchlick(F CosTheta, F eta1, F eta2)
+Float FresnelSchlick(Float CosTheta, Float eta1, Float eta2)
 {
-    F F0 = (eta1 - eta2) / (eta1 + eta2);
-    F R0 = F0 * F0;
-    F Base = F(1) - CosTheta;
-    return R0 + (F(1) - R0) * math::power<5>(Base);
+    Float F0 = (eta1 - eta2) / (eta1 + eta2);
+    Float R0 = F0 * F0;
+    Float Base = Float(1) - CosTheta;
+    return R0 + (Float(1) - R0) * math::power<5>(Base);
 }
 
 
-F DistributionGTR2(F roughness, F NdotH)
+Float DistributionGTR2(Float roughness, Float NdotH)
 {
     //F alpha = math::square(roughness);
-    F alpha2 = math::power<4>(roughness);
+    Float alpha2 = math::power<4>(roughness);
     //      alpha^2 * X(n.m)           sqrt           alpha * X                    0.5 * alpha * X
     //--------------------------------- = -------------------------------- = ----------------------------
     // 4 * cos^4 * (alpha^2 + tan^2)^2      2 * (alpha^2 * cos^2 + sin^2)      cos^2 * (alpha^2 - 1) + 1     //<----should replace 4 with PI.
@@ -43,65 +43,65 @@ F DistributionGTR2(F roughness, F NdotH)
     //                  a^2                                               a2
     //  Dtr = -------------------------- = InversePi * ----------------------------------------
     //         PI * ((n.h)^2(a^2-1)+1)^2                 (NdotH^2 * (a2 - 1) + 1)^2
-    F cos = math::saturate(NdotH); //<--hidden X(x) -> x>0?1:0; here
-    F denominator = math::square(cos) * (alpha2 - 1) + 1;
-    return alpha2 * math::square(denominator) * math::InvPI<F>;
+    Float cos = math::saturate(NdotH); //<--hidden X(x) -> x>0?1:0; here
+    Float denominator = math::square(cos) * (alpha2 - 1) + 1;
+    return alpha2 * math::square(denominator) * math::InvPI<Float>;
 }
 
 //still error with GTR2, so I copy this from filament's description
-F DistributionGGX_FromFilament(F roughness, F NdotH)
+Float DistributionGGX_FromFilament(Float roughness, Float NdotH)
 {
-    F a = NdotH * roughness;
-    F cos = math::saturate(NdotH);
-    F numerator = roughness;
-    F denominator = F(1) - math::square(cos) + math::square(a);
-    return math::square(numerator / denominator) * math::InvPI<F>;
+    Float a = NdotH * roughness;
+    Float cos = math::saturate(NdotH);
+    Float numerator = roughness;
+    Float denominator = Float(1) - math::square(cos) + math::square(a);
+    return math::square(numerator / denominator) * math::InvPI<Float>;
 }
 
-F DistributionGTR1(F roughness, F HdotN)
+Float DistributionGTR1(Float roughness, Float HdotN)
 {
-    F alpha = math::square(roughness);
-    F X = HdotN > 0 ? F(1) : F(0);
+    Float alpha = math::square(roughness);
+    Float X = HdotN > 0 ? Float(1) : Float(0);
     //      alpha^2 * X(n.m)                       alpha^2 * X                  (0.5 * alpha * X)^2
     //--------------------------------- = ------------------------------- = ---------------------------
     // 4 * cos^2 * (alpha^2 + tan^2)       4 * (alpha^2 * cos^2 + sin^2)     cos^2 * (alpha^2 - 1) + 1
     //
-    F cos = math::saturate(HdotN);
-    F numerator = F(0.5) * alpha * X;
-    F denominator = math::square(cos) * (math::square(alpha) - F(1)) + 1;
+    Float cos = math::saturate(HdotN);
+    Float numerator = Float(0.5) * alpha * X;
+    Float denominator = math::square(cos) * (math::square(alpha) - Float(1)) + 1;
     return math::square(numerator) / denominator;
 }
 
-F DistributionGGX(F roughness, F NdotH)
+Float DistributionGGX(Float roughness, Float NdotH)
 {
     return DistributionGTR2(roughness, NdotH);
 }
 
-F DistributionBerry(F roughness, F NdotH)
+Float DistributionBerry(Float roughness, Float NdotH)
 {
     return DistributionGTR1(roughness, NdotH);
 }
 
-F ShadowingGGX(F roughness, F VdotH, F NdotH)
+Float ShadowingGGX(Float roughness, Float VdotH, Float NdotH)
 {
-    F alpha = math::square(roughness);
-    F alpha2 = math::square(alpha);
-    F cos = math::saturate(VdotH);
-    F cos2 = math::square(cos);
-    F X = (NdotH / VdotH) > 0 ? F(1) : F(0);
+    Float alpha = math::square(roughness);
+    Float alpha2 = math::square(alpha);
+    Float cos = math::saturate(VdotH);
+    Float cos2 = math::square(cos);
+    Float X = (NdotH / VdotH) > 0 ? Float(1) : Float(0);
     //          2 * X                                       2 * cos * X                                     2 * cos * X
     //--------------------------------- = ------------------------------------------- = ---------------------------------------------
     // 1 + sqrt(1 + AlphaG^2 * tan^2)      cos + sqrt(cos^2 + alpha^2 * (1 - cos^2))     cos + sqrt(cos^2 * (1 - alpha^2) + alpha^2)
     //
-    F numerator = F(2) * cos * X;
-    F denominator = cos + sqrt(cos2 * (F(1) - alpha2) + alpha2);
+    Float numerator = Float(2) * cos * X;
+    Float denominator = cos + sqrt(cos2 * (Float(1) - alpha2) + alpha2);
     return numerator / denominator;
 }
 
-F GeometryGGX(F roughness, F NdotH, F VdotH, F LdotH)
+Float GeometryGGX(Float roughness, Float NdotH, Float VdotH, Float LdotH)
 {
-    F G1 = ShadowingGGX(roughness, VdotH, NdotH);
-    F G2 = ShadowingGGX(roughness, LdotH, NdotH);
+    Float G1 = ShadowingGGX(roughness, VdotH, NdotH);
+    Float G2 = ShadowingGGX(roughness, LdotH, NdotH);
     return math::min2(G1, G2);
 }
 
@@ -109,107 +109,107 @@ F GeometryGGX(F roughness, F NdotH, F VdotH, F LdotH)
 
 struct UVW
 {
-    math::nvector3<F> u, v, w;
+    Direction u, v, w;
 
-    UVW(const math::nvector3<F>& normal) { from_normal(normal); }
+    UVW(const Direction& normal) { from_normal(normal); }
 
-    void from_normal(const math::nvector3<F>& normal)
+    void from_normal(const Direction& normal)
     {
         w = normal;
-        v = fabs(w.x) > F(0.95) ? math::nvector3<F>::unit_y() : math::nvector3<F>::unit_x();
+        v = fabs(w.x) > Float(0.95) ? Direction::unit_y() : Direction::unit_x();
         v = math::cross(w, v);
         u = math::cross(w, v);
     }
 
-    math::nvector3<F> local_to_world(F x, F y, F z)
+    Direction local_to_world(Float x, Float y, Float z)
     {
         return x * u + y * v + z * w;
     }
-    math::nvector3<F> local_to_world(const math::nvector3<F>& dir)
+    Direction local_to_world(const Direction& dir)
     {
         return local_to_world(dir.x, dir.y, dir.z);
     }
 
-    math::nvector3<F> world_to_local(const math::nvector3<F>& dir)
+    Direction world_to_local(const Direction& dir)
     {
-        math::vector3<F> x = math::projection(dir, u);
-        math::vector3<F> y = math::projection(dir, v);
-        math::vector3<F> z = math::projection(dir, w);
+        Spectrum x = math::projection(dir, u);
+        Spectrum y = math::projection(dir, v);
+        Spectrum z = math::projection(dir, w);
         return x + y + z;
     }
 };
 
-math::vector3<F> GenerateUnitSphereVector()
+Spectrum GenerateUnitSphereVector()
 {
-    static random<F> rand;
+    static random<Float> rand;
     while (true)
     {
-        F x = rand(F(1));
-        F y = rand(F(1));
-        F z = rand(F(1));
-        math::vector3<F> v = math::vector3<F>(x, y, z);
-        if (math::magnitude_sqr(v) < F(1))
+        Float x = rand(Float(1));
+        Float y = rand(Float(1));
+        Float z = rand(Float(1));
+        Spectrum v = Spectrum(x, y, z);
+        if (math::magnitude_sqr(v) < Float(1))
         {
             return v;
         }
     }
 }
 
-math::nvector3<F> GenerateHemisphereDirection(F epsilon[2], const math::nvector3<F>& normal)
+Direction GenerateHemisphereDirection(Float epsilon[2], const Direction& normal)
 {
-    F rand_theta = epsilon[0];
-    F rand_phi = epsilon[1];
-    F cosTheta = F(1) - F(2) * rand_theta;
-    F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
-    math::radian<F> phi(math::TWO_PI<F> *rand_phi);
-    F cosPhi = math::cos(phi);
-    F sinPhi = math::sin(phi);
+    Float rand_theta = epsilon[0];
+    Float rand_phi = epsilon[1];
+    Float cosTheta = Float(1) - Float(2) * rand_theta;
+    Float sinTheta = sqrt(Float(1) - cosTheta * cosTheta);
+    Radian phi(math::TWO_PI<Float> *rand_phi);
+    Float cosPhi = math::cos(phi);
+    Float sinPhi = math::sin(phi);
 
-    F x = sinTheta * cosPhi;
-    F y = sinTheta * sinPhi;
-    F z = cosTheta;
+    Float x = sinTheta * cosPhi;
+    Float y = sinTheta * sinPhi;
+    Float z = cosTheta;
 
     UVW uvw(normal);
     return uvw.local_to_world(x, y, z);
 }
 
-math::nvector3<F> GenerateUniformHemisphereDirection(F epsilon[2], const math::nvector3<F>& normal)
+Direction GenerateUniformHemisphereDirection(Float epsilon[2], const Direction& normal)
 {
-    F rand_theta = epsilon[0];
-    F rand_phi = epsilon[1];
+    Float rand_theta = epsilon[0];
+    Float rand_phi = epsilon[1];
     // pdf = 1/2PI
     // => cdf = 1/2PI*phi*(1-cos_theta)
     // => f_phi = 1/2PI*phi       --> phi(x) = 2*PI*x
     // => f_theta = 1-cos_theta   --> cos_theta(x) = 1-x = x'
-    F cosTheta = rand_theta; //replace 1-e to e'
-    F sinTheta = sqrt(F(1) - cosTheta * cosTheta);
-    math::radian<F> phi(math::TWO_PI<F> *rand_phi);
-    F cosPhi = math::cos(phi);
-    F sinPhi = math::sin(phi);
+    Float cosTheta = rand_theta; //replace 1-e to e'
+    Float sinTheta = sqrt(Float(1) - cosTheta * cosTheta);
+    Radian phi(math::TWO_PI<Float> *rand_phi);
+    Float cosPhi = math::cos(phi);
+    Float sinPhi = math::sin(phi);
 
-    F x = sinTheta * cosPhi;
-    F y = sinTheta * sinPhi;
-    F z = cosTheta;
+    Float x = sinTheta * cosPhi;
+    Float y = sinTheta * sinPhi;
+    Float z = cosTheta;
 
     return UVW(normal).local_to_world(x, y, z);
 }
 
 
-math::vector3<F> GenerateCosineWeightedHemisphereDirection(F epsilon[2], const math::nvector3<F>& normal)
+Spectrum GenerateCosineWeightedHemisphereDirection(Float epsilon[2], const Direction& normal)
 {
-    F rand_theta = epsilon[0];
-    F rand_phi = epsilon[1];
+    Float rand_theta = epsilon[0];
+    Float rand_phi = epsilon[1];
     // pdf = cos(theta) / Pi.
-    F cosTheta_sqr = rand_theta; //replace 1-e to e'
-    F cosTheta = sqrt(cosTheta_sqr);
-    F sinTheta = sqrt(F(1) - cosTheta_sqr);
-    math::radian<F> phi(F(2) * math::PI<F> *rand_phi);
-    F cosPhi = math::cos(phi);
-    F sinPhi = math::sin(phi);
+    Float cosTheta_sqr = rand_theta; //replace 1-e to e'
+    Float cosTheta = sqrt(cosTheta_sqr);
+    Float sinTheta = sqrt(Float(1) - cosTheta_sqr);
+    Radian phi(Float(2) * math::PI<Float> *rand_phi);
+    Float cosPhi = math::cos(phi);
+    Float sinPhi = math::sin(phi);
 
-    F x = sinTheta * cosPhi;
-    F y = sinTheta * sinPhi;
-    F z = cosTheta;
+    Float x = sinTheta * cosPhi;
+    Float y = sinTheta * sinPhi;
+    Float z = cosTheta;
 
     UVW uvw(normal);
     return uvw.local_to_world(x, y, z);
@@ -217,66 +217,66 @@ math::vector3<F> GenerateCosineWeightedHemisphereDirection(F epsilon[2], const m
 
 
 
-bool Lambertian::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
+bool Lambertian::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
-    math::nvector3<F> Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
+    Direction Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
     outLightRay.cosine = math::dot(Wi, N);
     outLightRay.f = Lambertian::f(N, Ray.direction(), Wi, IsOnSurface);
-    return outLightRay.cosine >= F(0);
+    return outLightRay.cosine >= Float(0);
 }
 
-math::vector3<F> Lambertian::f(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi,
+Spectrum Lambertian::f(
+    const Direction& N,
+    const Direction& Wo,
+    const Direction& Wi,
     bool IsOnSurface) const
 {
-    return Albedo * math::InvPI<F>;
+    return Albedo * math::InvPI<Float>;
 }
 
-F Lambertian::pdf(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi) const
+Float Lambertian::pdf(
+    const Direction& N,
+    const Direction& Wo,
+    const Direction& Wi) const
 {
-    F NdotL = math::dot(N, Wi);
-    return math::saturate(NdotL) * math::InvPI<F>;
+    Float NdotL = math::dot(N, Wi);
+    return math::saturate(NdotL) * math::InvPI<Float>;
 }
 
 
 
-OrenNayer::OrenNayer(F r, F g, F b, math::radian<F> sigma, F weight)
+OrenNayer::OrenNayer(Float r, Float g, Float b, Radian sigma, Float weight)
     : BSDF("Oren-Nayer", Material::BSDFMask::Diffuse, weight)
     , Albedo(r, g, b)
     , Sigma(sigma)
     , SigmaSquare(math::square(sigma.value))
 {
-    A = F(1) - F(0.5) * SigmaSquare.value / (SigmaSquare.value + F(0.33));
-    B = F(0.45) * SigmaSquare.value / (SigmaSquare.value + F(0.09));
+    A = Float(1) - Float(0.5) * SigmaSquare.value / (SigmaSquare.value + Float(0.33));
+    B = Float(0.45) * SigmaSquare.value / (SigmaSquare.value + Float(0.09));
 }
 
-bool OrenNayer::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
+bool OrenNayer::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
-    math::nvector3<F> Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
+    Direction Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
     outLightRay.cosine = math::dot(Wi, N);
     outLightRay.f = f(N, Ray.direction(), Wi, IsOnSurface);
-    return outLightRay.cosine >= F(0);
+    return outLightRay.cosine >= Float(0);
 }
 
-math::vector3<F> OrenNayer::f(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi,
+Spectrum OrenNayer::f(
+    const Direction& N,
+    const Direction& Wo,
+    const Direction& Wi,
     bool IsOnSurface) const
 {
-    const F cosWi = math::saturate(math::dot(N, Wi)); const F sinWi = sqrt(F(1) - math::square(cosWi));
-    const F cosWo = math::saturate(math::dot(N, Wo)); const F sinWo = sqrt(F(1) - math::square(cosWo));
+    const Float cosWi = math::saturate(math::dot(N, Wi)); const Float sinWi = sqrt(Float(1) - math::square(cosWi));
+    const Float cosWo = math::saturate(math::dot(N, Wo)); const Float sinWo = sqrt(Float(1) - math::square(cosWo));
 
-    F sinAlpha, tanBeta;
+    Float sinAlpha, tanBeta;
     bool IsWiGreater = cosWi < cosWo;
     if (IsWiGreater)
     {
@@ -289,68 +289,68 @@ math::vector3<F> OrenNayer::f(
         tanBeta = sinWi / cosWi;
     }
 
-    F maxWi_Wo = math::max2(F(0), cosWi * cosWo + sinWi * sinWo);
-    F factor = A + B * maxWi_Wo * sinAlpha * tanBeta;
-    return Albedo * math::InvPI<F> *factor * cosWi;
+    Float maxWi_Wo = math::max2(Float(0), cosWi * cosWo + sinWi * sinWo);
+    Float factor = A + B * maxWi_Wo * sinAlpha * tanBeta;
+    return Albedo * math::InvPI<Float> *factor * cosWi;
 }
 
-F OrenNayer::pdf(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi) const
+Float OrenNayer::pdf(
+    const Direction& N,
+    const Direction& Wo,
+    const Direction& Wi) const
 {
-    F NdotL = math::dot(N, Wi);
-    return math::saturate(NdotL) * math::InvPI<F>;
+    Float NdotL = math::dot(N, Wi);
+    return math::saturate(NdotL) * math::InvPI<Float>;
 }
 
-bool IsReflectionDirection(const math::nvector3<F>& N, const math::nvector3<F>& Wo, const math::nvector3<F>& Wi)
+bool IsReflectionDirection(const Direction& N, const Direction& Wo, const Direction& Wi)
 {
-    const math::nvector3<F> Wr = math::reflection(Wo, N);
-    const math::nvector3<F> a = math::cross(N, Wo);
-    const math::nvector3<F> b = math::cross(Wr, N);
-    return math::almost_same(Wr, Wi, F(0.05)) && math::almost_same(a, b, F(0.01));
+    const Direction Wr = math::reflection(Wo, N);
+    const Direction a = math::cross(N, Wo);
+    const Direction b = math::cross(Wr, N);
+    return math::almost_same(Wr, Wi, Float(0.05)) && math::almost_same(a, b, Float(0.01));
 }
 
-const F AirRefractiveIndex = F(1.0003);
-bool Glossy::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
+const Float AirRefractiveIndex = Float(1.0003);
+bool Glossy::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
-    const F eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
-    const F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
+    const Float eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
+    const Float eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
 
     bool result = false;
     bool chooseReflectRay = epsilon[0] < SpecularSamplingProbability;
     if (chooseReflectRay)
     {
-        const math::nvector3<F> Wo = -Ray.direction();
-        const math::nvector3<F> Wi = math::reflection(Wo, N);
-        const F NdotL = math::dot(Wi, N);
-        const F Fi = FresnelSchlick(NdotL, eta1, eta2);
+        const Direction Wo = -Ray.direction();
+        const Direction Wi = math::reflection(Wo, N);
+        const Float NdotL = math::dot(Wi, N);
+        const Float Fi = FresnelSchlick(NdotL, eta1, eta2);
         outLightRay.specular = true;
         outLightRay.scattering.set_origin(P);
         outLightRay.scattering.set_direction(Wi);
-        outLightRay.f = math::vector3<F>::one() * Fi;
+        outLightRay.f = Spectrum::one() * Fi;
         outLightRay.cosine = NdotL;
-        result = NdotL > F(0);
+        result = NdotL > Float(0);
     }
     else
     {
-        const math::nvector3<F> Wo = -Ray.direction();
-        math::nvector3<F> Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
+        const Direction Wo = -Ray.direction();
+        Direction Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
         outLightRay.scattering.set_origin(P);
         outLightRay.scattering.set_direction(Wi);
         outLightRay.cosine = math::dot(Wi, N);
         outLightRay.f = f(N, Ray.direction(), Wi, IsOnSurface);
 
-        result = outLightRay.cosine >= F(0);
+        result = outLightRay.cosine >= Float(0);
 
         if (result)
         {
-            const math::nvector3<F>& Wi = outLightRay.scattering.direction();
-            const F NdotL = outLightRay.cosine;
-            const F NdotV = math::dot(Wo, N);
-            const F Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-            const F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
-            outLightRay.f *= math::saturate(F(1) - Fi) * math::saturate((F(1) - Fr));
+            const Direction& Wi = outLightRay.scattering.direction();
+            const Float NdotL = outLightRay.cosine;
+            const Float NdotV = math::dot(Wo, N);
+            const Float Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
+            const Float Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
+            outLightRay.f *= math::saturate(Float(1) - Fi) * math::saturate((Float(1) - Fr));
         }
     }
     return result;
@@ -358,144 +358,144 @@ bool Glossy::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nve
 
 
 bool Glossy::IsSpecular(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi) const
+    const Direction& N,
+    const Direction& Wo,
+    const Direction& Wi) const
 {
     return IsReflectionDirection(N, Wo, Wi);
 }
 
-math::vector3<F> Glossy::f(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi,
+Spectrum Glossy::f(
+    const Direction& N,
+    const Direction& Wo,
+    const Direction& Wi,
     bool IsOnSurface) const
 {
-    const F eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
-    const F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
-    const F NdotL = math::dot(Wi, N);
-    const F NdotV = math::dot(Wo, N);
+    const Float eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
+    const Float eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
+    const Float NdotL = math::dot(Wi, N);
+    const Float NdotV = math::dot(Wo, N);
 
-    F Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-    F Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
-    F DiracApproxmation = IsSpecular(N, Wo, Wi) ? F(1) : F(0);
-    math::vector3<F> s = math::vector3<F>::one() * (Fi * DiracApproxmation);
-    math::vector3<F> d = f(N, Wo, Wi, IsOnSurface) * (F(1) - Fi) * (F(1) - Fr);
+    Float Fi = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
+    Float Fr = FresnelSchlick(math::saturate(NdotV), eta2, eta1);
+    Float DiracApproxmation = IsSpecular(N, Wo, Wi) ? Float(1) : Float(0);
+    Spectrum s = Spectrum::one() * (Fi * DiracApproxmation);
+    Spectrum d = f(N, Wo, Wi, IsOnSurface) * (Float(1) - Fi) * (Float(1) - Fr);
     return DiffuseSamplingProbability * d + SpecularSamplingProbability * s;
 }
 
-F Glossy::pdf(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi) const
+Float Glossy::pdf(
+    const Direction& N,
+    const Direction& Wo,
+    const Direction& Wi) const
 {
-    const math::nvector3<F> Wr = math::reflection(Wo, N);
-    const math::nvector3<F> a = math::cross(N, Wo);
-    const math::nvector3<F> b = math::cross(Wr, N);
-    F DiracApproxmation = math::almost_same(Wr, Wi, F(0.1)) && math::almost_same(a, b, F(0.1)) ? F(1) : F(0);
-    F pdfSpecular = DiracApproxmation;
+    const Direction Wr = math::reflection(Wo, N);
+    const Direction a = math::cross(N, Wo);
+    const Direction b = math::cross(Wr, N);
+    Float DiracApproxmation = math::almost_same(Wr, Wi, Float(0.1)) && math::almost_same(a, b, Float(0.1)) ? Float(1) : Float(0);
+    Float pdfSpecular = DiracApproxmation;
 
-    F NdotL = math::dot(N, Wi);
-    F pdfDiffuse = math::saturate(NdotL) * math::InvPI<F>;
+    Float NdotL = math::dot(N, Wi);
+    Float pdfDiffuse = math::saturate(NdotL) * math::InvPI<Float>;
     return DiffuseSamplingProbability * pdfDiffuse + SpecularSamplingProbability * pdfSpecular;
 }
 
 
-math::nvector3<F> SampleGGXVNDF(
-    const math::nvector3<F>& Wo,  // Input Wo: view direction
-    F alpha_x, F alpha_y,                   // Input alpha_x, alpha_y: roughness parameters
-    F e1, F e2                              // Input U1, U2: uniform random numbers
+Direction SampleGGXVNDF(
+    const Direction& Wo,  // Input Wo: view direction
+    Float alpha_x, Float alpha_y,                   // Input alpha_x, alpha_y: roughness parameters
+    Float e1, Float e2                              // Input U1, U2: uniform random numbers
 )
 {
     // stretch view
-    math::nvector3<F> V = Wo * math::vector3<F>(alpha_x, alpha_y, F(1));
+    Direction V = Wo * Spectrum(alpha_x, alpha_y, Float(1));
 
     // orthonormal basis
-    math::nvector3<F> T1 = V.z < F(0.99999)
-        ? math::cross(V, math::nvector3<F>::unit_z())
-        : math::nvector3<F>::unit_x();
-    math::nvector3<F> T2 = math::cross(V, T1);
+    Direction T1 = V.z < Float(0.99999)
+        ? math::cross(V, Direction::unit_z())
+        : Direction::unit_x();
+    Direction T2 = math::cross(V, T1);
 
     // sample point with polar coordinates (r, phi)
-    F a = F(1) / (F(1) + V.z);
-    F r = sqrt(e1);
-    math::radian<F> phi = (e2 < a)
-        ? math::radian<F>(e2 / a * math::PI<F>)
-        : math::radian<F>(math::PI<F> +(e2 - a) / (F(1) - a) * math::PI<F>);
+    Float a = Float(1) / (Float(1) + V.z);
+    Float r = sqrt(e1);
+    Radian phi = (e2 < a)
+        ? Radian(e2 / a * math::PI<Float>)
+        : Radian(math::PI<Float> +(e2 - a) / (Float(1) - a) * math::PI<Float>);
 
-    F t1 = r * cos(phi);
-    F t2 = r * sin(phi) * ((e2 < a) ? F(1) : V.z);
+    Float t1 = r * cos(phi);
+    Float t2 = r * sin(phi) * ((e2 < a) ? Float(1) : V.z);
 
     // compute normal
-    math::vector3<F> N = T1 * t1 + T2 * t2 + V * sqrt(math::max2(F(0), F(1) - math::square(t1) - math::square(t2)));
+    Spectrum N = T1 * t1 + T2 * t2 + V * sqrt(math::max2(Float(0), Float(1) - math::square(t1) - math::square(t2)));
 
     // unstretch
-    math::nvector3<F> Wm = math::vector3<F>(alpha_x * N.x, alpha_y * N.y, math::max2(F(0), N.z));
+    Direction Wm = Spectrum(alpha_x * N.x, alpha_y * N.y, math::max2(Float(0), N.z));
     return Wm;
 }
 
-bool GGX::Scattering(F epsilon[3], const math::vector3<F>& P, const math::nvector3<F>& N, const math::ray3d<F>& Ray, bool IsOnSurface, LightRay& outLightRay) const
+bool GGX::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const
 {
-    const math::nvector3<F> Wo = -Ray.direction();
-    const F eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
-    const F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
+    const Direction Wo = -Ray.direction();
+    const Float eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
+    const Float eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
 
-    F alpha = math::square(Roughness);
+    Float alpha = math::square(Roughness);
     UVW uvw(N);
-    math::nvector3<F> Wm = SampleGGXVNDF(uvw.world_to_local(-Wo), alpha, alpha, epsilon[1], epsilon[2]);
-    math::nvector3<F> H = uvw.local_to_world(Wm);
-    math::nvector3<F> Wi = math::reflection(Wo, H);
-    const F NdotL = math::dot(Wi, N);
-    const F NdotH = math::dot(N, H);
-    const F HdotV = math::dot(H, Wo);
-    const F Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
+    Direction Wm = SampleGGXVNDF(uvw.world_to_local(-Wo), alpha, alpha, epsilon[1], epsilon[2]);
+    Direction H = uvw.local_to_world(Wm);
+    Direction Wi = math::reflection(Wo, H);
+    const Float NdotL = math::dot(Wi, N);
+    const Float NdotH = math::dot(N, H);
+    const Float HdotV = math::dot(H, Wo);
+    const Float Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
     //const F D = DistributionGGX(Roughness, NdotH);
-    const F G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
+    const Float G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
     //const F BRDF = F(0.25) * Frehnel * D * G / NdotV;
-    const F BRDF = Frehnel * G / HdotV;
-    outLightRay.f = math::vector3<F>::one() * BRDF;
+    const Float BRDF = Frehnel * G / HdotV;
+    outLightRay.f = Spectrum::one() * BRDF;
     outLightRay.cosine = NdotL;
     outLightRay.specular = true;
     return NdotL > 0;
 }
 
-math::vector3<F> GGX::f(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi,
+Spectrum GGX::f(
+    const Direction& N,
+    const Direction& Wo,
+    const Direction& Wi,
     bool IsOnSurface) const
 {
-    const math::nvector3<F> H = Wo + Wi;
-    const F eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
-    const F eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
-    const F NdotL = math::dot(N, Wi);
-    const F NdotH = math::dot(N, H);
-    const F NdotV = math::dot(N, Wo);
-    const F HdotV = math::dot(H, Wo);
-    const F Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-    const F D = DistributionGGX(Roughness, NdotH);
-    const F G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
-    const F brdf = Frehnel * G / HdotV;
-    return NdotL > F(0) ? math::vector3<F>::one() * brdf : math::vector3<F>::zero();
+    const Direction H = Wo + Wi;
+    const Float eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
+    const Float eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
+    const Float NdotL = math::dot(N, Wi);
+    const Float NdotH = math::dot(N, H);
+    const Float NdotV = math::dot(N, Wo);
+    const Float HdotV = math::dot(H, Wo);
+    const Float Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
+    const Float D = DistributionGGX(Roughness, NdotH);
+    const Float G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
+    const Float brdf = Frehnel * G / HdotV;
+    return NdotL > Float(0) ? Spectrum::one() * brdf : Spectrum::zero();
 }
 
-F GGX::pdf(
-    const math::nvector3<F>& N,
-    const math::nvector3<F>& Wo,
-    const math::nvector3<F>& Wi) const
+Float GGX::pdf(
+    const Direction& N,
+    const Direction& Wo,
+    const Direction& Wi) const
 {
 #if true
     //copy from UE4.
-    const math::nvector3<F> H = Wi + Wo;
-    const F NdotH = math::dot(N, H);
-    const F VdotH = math::dot(Wo, H);
-    const F D = DistributionGGX(Roughness, NdotH);
+    const Direction H = Wi + Wo;
+    const Float NdotH = math::dot(N, H);
+    const Float VdotH = math::dot(Wo, H);
+    const Float D = DistributionGGX(Roughness, NdotH);
     return NdotH / VdotH;
     //return D * NdotH * 0.25 / VdotH;
 #else
-	const math::nvector3<F> H = Wi + Wo;
+	const Direction H = Wi + Wo;
     F pdfSpecular = math::power<5>(math::dot(H, N));
     return pdfSpecular;
 #endif
@@ -520,7 +520,7 @@ const std::unique_ptr<BSDF>& Material::GetBSDFComponentByMask(uint32_t mask) con
     return dummy;
 }
 
-const std::unique_ptr<BSDF>& Material::GetRandomBSDFComponent(F u) const
+const std::unique_ptr<BSDF>& Material::GetRandomBSDFComponent(Float u) const
 {
     uint32_t length = (uint32_t)mBSDFComponents.size();
     uint32_t index = math::min2<uint32_t>(math::floor2<uint32_t>(u * length), length - 1);

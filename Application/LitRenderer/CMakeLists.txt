@@ -6,6 +6,7 @@ project(LitRenderer)
 if(MSVC)
 
 set(LitRenderer_SourceFiles
+    ${CMAKE_CURRENT_SOURCE_DIR}/PreInclude.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Integrator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Integrator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LDRFilm.h
