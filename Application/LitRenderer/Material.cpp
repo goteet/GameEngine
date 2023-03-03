@@ -247,9 +247,9 @@ Float Lambertian::pdf(
 
 
 
-OrenNayer::OrenNayer(Float r, Float g, Float b, Radian sigma, Float weight)
+OrenNayer::OrenNayer(const Spectrum& albedo, Radian sigma, Float weight)
     : BSDF("Oren-Nayer", Material::BSDFMask::Diffuse, weight)
-    , Albedo(r, g, b)
+    , Albedo(albedo)
     , Sigma(sigma)
     , SigmaSquare(math::square(sigma.value))
 {

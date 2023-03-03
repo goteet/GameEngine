@@ -105,7 +105,7 @@ struct Lambertian : public BSDF
 {
     Spectrum Albedo = Spectrum::one();
     Lambertian(Float weight = Float(1)) : BSDF("Lambertian", Material::BSDFMask::Diffuse, weight) { }
-    Lambertian(Float r, Float g, Float b, Float weight = Float(1)) : BSDF("Lambertian", Material::BSDFMask::Diffuse, weight), Albedo(r, g, b) { }
+    Lambertian(const Spectrum& albedo, Float weight = Float(1)) : BSDF("Lambertian", Material::BSDFMask::Diffuse, weight), Albedo(albedo) { }
     virtual bool Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual Spectrum f(
         const Direction& N,
@@ -125,8 +125,8 @@ struct OrenNayer : public BSDF
     Radian SigmaSquare = 0_degd;
     Float A = Float(1);
     Float B = Float(0);
-    OrenNayer(Float weight = Float(1)) : BSDF("Oren-Nayer", Material::BSDFMask::Diffuse, weight) { }; ;
-    OrenNayer(Float r, Float g, Float b, Radian sigma = 0_degd, Float weight = Float(1));
+    OrenNayer(Float weight = Float(1)) : BSDF("Oren-Nayer", Material::BSDFMask::Diffuse, weight) { };
+    OrenNayer(const Spectrum& albedo, Radian sigma = 0_degd, Float weight = Float(1));
     virtual bool Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual Spectrum f(
         const Direction& N,
@@ -147,7 +147,7 @@ struct Glossy : public BSDF
     Float DiffuseSamplingProbability = Float(1) - SpecularSamplingProbability;
 
     Glossy(Float weight = Float(1)) : BSDF("Glossy-legacy", Material::BSDFMask::Specular, weight) { }
-    Glossy(Float r, Float g, Float b, Float ior = Float(1.5)) : BSDF("Glossy-legacy", Material::BSDFMask::Specular, Float(1)), Albedo(r, g, b), RefractiveIndex(ior) { }
+    Glossy(const Spectrum& albedo, Float ior = Float(1.5)) : BSDF("Glossy-legacy", Material::BSDFMask::Specular, Float(1)), Albedo(albedo), RefractiveIndex(ior) { }
     virtual bool Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const override;
     virtual Spectrum f(
         const Direction& N,
@@ -192,30 +192,30 @@ struct GGX : public BSDF
         const Direction& Wi) const override;
 };
 
-inline std::unique_ptr<Material> MakeMatteMaterial(Float albedoR = Float(1), Float albedoG = Float(1), Float albedoB = Float(1))
+inline std::unique_ptr<Material> MakeMatteMaterial(const Spectrum& albedo = Spectrum::one())
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
-    std::unique_ptr<Lambertian> compLambertian = std::make_unique<Lambertian>(albedoR, albedoG, albedoB);
+    std::unique_ptr<Lambertian> compLambertian = std::make_unique<Lambertian>(albedo);
 
     material->AddBSDFComponent(std::move(compLambertian));
 
     return material;
 }
 
-inline std::unique_ptr<Material> MakeMatteMaterial(Float albedoR, Float albedoG, Float albedoB, Radian sigma)
+inline std::unique_ptr<Material> MakeMatteMaterial(const Spectrum& albedo, Radian sigma)
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
-    std::unique_ptr<OrenNayer> compLambertian = std::make_unique<OrenNayer>(albedoR, albedoG, albedoB, sigma);
+    std::unique_ptr<OrenNayer> compLambertian = std::make_unique<OrenNayer>(albedo, sigma);
 
     material->AddBSDFComponent(std::move(compLambertian));
 
     return material;
 }
 
-inline std::unique_ptr<Material> MakePlasticMaterial(Float Kd, Float albedoR, Float albedoG, Float albedoB, Float Ks, Float roughness, Float IoR = Float(1.5))
+inline std::unique_ptr<Material> MakePlasticMaterial(Float Kd, const Spectrum& albedo, Float Ks, Float roughness, Float IoR = Float(1.5))
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
-    std::unique_ptr<Lambertian> compLambertian = std::make_unique<Lambertian>(albedoR, albedoG, albedoB, Kd);
+    std::unique_ptr<Lambertian> compLambertian = std::make_unique<Lambertian>(albedo, Kd);
     std::unique_ptr<GGX> compGGX = std::make_unique<GGX>(roughness, IoR, Ks);
 
     material->AddBSDFComponent(std::move(compLambertian));
@@ -228,6 +228,7 @@ inline std::unique_ptr<Material> MakeGGXMaterialForDebug(Float roughness, Float 
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
     std::unique_ptr<GGX> compGGX = std::make_unique<GGX>(roughness, IoR);
+
     material->AddBSDFComponent(std::move(compGGX));
 
     return material;

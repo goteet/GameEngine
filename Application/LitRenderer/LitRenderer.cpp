@@ -47,38 +47,45 @@ namespace
             {
                 Float Ks = Float(0.5);
                 Float Kd = Float(1) - Ks;
-                mainSphere->Material = MakePlasticMaterial(Kd, Float(0.5), Float(0.5), Float(0.5), Ks, roughness, IoR);
+                mainSphere->Material = MakePlasticMaterial(Kd, Spectrum(Float(0.5), Float(0.5), Float(0.5)), Ks, roughness, IoR);
                 //mainSphere->Material = MakeGGXMaterialForDebug(roughness, IoR);
             }
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
             wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
-            wallLeft->Material = MakeMatteMaterial(Float(0.75), Float(0.2), Float(0.2));
+
+            Spectrum Red(Float(0.75), Float(0.2), Float(0.2));
+            Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
+            Spectrum Blue(Float(0.2), Float(0.2), Float(0.75));
+            Spectrum Gray(Float(0.75), Float(0.75), Float(0.75));
+            Spectrum DarkGray(Float(0.6), Float(0.6), Float(0.6));
+
+            wallLeft->Material = MakeMatteMaterial(Red);
             
             SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
             wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
             wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
             wallRight->SetExtends(SceneExtendZ, SceneExtendY);
-            wallRight->Material = MakeMatteMaterial(Float(0.2), Float(0.2), Float(0.75));
+            wallRight->Material = MakeMatteMaterial(Blue);
             
             SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
             wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
             wallTop->SetExtends(SceneExtendZ, SceneExtendX);
             wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
-            wallTop->Material = MakeMatteMaterial(Float(0.75), Float(0.75), Float(0.75));
+            wallTop->Material = MakeMatteMaterial(Gray);
             
             SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
             wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
             wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
             wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
-            wallBottom->Material = MakeMatteMaterial(Float(0.2), Float(0.75), Float(0.2));
+            wallBottom->Material = MakeMatteMaterial(Green);
             
             SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
             wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
             wallFar->SetExtends(SceneExtendX, SceneExtendY);
             wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
-            wallFar->Material = MakeMatteMaterial(Float(0.6), Float(0.6), Float(0.6));
+            wallFar->Material = MakeMatteMaterial(DarkGray);
 
             SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
             LightDisk->SetDualFace(true);
@@ -120,7 +127,7 @@ namespace
                 SceneCenterX + 30,
                 SceneBottom + 22,
                 SceneCenterZ + 10);
-            LambertianShere->Material = MakeMatteMaterial(1, 1, 1);
+            LambertianShere->Material = MakeMatteMaterial();
 
 
             SceneSphere* orenNayerSphere = new SceneSphere(); OutSceneObjects.push_back(orenNayerSphere);
@@ -129,36 +136,42 @@ namespace
                 SceneCenterX - 30,
                 SceneBottom + 22,
                 SceneCenterZ + 10);
-            orenNayerSphere->Material = MakeMatteMaterial(1, 1, 1, 0.25_radd);
+            orenNayerSphere->Material = MakeMatteMaterial(Spectrum::one(), 0.25_radd);
+
+            Spectrum Red(Float(0.75), Float(0.2), Float(0.2));
+            Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
+            Spectrum Blue(Float(0.2), Float(0.2), Float(0.75));
+            Spectrum Gray(Float(0.75), Float(0.75), Float(0.75));
+            Spectrum DarkGray(Float(0.6), Float(0.6), Float(0.6));
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
             wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
-            wallLeft->Material = MakeMatteMaterial(Float(0.6), Float(0.6), Float(0.6));
+            wallLeft->Material = MakeMatteMaterial(DarkGray);
 
             SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
             wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
             wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
             wallRight->SetExtends(SceneExtendZ, SceneExtendY);
-            wallRight->Material = MakeMatteMaterial(Float(0.6), Float(0.6), Float(0.6));
+            wallRight->Material = MakeMatteMaterial(DarkGray);
 
             SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
             wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
             wallTop->SetExtends(SceneExtendZ, SceneExtendX);
             wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
-            wallTop->Material = MakeMatteMaterial(Float(0.75), Float(0.75), Float(0.75));
+            wallTop->Material = MakeMatteMaterial(Gray);
 
             SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
             wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
             wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
             wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
-            wallBottom->Material = MakeMatteMaterial(Float(0.2), Float(0.2), Float(0.75));
+            wallBottom->Material = MakeMatteMaterial(Blue);
 
             SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
             wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
             wallFar->SetExtends(SceneExtendX, SceneExtendY);
             wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
-            wallFar->Material = MakeMatteMaterial(Float(0.75), Float(0.2), Float(0.2));
+            wallFar->Material = MakeMatteMaterial(Red);
 
             SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
             LightDisk->SetDualFace(true);
