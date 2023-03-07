@@ -45,15 +45,11 @@ namespace
             }
             else
             {
-                Float Ks = Float(0.0);
+                Float Ks = Float(0.5);
                 Float Kd = Float(1) - Ks;
                 mainSphere->Material = MakePlasticMaterial(Kd, Spectrum(Float(0.5), Float(0.5), Float(0.5)), Ks, roughness, IoR);
-                //mainSphere->Material = MakeGGXMaterialForDebug(roughness, IoR);
             }
 
-            SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
-            wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
-            wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
 
             Spectrum Red(Float(0.75), Float(0.2), Float(0.2));
             Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
@@ -61,6 +57,9 @@ namespace
             Spectrum Gray(Float(0.75), Float(0.75), Float(0.75));
             Spectrum DarkGray(Float(0.6), Float(0.6), Float(0.6));
 
+            SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
+            wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
+            wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
             wallLeft->Material = MakeMatteMaterial(Red);
             
             SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
@@ -75,23 +74,24 @@ namespace
             wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
             wallTop->Material = MakeMatteMaterial(Gray);
             
-            SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
-            wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
-            wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
-            wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
-            wallBottom->Material = MakeMatteMaterial(Green);
-            
             SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
             wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
             wallFar->SetExtends(SceneExtendX, SceneExtendY);
             wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
             wallFar->Material = MakeMatteMaterial(DarkGray);
 
+            SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
+            wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
+            wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
+            wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
+            wallBottom->Material = MakeMatteMaterial(Green);
+
             SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
             LightDisk->SetDualFace(true);
             LightDisk->SetTranslate(SceneCenterX, SceneTop - Float(0.01), SceneCenterZ + Float(10));
+            //LightDisk->SetRadius(50);
             LightDisk->SetExtends(25, 25);
-            LightDisk->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
+            LightDisk->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
             Float Intensity = 4.5;
 
             LightDisk->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
@@ -148,25 +148,25 @@ namespace
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
             wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
             wallLeft->Material = MakeMatteMaterial(DarkGray);
-
+            
             SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
             wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
             wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
             wallRight->SetExtends(SceneExtendZ, SceneExtendY);
             wallRight->Material = MakeMatteMaterial(DarkGray);
-
+            
             SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
             wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
             wallTop->SetExtends(SceneExtendZ, SceneExtendX);
             wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
             wallTop->Material = MakeMatteMaterial(Gray);
-
+            
             SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
             wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
             wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
             wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
             wallBottom->Material = MakeMatteMaterial(Blue);
-
+            
             SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
             wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
             wallFar->SetExtends(SceneExtendX, SceneExtendY);
@@ -288,7 +288,9 @@ void LitRenderer::Initialize()
 
 void LitRenderer::GenerateImageProgressive()
 {
-    if (MaxSampleCount <= 0 || (mFilm.GetSampleCount() <= MaxSampleCount))
+    const bool bGenerateInfinite = MaxSampleCount <= 0;
+    const bool bGenerateMore = MaxSampleCount > 0 && mFilm.GetSampleCount() <= MaxSampleCount;
+    if (bGenerateInfinite || bGenerateMore)
     {
         ResolveSamples();
         mNeedFlushBackbuffer = true;

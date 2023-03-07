@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "Integrator.h"
 
 Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1)
@@ -22,14 +23,8 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
     for (int bounce = 0; hitRecord && !math::near_zero(beta) && bounce < MaxBounces; ++bounce)
     {
         const SceneObject& surface = *hitRecord.Object;
-        const std::unique_ptr<Material>& material = surface.Material;
-        const Direction& N = hitRecord.SurfaceNormal;
-        const Direction Wo = -ray.direction();
+
         const bool bIsLightSource = surface.LightSource != nullptr;
-        Float biasedDistance = math::max2<Float>(hitRecord.Distance, Float(0));
-        Point P_i = ray.calc_offset(biasedDistance);
-
-
         if (bIsLightSource)
         {
             if (bounce == 0 || bIsReflectionTrace)
@@ -47,7 +42,12 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
             mUniformSamplers[2].value()
         };
 
+        const Direction& N = hitRecord.SurfaceNormal;
+        const Direction Wo = -ray.direction();
+        const std::unique_ptr<Material>& material = surface.Material;
         const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
+        Float biasedDistance = math::max2<Float>(hitRecord.Distance, Float(0));
+        Point P_i = ray.calc_offset(biasedDistance);
         bIsReflectionTrace = (bsdf.BSDFMask & Material::BSDFMask::Reflection) != 0;
 
         //Sampling Light Source
@@ -71,6 +71,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
                     if (bIsVisible)
                     {
                         Float pdf_light = lightSource->SamplePdf(lightSI, lightRay);
+                        assert(pdf_light > Float(0));
                         //F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
                         Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
                         Float weight = PowerHeuristic(pdf_light, pdf_bsdf);

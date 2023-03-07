@@ -47,7 +47,7 @@ private:
     {
         Ray Ray;
         SurfaceIntersection RecordP1;
-        int PixelRow, PixelCol;
+        int PixelRow = 0, PixelCol = 0;
     };
 
     const int mCanvasLinePitch;
