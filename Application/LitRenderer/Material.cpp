@@ -52,23 +52,24 @@ Float DistributionGTR2(Float roughness, Float NdotH)
 //still error with GTR2, so I copy this from filament's description
 Float DistributionGGX_FromFilament(Float roughness, Float NdotH)
 {
-    Float a = NdotH * roughness;
+    Float alpha = NdotH * roughness;
     Float cos = math::saturate(NdotH);
     Float numerator = roughness;
-    Float denominator = Float(1) - math::square(cos) + math::square(a);
+    Float denominator = Float(1) - math::square(cos) + math::square(alpha);
     return math::square(numerator / denominator) * math::InvPI<Float>;
 }
 
 Float DistributionGTR1(Float roughness, Float HdotN)
 {
     Float alpha = math::square(roughness);
-    Float X = HdotN > 0 ? Float(1) : Float(0);
+    //Float X = HdotN > 0 ? Float(1) : Float(0);
     //      alpha^2 * X(n.m)                       alpha^2 * X                  (0.5 * alpha * X)^2
     //--------------------------------- = ------------------------------- = ---------------------------
     // 4 * cos^2 * (alpha^2 + tan^2)       4 * (alpha^2 * cos^2 + sin^2)     cos^2 * (alpha^2 - 1) + 1
     //
+    // Note that X is already hide in saturate() operation.
     Float cos = math::saturate(HdotN);
-    Float numerator = Float(0.5) * alpha * X;
+    Float numerator = Float(0.5) * alpha;// *X;
     Float denominator = math::square(cos) * (math::square(alpha) - Float(1)) + 1;
     return math::square(numerator) / denominator;
 }
@@ -156,13 +157,11 @@ Spectrum GenerateUnitSphereVector()
     }
 }
 
-Direction GenerateHemisphereDirection(Float epsilon[2], const Direction& normal)
+Direction GenerateHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& normal)
 {
-    Float rand_theta = epsilon[0];
-    Float rand_phi = epsilon[1];
-    Float cosTheta = Float(1) - Float(2) * rand_theta;
+    Float cosTheta = Float(1) - Float(2) * uTheta;
     Float sinTheta = sqrt(Float(1) - cosTheta * cosTheta);
-    Radian phi(math::TWO_PI<Float> *rand_phi);
+    Radian phi(math::TWO_PI<Float> *uPhi);
     Float cosPhi = math::cos(phi);
     Float sinPhi = math::sin(phi);
 
@@ -174,17 +173,15 @@ Direction GenerateHemisphereDirection(Float epsilon[2], const Direction& normal)
     return uvw.local_to_world(x, y, z);
 }
 
-Direction GenerateUniformHemisphereDirection(Float epsilon[2], const Direction& normal)
+Direction GenerateUniformHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& normal)
 {
-    Float rand_theta = epsilon[0];
-    Float rand_phi = epsilon[1];
     // pdf = 1/2PI
     // => cdf = 1/2PI*phi*(1-cos_theta)
     // => f_phi = 1/2PI*phi       --> phi(x) = 2*PI*x
     // => f_theta = 1-cos_theta   --> cos_theta(x) = 1-x = x'
-    Float cosTheta = rand_theta; //replace 1-e to e'
+    Float cosTheta = uTheta; //replace 1-e to e'
     Float sinTheta = sqrt(Float(1) - cosTheta * cosTheta);
-    Radian phi(math::TWO_PI<Float> *rand_phi);
+    Radian phi(math::TWO_PI<Float> *uPhi);
     Float cosPhi = math::cos(phi);
     Float sinPhi = math::sin(phi);
 
@@ -196,15 +193,13 @@ Direction GenerateUniformHemisphereDirection(Float epsilon[2], const Direction& 
 }
 
 
-Spectrum GenerateCosineWeightedHemisphereDirection(const Float epsilon[2], const Direction& normal)
+Spectrum GenerateCosineWeightedHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& normal)
 {
-    Float rand_theta = epsilon[0];
-    Float rand_phi = epsilon[1];
     // pdf = cos(theta) / Pi.
-    Float cosTheta_sqr = rand_theta; //replace 1-e to e'
+    Float cosTheta_sqr = uTheta; //replace 1-e to e'
     Float cosTheta = sqrt(cosTheta_sqr);
     Float sinTheta = sqrt(Float(1) - cosTheta_sqr);
-    Radian phi(Float(2) * math::PI<Float> *rand_phi);
+    Radian phi(Float(2) * math::PI<Float> *uPhi);
     Float cosPhi = math::cos(phi);
     Float sinPhi = math::sin(phi);
 
@@ -223,15 +218,15 @@ bool Lambertian::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& 
     //  f * cos(theta)     rho * cos(theta)        Pi
     // ---------------- = ----------------- * ------------ = rho
     //      pdf                 Pi             cos(theta)  
-    oBSDFSample.Wi = GenerateCosineWeightedHemisphereDirection(u + 1, N);
+    oBSDFSample.Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
     oBSDFSample.F = Albedo;
     Float NdotL = math::dot(oBSDFSample.Wi, N);
     return NdotL >= Float(0);
 }
 
-bool Lambertian::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
+bool Lambertian::Scattering(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
 {
-    Direction Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
+    Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
     outLightRay.cosine = math::dot(Wi, N);
@@ -301,7 +296,7 @@ bool OrenNayer::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N
     //      pdf                                   Pi                  cos(theta) 
     // *  Float NdotL = math::dot(N, Wi);
 
-    const Direction Wi = GenerateCosineWeightedHemisphereDirection(u + 1, N);
+    const Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
     const Direction Wo = -Ray.direction();
     Float factor, CosineWi;
     std::tie(factor, CosineWi) = CalculateFactorAndCosineWi(N, Wi, Wo, A, B);
@@ -310,9 +305,9 @@ bool OrenNayer::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N
     return CosineWi >= Float(0);
 }
 
-bool OrenNayer::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
+bool OrenNayer::Scattering(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
 {
-    Direction Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
+    Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
     outLightRay.cosine = math::dot(Wi, N);
@@ -455,11 +450,11 @@ Spectrum GGX::f(
     const Float NdotH = math::dot(N, H);
     const Float NdotV = math::dot(N, Wo);
     const Float HdotV = math::dot(H, Wo);
-    const Float Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
+    const Float F = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
     const Float D = DistributionGGX(Roughness, NdotH);
     const Float G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
-    const Float brdf = Frehnel * G / HdotV;
-    return NdotL > Float(0) ? Spectrum::one() * brdf : Spectrum::zero();
+    const Float BRDF = Float(0.25) * D * F * G / (NdotV * NdotL);
+    return NdotL > Float(0) ? Spectrum::one() * BRDF : Spectrum::zero();
 }
 
 Float GGX::pdf(
