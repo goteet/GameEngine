@@ -46,7 +46,7 @@ Float DistributionGTR2(Float roughness, Float NdotH)
     //         PI * ((n.h)^2(a^2-1)+1)^2                 (NdotH^2 * (a2 - 1) + 1)^2
     Float cos = math::saturate(NdotH); //<--hidden X(x) -> x>0?1:0; here
     Float denominator = math::square(cos) * (alpha2 - 1) + 1;
-    return alpha2 * math::square(denominator) * math::InvPI<Float>;
+    return alpha2 * math::InvPI<Float> / math::square(denominator);
 }
 
 //still error with GTR2, so I copy this from filament's description
