@@ -143,34 +143,6 @@ struct OrenNayer : public BSDF
         const Direction& Wi) const override;
 };
 
-struct Glossy : public BSDF
-{
-    Spectrum Albedo = Spectrum::one();
-    Float RefractiveIndex = Float(2.5);
-    Float SpecularSamplingProbability = Float(0.5);
-    Float DiffuseSamplingProbability = Float(1) - SpecularSamplingProbability;
-
-    Glossy(Float weight = Float(1)) : BSDF("Glossy-legacy", Material::BSDFMask::Specular, weight) { }
-    Glossy(const Spectrum& albedo, Float ior = Float(1.5)) : BSDF("Glossy-legacy", Material::BSDFMask::Specular, Float(1)), Albedo(albedo), RefractiveIndex(ior) { }
-    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const override { return false; }
-    virtual bool Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const override;
-    virtual Spectrum f(
-        const Direction& N,
-        const Direction& Wo,
-        const Direction& Wi,
-        bool IsOnSurface) const override;
-    virtual Float pdf(
-        const Direction& N,
-        const Direction& Wo,
-        const Direction& Wi) const override;
-
-private:
-    bool IsSpecular(
-        const Direction& N,
-        const Direction& Wo,
-        const Direction& Wi) const;
-};
-
 struct GGX : public BSDF
 {
     Float Roughness = Float(0.5);

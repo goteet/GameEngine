@@ -45,7 +45,7 @@ namespace
             }
             else
             {
-                Float Ks = Float(0.5);
+                Float Ks = Float(0.0);
                 Float Kd = Float(1) - Ks;
                 mainSphere->Material = MakePlasticMaterial(Kd, Spectrum(Float(0.5), Float(0.5), Float(0.5)), Ks, roughness, IoR);
                 //mainSphere->Material = MakeGGXMaterialForDebug(roughness, IoR);
