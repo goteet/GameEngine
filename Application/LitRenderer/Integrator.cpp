@@ -24,7 +24,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
         const SceneObject& surface = *hitRecord.Object;
         const std::unique_ptr<Material>& material = surface.Material;
         const Direction& N = hitRecord.SurfaceNormal;
-        const Direction W_o = -ray.direction();
+        const Direction Wo = -ray.direction();
         const bool bIsLightSource = surface.LightSource != nullptr;
         Float biasedDistance = math::max2<Float>(hitRecord.Distance, Float(0));
         Point P_i = ray.calc_offset(biasedDistance);
@@ -58,25 +58,25 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
             {
                 Point P_i_1 = lightSource->SampleRandomPoint(u);
                 Ray lightRay(P_i, P_i_1);
-                const Direction& W_i = lightRay.direction();
+                const Direction& Wi = lightRay.direction();
 
                 SurfaceIntersection lightSI = scene.DetectIntersecting(lightRay, nullptr, math::SMALL_NUM<Float>);
                 bool bIsVisible = lightSI.Object == lightSource;
                 if (bIsVisible)
                 {
                     Direction N_light = lightSI.SurfaceNormal;
-                    Float cosThetaPrime = math::dot(N_light, -W_i);
+                    Float cosThetaPrime = math::dot(N_light, -Wi);
                     bIsVisible = cosThetaPrime > math::SMALL_NUM<Float> || (cosThetaPrime < -math::SMALL_NUM<Float> && lightSource->IsDualface());
 
                     if (bIsVisible)
                     {
                         Float pdf_light = lightSource->SamplePdf(lightSI, lightRay);
                         //F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
-                        Float pdf_bsdf = material->SamplePdf(N, W_o, W_i);
+                        Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
                         Float weight = PowerHeuristic(pdf_light, pdf_bsdf);
                         //Spectrum f = bsdf.f(N, W_o, W_i, true);
 
-                        Spectrum f = material->SampleF(N, W_o, W_i, true);
+                        Spectrum f = material->SampleF(N, Wo, Wi, true);
 
                         const Spectrum& Le = lightSource->LightSource->Le();
                         Lo += weight * beta * f * Le / pdf_light;
@@ -87,18 +87,20 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
 
         //Sampling BSDF
         {
-            BSDFSample scatterLight;
-            if (!bsdf.Scattering(u, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
+            BSDFSample BSDFSample;
+
+            if (!bsdf.SampleFCosOverPdf(u, P_i, N, ray, hitRecord.IsOnSurface, BSDFSample))
             {
                 break;
             }
 
-            ray = scatterLight.scattering;
-            const Direction& W_i = ray.direction();
-            Float pdf_light = scene.SampleLightPdf(scatterLight.scattering);
-            Float pdf_bsdf = bsdf.pdf(N, W_o, W_i);
+            const Direction& Wi = BSDFSample.Wi;
+            ray.set_origin(P_i);
+            ray.set_direction(Wi);
+            Float pdf_light = scene.SampleLightPdf(ray);
+            Float pdf_bsdf = bsdf.pdf(N, Wo, Wi);
             Float weight = PowerHeuristic(pdf_bsdf, pdf_light);
-            beta *= weight * bsdf.Weight * scatterLight.f * math::saturate(scatterLight.cosine) / pdf_bsdf;
+            beta *= weight * bsdf.Weight * BSDFSample.F;
         }
 
         if (bounce > 3)
@@ -137,7 +139,7 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
     const SceneObject& surface = *hitRecord.Object;
     const std::unique_ptr<Material>& material = surface.Material;
     const Direction& N = hitRecord.SurfaceNormal;
-    const Direction W_o = -ray.direction();
+    const Direction Wo = -ray.direction();
 
     const bool bIsLightSource = surface.LightSource != nullptr;
     if (bIsLightSource)
@@ -159,14 +161,13 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
         if (material)
         {
             const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
-            BSDFSample scatterLight;
-            if (bsdf.Scattering(u, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
+            BSDFSample BSDFSample;
+            if (bsdf.SampleFCosOverPdf(u, P_i, N, ray, hitRecord.IsOnSurface, BSDFSample))
             {
-                const Ray& scatteringRay = scatterLight.scattering;
-                const Direction& W_i = scatteringRay.direction();
-                return W_i;
+                const Direction& Wi = BSDFSample.Wi;
+                return Wi;
 
-                const Direction Half = (W_i + W_o);
+                const Direction Half = (Wi + Wo);
                 return Half * 0.5 + 0.5;
                 return Spectrum(1, 0, 0) * (math::dot(N, Half));
             }

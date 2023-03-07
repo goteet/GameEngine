@@ -29,11 +29,8 @@ Float PowerHeuristic(Float pdfA, Float pdfB);
 
 struct BSDFSample
 {
-    Direction Wi;
-    Spectrum F;
-    Float cosine = Float(1);
-    Ray scattering;
-    Spectrum f = Spectrum::zero();
+    Direction Wi = Direction::unit_y();
+    Spectrum F = Spectrum::zero();
 };
 
 struct BSDF
@@ -45,7 +42,6 @@ struct BSDF
     BSDF(const std::string& debugName, uint32_t mask, Float weight) : DebugName(debugName), BSDFMask(mask), Weight(weight) { }
     virtual ~BSDF() { }
     virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const = 0;
-    virtual bool Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const = 0;
     virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi, bool IsOnSurface) const { return Spectrum::zero(); }
     virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const { return Float(1); }
 };
@@ -109,7 +105,6 @@ struct Lambertian : public BSDF
     Lambertian(Float weight = Float(1)) : BSDF("Lambertian", Material::BSDFMask::Diffuse, weight) { }
     Lambertian(const Spectrum& albedo, Float weight = Float(1)) : BSDF("Lambertian", Material::BSDFMask::Diffuse, weight), Albedo(albedo) { }
     virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const override;
-    virtual bool Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const override;
     virtual Spectrum f(
         const Direction& N,
         const Direction& Wo,
@@ -131,7 +126,6 @@ struct OrenNayer : public BSDF
     OrenNayer(Float weight = Float(1)) : BSDF("Oren-Nayer", Material::BSDFMask::Diffuse, weight) { };
     OrenNayer(const Spectrum& albedo, Radian sigma = 0_degd, Float weight = Float(1));
     virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const override;
-    virtual bool Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const override;
     virtual Spectrum f(
         const Direction& N,
         const Direction& Wo,
@@ -158,7 +152,6 @@ struct GGX : public BSDF
         , Roughness(roughness)
         , RefractiveIndex(IoR) { }
     virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const override;
-    virtual bool Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const override;
     virtual Spectrum f(
         const Direction& N,
         const Direction& Wo,

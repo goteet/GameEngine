@@ -220,18 +220,8 @@ bool Lambertian::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& 
     //      pdf                 Pi             cos(theta)  
     oBSDFSample.Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
     oBSDFSample.F = Albedo;
-    Float NdotL = math::dot(oBSDFSample.Wi, N);
+    const Float NdotL = math::dot(oBSDFSample.Wi, N);
     return NdotL >= Float(0);
-}
-
-bool Lambertian::Scattering(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
-{
-    Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
-    outLightRay.scattering.set_origin(P);
-    outLightRay.scattering.set_direction(Wi);
-    outLightRay.cosine = math::dot(Wi, N);
-    outLightRay.f = f(N, Ray.direction(), Wi, IsOnSurface);
-    return outLightRay.cosine >= Float(0);
 }
 
 Spectrum Lambertian::f(
@@ -303,16 +293,6 @@ bool OrenNayer::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N
     oBSDFSample.Wi = Wi;
     oBSDFSample.F = (factor * CosineWi) * Albedo;
     return CosineWi >= Float(0);
-}
-
-bool OrenNayer::Scattering(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
-{
-    Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
-    outLightRay.scattering.set_origin(P);
-    outLightRay.scattering.set_direction(Wi);
-    outLightRay.cosine = math::dot(Wi, N);
-    outLightRay.f = f(N, -Ray.direction(), Wi, IsOnSurface);
-    return outLightRay.cosine >= Float(0);
 }
 
 Spectrum OrenNayer::f(
@@ -408,32 +388,6 @@ bool GGX::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, cons
     const Float G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
     oBSDFSample.Wi = Wi;
     oBSDFSample.F = math::saturate((F * G * HdotV) / (NdotV * NdotH)) * Spectrum::one();
-    return NdotL > 0;
-}
-
-bool GGX::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
-{
-    const Direction Wo = -Ray.direction();
-    const Float eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
-    const Float eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
-
-    Float alpha = math::square(Roughness);
-    UVW uvw(N);
-    Direction Wm = SampleGGXVNDF(uvw.world_to_local(-Wo), alpha, alpha, epsilon[1], epsilon[2]);
-    Direction H = uvw.local_to_world(Wm);
-    Direction Wi = math::reflection(Wo, H);
-    const Float NdotL = math::dot(Wi, N);
-    const Float NdotH = math::dot(N, H);
-    const Float HdotV = math::dot(H, Wo);
-    const Float Frehnel = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-    outLightRay.scattering.set_origin(P);
-    outLightRay.scattering.set_direction(Wi);
-    //const F D = DistributionGGX(Roughness, NdotH);
-    const Float G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
-    //const F BRDF = F(0.25) * Frehnel * D * G / NdotV;
-    const Float BRDF = Frehnel * G / HdotV;
-    outLightRay.f = Spectrum::one() * BRDF;
-    outLightRay.cosine = NdotL;
     return NdotL > 0;
 }
 
