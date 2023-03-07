@@ -181,19 +181,23 @@ namespace math
         const point<value_type, EDim::_3>& pos, const vector_t<value_type, EDim::_3>& normal, bool dualface,
         value_type error, value_type& t)
     {
-        value_type Dr_dot_N = dot(ray.direction(), normal);
-
-        if (Dr_dot_N < value_type(0) || (Dr_dot_N > value_type(0) && dualface))
+        value_type NdotDir = dot(ray.direction(), normal);
+        if (NdotDir < value_type(0) || (NdotDir > value_type(0) && dualface))
         {
             //t = -dot(N, Pp) / dot(Dr, N);
-            t = dot(pos - ray.origin(), normal) / Dr_dot_N;
-            if (t > error)
+            t = dot(pos - ray.origin(), normal) / NdotDir;
+            return (t > error)
+                ? intersection::intersect
+                : intersection::none;
+        }
+        else if (fabs(NdotDir) < error)
+        {
+            //check the origin is on the plane.
+            t = dot(pos - ray.origin(), normal);
+            if (fabs(t) < error)
             {
-                return intersection::intersect;
-            }
-            else
-            {
-                return intersection::none;
+                t = 0;
+                return intersection::inside;
             }
         }
         return intersection::none;
@@ -206,20 +210,20 @@ namespace math
         scaler_t<value_type> radius, bool dualface,
         value_type error, value_type& t)
     {
-        intersection r = intersect_plane(ray, pos, normal, dualface, error, t);
-        if (r != intersection::none)
+        intersection rst = intersect_plane(ray, pos, normal, dualface, error, t);
+        if (rst != intersection::none)
         {
             point<value_type, EDim::_3> intersection = ray.calc_offset(t);
             vector_t<value_type, EDim::_3> offset = (intersection - pos);
-            value_type r = dot(offset, offset);
-            value_type radius_sqr = radius * radius;
-            if (r > radius_sqr)
+            value_type diff_square = dot(offset, offset);
+            value_type radius_square = radius * radius;
+            if (diff_square > radius_square)
             {
-                intersection::none;
+                return intersection::none;
             }
-            else if (r < radius_sqr)
+            else if (diff_square < radius_square)
             {
-                return intersection::inside;
+                return intersection::intersect;
             }
             else
             {
@@ -248,11 +252,11 @@ namespace math
             value_type y = magnitude(offset - projection);
             if (x > extends.x || y > extends.y)
             {
-                intersection::none;
+                return intersection::none;
             }
             else if (x < extends.x && y < extends.y)
             {
-                return intersection::inside;
+                return intersection::intersect;
             }
             else
             {
@@ -294,7 +298,7 @@ namespace math
         value_type a = dot(Dr, Dr);
         value_type b = 2 * dot(Dr, Or_Os);
         value_type c = dot(Or_Os, Or_Os) - radius_sqr;
-        value_type det = b * b - 4 * a*c;
+        value_type det = b * b - 4 * a * c;
         if (det > value_type(0))
         {
             det = sqrt(det);
@@ -440,7 +444,7 @@ namespace math
     template<typename value_type>
     intersection intersect_triangle(const ray<value_type, EDim::_3>& ray,
         const point<value_type, EDim::_3>& v0, const point<value_type, EDim::_3>& v1, const point<value_type, EDim::_3>& v2,
-        value_type error, value_type& t, value_type&u, value_type& v, vector_t<value_type, EDim::_3>& normal)
+        value_type error, value_type& t, value_type& u, value_type& v, vector_t<value_type, EDim::_3>& normal)
     {
         //moller-trumbore
         vector_t<value_type, EDim::_3> v1v0 = v1 - v0;
