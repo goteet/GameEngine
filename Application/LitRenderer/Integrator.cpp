@@ -87,7 +87,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
 
         //Sampling BSDF
         {
-            LightRay scatterLight;
+            BSDFSample scatterLight;
             if (!bsdf.Scattering(u, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
             {
                 break;
@@ -159,7 +159,7 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
         if (material)
         {
             const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
-            LightRay scatterLight;
+            BSDFSample scatterLight;
             if (bsdf.Scattering(u, P_i, N, ray, hitRecord.IsOnSurface, scatterLight))
             {
                 const Ray& scatteringRay = scatterLight.scattering;

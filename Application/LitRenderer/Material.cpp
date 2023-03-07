@@ -1,3 +1,4 @@
+#include <tuple>
 #include "Material.h"
 #include "LitRenderer.h"
 
@@ -195,7 +196,7 @@ Direction GenerateUniformHemisphereDirection(Float epsilon[2], const Direction& 
 }
 
 
-Spectrum GenerateCosineWeightedHemisphereDirection(Float epsilon[2], const Direction& normal)
+Spectrum GenerateCosineWeightedHemisphereDirection(const Float epsilon[2], const Direction& normal)
 {
     Float rand_theta = epsilon[0];
     Float rand_phi = epsilon[1];
@@ -217,13 +218,24 @@ Spectrum GenerateCosineWeightedHemisphereDirection(Float epsilon[2], const Direc
 
 
 
-bool Lambertian::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const
+bool Lambertian::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const
+{
+    //  f * cos(theta)     rho * cos(theta)        Pi
+    // ---------------- = ----------------- * ------------ = rho
+    //      pdf                 Pi             cos(theta)  
+    oBSDFSample.Wi = GenerateCosineWeightedHemisphereDirection(u + 1, N);
+    oBSDFSample.F = Albedo;
+    Float NdotL = math::dot(oBSDFSample.Wi, N);
+    return NdotL >= Float(0);
+}
+
+bool Lambertian::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
 {
     Direction Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
     outLightRay.cosine = math::dot(Wi, N);
-    outLightRay.f = Lambertian::f(N, Ray.direction(), Wi, IsOnSurface);
+    outLightRay.f = f(N, Ray.direction(), Wi, IsOnSurface);
     return outLightRay.cosine >= Float(0);
 }
 
@@ -257,13 +269,54 @@ OrenNayer::OrenNayer(const Spectrum& albedo, Radian sigma, Float weight)
     B = Float(0.45) * SigmaSquare.value / (SigmaSquare.value + Float(0.09));
 }
 
-bool OrenNayer::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const
+std::tuple<Float, Float> CalculateFactorAndCosineWi(const Direction& N, const Direction& Wi, const Direction& Wo, const Float A, const Float B)
+{
+    const Float CosineWi = math::dot(N, Wi);
+    const Float CosineWo = math::dot(N, Wo);
+    const Float SineWi = sqrt(Float(1) - math::saturate(math::square(CosineWi)));
+    const Float SineWo = sqrt(Float(1) - math::saturate(math::square(CosineWo)));
+
+    Float SineAlpha, TangentBeta;
+    bool bIsWiGreater = CosineWi < CosineWo;
+    if (bIsWiGreater)
+    {
+        SineAlpha = SineWi;
+        TangentBeta = SineWo / CosineWo;
+    }
+    else
+    {
+        SineAlpha = SineWo;
+        TangentBeta = SineWi / CosineWi;
+    }
+
+    Float maxWi_Wo = math::max2(Float(0), CosineWi * CosineWo + SineWi * SineWo);
+    Float factor = A + B * maxWi_Wo * SineAlpha * TangentBeta;
+    return { factor, CosineWi };
+}
+
+bool OrenNayer::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const
+{
+    //  f * cos(theta)                           rho                     Pi
+    // ---------------- = factor * cosine(Wi) * ----- * cos(theta) * ------------ = factor * cosine(Wi) * rho
+    //      pdf                                   Pi                  cos(theta) 
+    // *  Float NdotL = math::dot(N, Wi);
+
+    const Direction Wi = GenerateCosineWeightedHemisphereDirection(u + 1, N);
+    const Direction Wo = -Ray.direction();
+    Float factor, CosineWi;
+    std::tie(factor, CosineWi) = CalculateFactorAndCosineWi(N, Wi, Wo, A, B);
+    oBSDFSample.Wi = Wi;
+    oBSDFSample.F = (factor * CosineWi) * Albedo;
+    return CosineWi >= Float(0);
+}
+
+bool OrenNayer::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
 {
     Direction Wi = GenerateCosineWeightedHemisphereDirection(epsilon + 1, N);
     outLightRay.scattering.set_origin(P);
     outLightRay.scattering.set_direction(Wi);
     outLightRay.cosine = math::dot(Wi, N);
-    outLightRay.f = f(N, Ray.direction(), Wi, IsOnSurface);
+    outLightRay.f = f(N, -Ray.direction(), Wi, IsOnSurface);
     return outLightRay.cosine >= Float(0);
 }
 
@@ -273,25 +326,9 @@ Spectrum OrenNayer::f(
     const Direction& Wi,
     bool IsOnSurface) const
 {
-    const Float cosWi = math::saturate(math::dot(N, Wi)); const Float sinWi = sqrt(Float(1) - math::square(cosWi));
-    const Float cosWo = math::saturate(math::dot(N, Wo)); const Float sinWo = sqrt(Float(1) - math::square(cosWo));
-
-    Float sinAlpha, tanBeta;
-    bool IsWiGreater = cosWi < cosWo;
-    if (IsWiGreater)
-    {
-        sinAlpha = sinWi;
-        tanBeta = sinWo / cosWo;
-    }
-    else
-    {
-        sinAlpha = sinWo;
-        tanBeta = sinWi / cosWi;
-    }
-
-    Float maxWi_Wo = math::max2(Float(0), cosWi * cosWo + sinWi * sinWo);
-    Float factor = A + B * maxWi_Wo * sinAlpha * tanBeta;
-    return Albedo * math::InvPI<Float> *factor * cosWi;
+    Float factor, CosineWi;
+    std::tie(factor, CosineWi) = CalculateFactorAndCosineWi(N, Wi, Wo, A, B);
+    return (factor * CosineWi * math::InvPI<Float>) * Albedo;
 }
 
 Float OrenNayer::pdf(
@@ -312,7 +349,7 @@ bool IsReflectionDirection(const Direction& N, const Direction& Wo, const Direct
 }
 
 const Float AirRefractiveIndex = Float(1.0003);
-bool Glossy::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const
+bool Glossy::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
 {
     const Float eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
     const Float eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
@@ -325,7 +362,6 @@ bool Glossy::Scattering(Float epsilon[3], const Point& P, const Direction& N, co
         const Direction Wi = math::reflection(Wo, N);
         const Float NdotL = math::dot(Wi, N);
         const Float Fi = FresnelSchlick(NdotL, eta1, eta2);
-        outLightRay.specular = true;
         outLightRay.scattering.set_origin(P);
         outLightRay.scattering.set_direction(Wi);
         outLightRay.f = Spectrum::one() * Fi;
@@ -339,7 +375,7 @@ bool Glossy::Scattering(Float epsilon[3], const Point& P, const Direction& N, co
         outLightRay.scattering.set_origin(P);
         outLightRay.scattering.set_direction(Wi);
         outLightRay.cosine = math::dot(Wi, N);
-        outLightRay.f = f(N, Ray.direction(), Wi, IsOnSurface);
+        outLightRay.f = f(N, -Ray.direction(), Wi, IsOnSurface);
 
         result = outLightRay.cosine >= Float(0);
 
@@ -434,7 +470,40 @@ Direction SampleGGXVNDF(
     return Wm;
 }
 
-bool GGX::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, LightRay& outLightRay) const
+bool GGX::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const
+{
+    // f * cos(theta)        D * F * G                      4 * HdotV     F * G * HdotV
+    //--------------- = ------------------- * cos(theta) * ----------- = ---------------
+    //     pdf           4 * NdotV * NdotL                  D * NdotH     NdotV * NdotH
+    //
+    // Note that cos(theta) = NdotL
+    //           Distribution::Pdf  = D * cos(theta),
+    //           Distribution::Pdf' = D * G1 * HdotV / NdotV, this will be special due to sampling visible area.
+
+    const Direction Wo = -Ray.direction();
+    const Float eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
+    const Float eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
+
+    Float alpha = math::square(Roughness);
+    UVW uvw(N);
+    Direction Ho = SampleGGXVNDF(uvw.world_to_local(-Wo), alpha, alpha, u[1], u[2]);
+    Direction H = uvw.local_to_world(Ho);
+    Direction Wi = math::reflection(Wo, H);
+
+    const Float NdotV = math::dot(Wo, N);
+    const Float NdotL = math::dot(Wi, N);
+    const Float NdotH = math::dot(N, H);
+    const Float HdotV = math::dot(H, Wo);
+
+    //const F D = DistributionGGX(Roughness, NdotH);
+    const Float F = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
+    const Float G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
+    oBSDFSample.Wi = Wi;
+    oBSDFSample.F = math::saturate((F * G * HdotV) / (NdotV * NdotH)) * Spectrum::one();
+    return NdotL > 0;
+}
+
+bool GGX::Scattering(Float epsilon[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& outLightRay) const
 {
     const Direction Wo = -Ray.direction();
     const Float eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
@@ -457,7 +526,6 @@ bool GGX::Scattering(Float epsilon[3], const Point& P, const Direction& N, const
     const Float BRDF = Frehnel * G / HdotV;
     outLightRay.f = Spectrum::one() * BRDF;
     outLightRay.cosine = NdotL;
-    outLightRay.specular = true;
     return NdotL > 0;
 }
 
@@ -486,19 +554,16 @@ Float GGX::pdf(
     const Direction& Wo,
     const Direction& Wi) const
 {
-#if true
-    //copy from UE4.
-    const Direction H = Wi + Wo;
+    //copy from Pbrt, same with UE4.
+    // D * NdotH
+    //-----------
+    // 4 * HdotV
+    const Direction H = Wo + Wi;
     const Float NdotH = math::dot(N, H);
-    const Float VdotH = math::dot(Wo, H);
+    const Float NdotL = math::dot(N, Wi);
+    const Float HdotV = math::dot(H, Wo);
     const Float D = DistributionGGX(Roughness, NdotH);
-    return NdotH / VdotH;
-    //return D * NdotH * 0.25 / VdotH;
-#else
-	const Direction H = Wi + Wo;
-    F pdfSpecular = math::power<5>(math::dot(H, N));
-    return pdfSpecular;
-#endif
+    return D * NdotH * Float(0.25) / HdotV;
 }
 
 void Material::AddBSDFComponent(std::unique_ptr<BSDF> component)
