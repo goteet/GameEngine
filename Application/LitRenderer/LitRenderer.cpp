@@ -37,18 +37,18 @@ namespace
                 SceneBottom + 40,
                 SceneCenterZ + 10);
 
-            const Float roughness = Float(0.5);
-            const Float IoR = Float(10);
+            const Float roughness = Float(0.1);
+            const Float IoR = Float(1.1);
+            Float Ks = Float(0.999);
             if (DEBUG)
             {
-                mainSphere->Material = MakeMicrofacetGGXMaterialDebug(roughness, IoR);
+                mainSphere->Material = MakeMicrofacetGGXMaterialDebug(roughness, IoR, Ks);
             }
             else
             {
-                Float Ks = Float(0.5);
                 Float Kd = Float(1) - Ks;
                 mainSphere->Material = MakePlasticMaterial(Kd, Spectrum(Float(0.5)), Ks, roughness, IoR);
-                mainSphere->Material = MakeAshikhminAndShirleyGGXMaterial(roughness, Kd, Ks);
+                mainSphere->Material = MakeMicrofacetGGXMaterialDebug(roughness, IoR, Float(1));
             }
 
 
@@ -62,25 +62,25 @@ namespace
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
             wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
             wallLeft->Material = MakeMatteMaterial(Red);
-
+            
             SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
             wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
             wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
             wallRight->SetExtends(SceneExtendZ, SceneExtendY);
             wallRight->Material = MakeMatteMaterial(Blue);
-
+            
             SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
             wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
             wallTop->SetExtends(SceneExtendZ, SceneExtendX);
             wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
             wallTop->Material = MakeMatteMaterial(Gray);
-
+            
             SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
             wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
             wallFar->SetExtends(SceneExtendX, SceneExtendY);
             wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
             wallFar->Material = MakeMatteMaterial(DarkGray);
-
+            
             SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
             wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
             wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
