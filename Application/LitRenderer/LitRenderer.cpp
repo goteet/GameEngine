@@ -54,8 +54,8 @@ namespace
             Spectrum Red(Float(0.75), Float(0.2), Float(0.2));
             Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
             Spectrum Blue(Float(0.2), Float(0.2), Float(0.75));
-            Spectrum Gray(Float(0.75), Float(0.75), Float(0.75));
-            Spectrum DarkGray(Float(0.6), Float(0.6), Float(0.6));
+            Spectrum Gray(Float(0.75));
+            Spectrum DarkGray(Float(0.6));
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
@@ -141,8 +141,8 @@ namespace
             Spectrum Red(Float(0.75), Float(0.2), Float(0.2));
             Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
             Spectrum Blue(Float(0.2), Float(0.2), Float(0.75));
-            Spectrum Gray(Float(0.75), Float(0.75), Float(0.75));
-            Spectrum DarkGray(Float(0.6), Float(0.6), Float(0.6));
+            Spectrum Gray(Float(0.75));
+            Spectrum DarkGray(Float(0.6));
 
             SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
             wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
