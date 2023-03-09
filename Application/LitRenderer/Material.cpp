@@ -35,10 +35,8 @@ Float FresnelSchlick(Float CosTheta, Float R0)
     return R0 + (Float(1) - R0) * math::power<5>(Float(1) - CosTheta);
 }
 
-Float DistributionGTR2(Float roughness, Float NdotH)
+Float DistributionGTR2(Float AlphaSquare, Float NdotH)
 {
-    //F alpha = math::square(roughness);
-    Float alpha2 = math::power<4>(roughness);
     //      alpha^2 * X(n.m)           sqrt           alpha * X                    0.5 * alpha * X
     //--------------------------------- = -------------------------------- = ----------------------------
     // 4 * cos^4 * (alpha^2 + tan^2)^2      2 * (alpha^2 * cos^2 + sin^2)      cos^2 * (alpha^2 - 1) + 1     //<----should replace 4 with PI.
@@ -49,8 +47,8 @@ Float DistributionGTR2(Float roughness, Float NdotH)
     //  Dtr = -------------------------- = InversePi * ----------------------------------------
     //         PI * ((n.h)^2(a^2-1)+1)^2                 (NdotH^2 * (a2 - 1) + 1)^2
     Float cos = math::saturate(NdotH); //<--hidden X(x) -> x>0?1:0; here
-    Float denominator = math::square(cos) * (alpha2 - 1) + 1;
-    return alpha2 * math::InvPI<Float> / math::square(denominator);
+    Float denominator = math::square(cos) * (AlphaSquare - 1) + 1;
+    return AlphaSquare * math::InvPI<Float> / math::square(denominator);
 }
 
 //still error with GTR2, so I copy this from filament's description
@@ -78,40 +76,32 @@ Float DistributionGTR1(Float roughness, Float HdotN)
     return math::square(numerator) / denominator;
 }
 
-Float DistributionGGX(Float roughness, Float NdotH)
-{
-    return DistributionGTR2(roughness, NdotH);
-}
-
 Float DistributionBerry(Float roughness, Float NdotH)
 {
     return DistributionGTR1(roughness, NdotH);
 }
 
-Float ShadowingGGX(Float roughness, Float VdotH, Float NdotH)
+Float ShadowingGGX(Float AlphaSquare, Float HdotV, Float NdotH)
 {
-    Float alpha = math::square(roughness);
-    Float alpha2 = math::square(alpha);
-    Float cos = math::saturate(VdotH);
+    Float cos = math::saturate(HdotV);
     Float cos2 = math::square(cos);
-    Float X = (NdotH / VdotH) > 0 ? Float(1) : Float(0);
+    Float X = (NdotH / HdotV) > 0 ? Float(1) : Float(0);
     //          2 * X                                       2 * cos * X                                     2 * cos * X
     //--------------------------------- = ------------------------------------------- = ---------------------------------------------
     // 1 + sqrt(1 + AlphaG^2 * tan^2)      cos + sqrt(cos^2 + alpha^2 * (1 - cos^2))     cos + sqrt(cos^2 * (1 - alpha^2) + alpha^2)
     //
     Float numerator = Float(2) * cos * X;
-    Float denominator = cos + sqrt(cos2 * (Float(1) - alpha2) + alpha2);
+    Float denominator = cos + sqrt(cos2 * (Float(1) - AlphaSquare) + AlphaSquare);
     return numerator / denominator;
 }
 
-Float GeometryGGX(Float roughness, Float NdotH, Float VdotH, Float LdotH)
+Float GeometryGGX(Float roughness, Float NdotH, Float HdotV, Float HdotL)
 {
-    Float G1 = ShadowingGGX(roughness, VdotH, NdotH);
-    Float G2 = ShadowingGGX(roughness, LdotH, NdotH);
+    Float AlphaSquare = math::power<4>(roughness);
+    Float G1 = ShadowingGGX(AlphaSquare, HdotV, NdotH);
+    Float G2 = ShadowingGGX(AlphaSquare, HdotL, NdotH);
     return math::min2(G1, G2);
 }
-
-
 
 struct UVW
 {
@@ -196,6 +186,39 @@ Direction GenerateUniformHemisphereDirection(const Float uTheta, const Float uPh
     return UVW(normal).local_to_world(x, y, z);
 }
 
+Direction SampleGGXVNDF(
+    const Direction& Wo,  // Input Wo: view direction
+    Float AlphaX, Float AlphaY,                   // Input alpha_x, alpha_y: roughness parameters
+    Float u1, Float u2                              // Input U1, U2: uniform random numbers
+)
+{
+    // stretch view
+    Direction V = Wo * math::vector3<Float>(AlphaX, AlphaY, Float(1));
+
+    // orthonormal basis
+    Direction T1 = V.z < Float(0.99999)
+        ? math::cross(V, Direction::unit_z())
+        : Direction::unit_x();
+    Direction T2 = math::cross(V, T1);
+
+    // sample point with polar coordinates (r, phi)
+    Float a = Float(1) / (Float(1) + V.z);
+    Float r = sqrt(u1);
+    Radian phi = (u2 < a)
+        ? Radian(u2 / a * math::PI<Float>)
+        : Radian(math::PI<Float> +(u2 - a) / (Float(1) - a) * math::PI<Float>);
+
+    Float t1 = r * cos(phi);
+    Float t2 = r * sin(phi) * ((u2 < a) ? Float(1) : V.z);
+
+    // compute normal
+    Spectrum N = T1 * t1 + T2 * t2 + V * sqrt(math::max2(Float(0), Float(1) - math::square(t1) - math::square(t2)));
+
+    // unstretch
+    // note this will do the normalize() operation.
+    Direction Wm = math::vector3<Float>(AlphaX * N.x, AlphaY * N.y, math::max2(Float(0), N.z));
+    return Wm;
+}
 
 Spectrum GenerateCosineWeightedHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& normal)
 {
@@ -213,6 +236,35 @@ Spectrum GenerateCosineWeightedHemisphereDirection(const Float uTheta, const Flo
 
     UVW uvw(normal);
     return uvw.local_to_world(x, y, z);
+}
+
+DistributionGGX::DistributionGGX(Float roughness)
+    : Roughness(roughness)
+    , Alpha(math::power<2>(roughness))
+    , AlphaSquare(math::power<4>(roughness))
+{
+}
+
+Direction DistributionGGX::SampleWh(const Direction& Wo, Float u1, Float u2) const
+{
+    return SampleGGXVNDF(Wo, Alpha, Alpha, u1, u2);
+}
+
+Float DistributionGGX::D(Float NdotH) const
+{
+    return DistributionGTR2(AlphaSquare, NdotH);
+}
+
+Float DistributionGGX::G(Float NdotH, Float HdotV, Float HdotL) const
+{
+    Float G1 = ShadowingGGX(AlphaSquare, HdotV, NdotH);
+    Float G2 = ShadowingGGX(AlphaSquare, HdotL, NdotH);
+    return math::min2(G1, G2);
+}
+
+Float DistributionGGX::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
+{
+    return Float();
 }
 
 
@@ -331,40 +383,7 @@ bool IsReflectionDirection(const Direction& N, const Direction& Wo, const Direct
 
 const Float AirRefractiveIndex = Float(1.0003);
 
-Direction SampleGGXVNDF(
-    const Direction& Wo,  // Input Wo: view direction
-    Float alpha_x, Float alpha_y,                   // Input alpha_x, alpha_y: roughness parameters
-    Float u1, Float u2                              // Input U1, U2: uniform random numbers
-)
-{
-    // stretch view
-    Direction V = Wo * Spectrum(alpha_x, alpha_y, Float(1));
-
-    // orthonormal basis
-    Direction T1 = V.z < Float(0.99999)
-        ? math::cross(V, Direction::unit_z())
-        : Direction::unit_x();
-    Direction T2 = math::cross(V, T1);
-
-    // sample point with polar coordinates (r, phi)
-    Float a = Float(1) / (Float(1) + V.z);
-    Float r = sqrt(u1);
-    Radian phi = (u2 < a)
-        ? Radian(u2 / a * math::PI<Float>)
-        : Radian(math::PI<Float> +(u2 - a) / (Float(1) - a) * math::PI<Float>);
-
-    Float t1 = r * cos(phi);
-    Float t2 = r * sin(phi) * ((u2 < a) ? Float(1) : V.z);
-
-    // compute normal
-    Spectrum N = T1 * t1 + T2 * t2 + V * sqrt(math::max2(Float(0), Float(1) - math::square(t1) - math::square(t2)));
-
-    // unstretch
-    Direction Wm = Spectrum(alpha_x * N.x, alpha_y * N.y, math::max2(Float(0), N.z));
-    return Wm;
-}
-
-bool TorranceSparrowGTR2::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const
+bool TorranceSparrow::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const
 {
     // f * cos(theta)        D * F * G                      4 * HdotV     F * G * HdotV
     //--------------- = ------------------- * cos(theta) * ----------- = ---------------
@@ -373,34 +392,29 @@ bool TorranceSparrowGTR2::SampleFCosOverPdf(Float u[3], const Point& P, const Di
     // Note that cos(theta) = NdotL
     //           Distribution::Pdf  = D * cos(theta),
     //           Distribution::Pdf' = D * G1 * HdotV / NdotV, this will be special due to sampling visible area.
-
     const Direction Wo = -Ray.direction();
     const Float eta1 = IsOnSurface ? AirRefractiveIndex : RefractiveIndex;
     const Float eta2 = IsOnSurface ? RefractiveIndex : AirRefractiveIndex;
 
-    Float alpha = math::square(Roughness);
     UVW uvw(N);
-    Direction Ho = SampleGGXVNDF(uvw.world_to_local(-Wo), alpha, alpha, u[1], u[2]);
-    Direction H = uvw.local_to_world(Ho);
-    Direction Wi = math::reflection(Wo, H);
-
-    const Float NdotV = math::dot(Wo, N);
+    const Direction Ho = Distribution->SampleWh(uvw.world_to_local(-Wo), u[1], u[2]);
+    const Direction H = uvw.local_to_world(Ho);
+    const Direction Wi = math::reflection(Wo, H);
     const Float NdotL = math::dot(Wi, N);
     const Float NdotH = math::dot(N, H);
-    const Float HdotV = math::dot(H, Wo);
 
     //const F D = DistributionGGX(Roughness, NdotH);
     const Float F = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-    const Float G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
+    const Float G = Distribution->G(NdotH, math::dot(H, Wi), math::dot(H, Wo));
     oBSDFSample.Wi = Wi;
-    oBSDFSample.F = math::saturate((F * G * HdotV) / (NdotV * NdotH)) * Spectrum::one();
-    oBSDFSample.SampleMask = (Roughness < Float(0.005)
+    oBSDFSample.F = (f(N, Wo, Wi, IsOnSurface) * NdotL / pdf(N, Wo, Wi)) * Spectrum::one();
+    oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
         ? BSDFMask::Specular | BSDFMask::Reflection
         : BSDFMask::Specular);
     return NdotL > 0;
 }
 
-Spectrum TorranceSparrowGTR2::f(
+Spectrum TorranceSparrow::f(
     const Direction& N,
     const Direction& Wo,
     const Direction& Wi,
@@ -414,13 +428,13 @@ Spectrum TorranceSparrowGTR2::f(
     const Float NdotV = math::dot(N, Wo);
     const Float HdotV = math::dot(H, Wo);
     const Float F = FresnelSchlick(math::saturate(NdotL), eta1, eta2);
-    const Float D = DistributionGGX(Roughness, NdotH);
-    const Float G = GeometryGGX(Roughness, NdotH, math::dot(H, Wi), math::dot(H, Wo));
+    const Float D = Distribution->D(NdotH);
+    const Float G = Distribution->G(NdotH, math::dot(H, Wi), math::dot(H, Wo));
     const Float BRDF = Float(0.25) * D * F * G / (NdotV * NdotL);
     return NdotL > Float(0) ? Spectrum::one() * BRDF : Spectrum::zero();
 }
 
-Float TorranceSparrowGTR2::pdf(
+Float TorranceSparrow::pdf(
     const Direction& N,
     const Direction& Wo,
     const Direction& Wi) const
@@ -433,7 +447,7 @@ Float TorranceSparrowGTR2::pdf(
     const Float NdotH = math::dot(N, H);
     const Float NdotL = math::dot(N, Wi);
     const Float HdotV = math::dot(H, Wo);
-    const Float D = DistributionGGX(Roughness, NdotH);
+    const Float D = Distribution->D(NdotH);
     return D * NdotH * Float(0.25) / HdotV;
 }
 
@@ -463,7 +477,7 @@ const std::unique_ptr<BSDF>& Material::GetRandomBSDFComponent(Float u) const
     return GetBSDFComponentByIndex(index);
 }
 
-bool AshikhminAndShirleyGTR2::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const
+bool AshikhminAndShirley::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const
 {
     const Direction Wo = -Ray.direction();
     Direction Wi;
@@ -476,12 +490,11 @@ bool AshikhminAndShirleyGTR2::SampleFCosOverPdf(Float u[3], const Point& P, cons
     else
     {
         //sample specular
-        Float Alpha = math::square(Roughness);
         UVW uvw(N);
-        const Direction Ho = SampleGGXVNDF(uvw.world_to_local(-Wo), Alpha, Alpha, u[1], u[2]);
+        const Direction Ho = Distribution->SampleWh(uvw.world_to_local(-Wo), u[1], u[2]);
         const Direction H = uvw.local_to_world(Ho);
         Wi = math::reflection(Wo, H);
-        oBSDFSample.SampleMask = (Roughness < Float(0.05)
+        oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
             ? BSDFMask::Specular | BSDFMask::Reflection
             : BSDFMask::Specular);
     }
@@ -492,7 +505,7 @@ bool AshikhminAndShirleyGTR2::SampleFCosOverPdf(Float u[3], const Point& P, cons
     return NdotL >= Float(0);
 }
 
-Spectrum AshikhminAndShirleyGTR2::f(const Direction& N, const Direction& Wo, const Direction& Wi, bool IsOnSurface) const
+Spectrum AshikhminAndShirley::f(const Direction& N, const Direction& Wo, const Direction& Wi, bool IsOnSurface) const
 {
     const Direction H = Wo + Wi;
     if (math::near_zero(H))
@@ -503,7 +516,7 @@ Spectrum AshikhminAndShirleyGTR2::f(const Direction& N, const Direction& Wo, con
     const Float NdotL = math::dot(N, Wi);
     const Float NdotV = math::dot(N, Wo);
     const Float NdotH = math::dot(N, H);
-    const Float D = DistributionGGX(Roughness, NdotH);
+    const Float D = Distribution->D(NdotH);
     const Float F = FresnelSchlick(HdotL, Rs);
 
     // 28*Rd 
@@ -524,7 +537,7 @@ Spectrum AshikhminAndShirleyGTR2::f(const Direction& N, const Direction& Wo, con
     return Diffse + Specular;
 }
 
-Float AshikhminAndShirleyGTR2::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Float AshikhminAndShirley::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
 {
     const Direction H = Wo + Wi;
     if (math::near_zero(H))
@@ -535,7 +548,7 @@ Float AshikhminAndShirleyGTR2::pdf(const Direction& N, const Direction& Wo, cons
     Float NdotH = math::dot(N, H);
     Float NdotL = math::dot(N, Wi);
     Float HdotV = math::dot(H, Wo);
-    Float D = DistributionGGX(Roughness, NdotH);
+    Float D = Distribution->D(NdotH);
     //copy from Pbrt, same with UE4.
     // D * NdotH
     //-----------

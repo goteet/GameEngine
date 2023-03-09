@@ -42,6 +42,28 @@ struct BSDFSample
     uint32_t SampleMask = BSDFMask::None;
 };
 
+struct DistributionFunction
+{
+    virtual ~DistributionFunction() = default;
+    virtual bool IsNearMirrorReflection() const = 0;
+    virtual Direction SampleWh(const Direction& Wo, Float u1, Float u2) const = 0;
+    virtual Float D(Float NdotH) const = 0;
+    virtual Float G(Float NdotH, Float HdotV, Float HdotL) const = 0;
+    virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi)const = 0;
+};
+
+struct DistributionGGX : DistributionFunction
+{
+    Float Roughness;
+    Float Alpha, AlphaSquare;
+    DistributionGGX(Float roughness = Float(0.5));
+    virtual bool IsNearMirrorReflection() const override { return Roughness < Float(0.05); }
+    virtual Direction SampleWh(const Direction& Wo, Float u1, Float u2) const override;
+    virtual Float D(Float NdotH) const override;
+    virtual Float G(Float NdotH, Float HdotV, Float HdotL) const override;
+    virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
+};
+
 struct BSDF
 {
     const std::string DebugName;
@@ -140,19 +162,16 @@ struct OrenNayer : public BSDF
         const Direction& Wi) const override;
 };
 
-struct TorranceSparrowGTR2 : public BSDF
+struct TorranceSparrow : public BSDF
 {
-    Float Roughness = Float(0.5);
+    std::unique_ptr<DistributionFunction> Distribution;
     Float RefractiveIndex = Float(2.5);
 
-    TorranceSparrowGTR2(Float weight = Float(1)) : BSDF("Microfacet GGX", BSDFMask::Specular, weight) { }
-    TorranceSparrowGTR2(Float roughness, Float IoR, Float weight = Float(1))
+    TorranceSparrow(std::unique_ptr<DistributionFunction>&& distrib, Float IoR, Float weight = Float(1))
         : BSDF("GGX Microfacet"
-            , (roughness < 0.05)
-                ? (BSDFMask::Reflection | BSDFMask::Specular)
-                : BSDFMask::Specular
+            , (distrib->IsNearMirrorReflection() ? (BSDFMask::Reflection | BSDFMask::Specular) : BSDFMask::Specular)
             , weight)
-        , Roughness(roughness)
+        , Distribution(std::move(distrib))
         , RefractiveIndex(IoR) { }
     virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const override;
     virtual Spectrum f(
@@ -166,19 +185,25 @@ struct TorranceSparrowGTR2 : public BSDF
         const Direction& Wi) const override;
 };
 
-struct AshikhminAndShirleyGTR2 : public BSDF
+struct AshikhminAndShirley : public BSDF
 {
-    Float Roughness = Float(0.5);
+    std::unique_ptr<DistributionFunction> Distribution;
     Float Rd = Float(0.5);
     Float Rs = Float(0.5);
-    AshikhminAndShirleyGTR2(Float weight = Float(1)) : BSDF("Ashikhmin-Shirley GGX", BSDFMask::Specular, weight) { }
-    AshikhminAndShirleyGTR2(Float roughness, Float diffuse, Float specular, Float weight = Float(1))
+    AshikhminAndShirley(std::unique_ptr<DistributionFunction>&& distrib, Float weight = Float(1))
         : BSDF("Ashikhmin-Shirley GGX"
-            , (roughness < 0.05)
+            , (distrib->IsNearMirrorReflection()
                 ? (BSDFMask::Reflection | BSDFMask::Specular | BSDFMask::Diffuse)
-                : BSDFMask::Specular | BSDFMask::Diffuse
+                : BSDFMask::Specular | BSDFMask::Diffuse)
             , weight)
-        , Roughness(roughness), Rd(diffuse), Rs(specular) { }
+        , Distribution(std::move(distrib)) { }
+    AshikhminAndShirley(std::unique_ptr<DistributionFunction>&& distrib, Float diffuse, Float specular, Float weight = Float(1))
+        : BSDF("Ashikhmin-Shirley GGX"
+            , (distrib->IsNearMirrorReflection()
+                ? (BSDFMask::Reflection | BSDFMask::Specular | BSDFMask::Diffuse)
+                : BSDFMask::Specular | BSDFMask::Diffuse)
+            , weight)
+        , Distribution(std::move(distrib)), Rd(diffuse), Rs(specular) { }
     virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const override;
     virtual Spectrum f(
         const Direction& N,
@@ -191,7 +216,7 @@ struct AshikhminAndShirleyGTR2 : public BSDF
         const Direction& Wi) const override;
 };
 
-using MircofacetGGX = TorranceSparrowGTR2;
+using MircofacetGGX = TorranceSparrow;
 
 inline std::unique_ptr<Material> MakeMatteMaterial(const Spectrum& albedo = Spectrum::one())
 {
@@ -216,8 +241,9 @@ inline std::unique_ptr<Material> MakeMatteMaterial(const Spectrum& albedo, Radia
 inline std::unique_ptr<Material> MakePlasticMaterial(Float Kd, const Spectrum& albedo, Float Ks, Float roughness, Float IoR = Float(1.5))
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
+    std::unique_ptr<DistributionGGX> distribGGX = std::make_unique<DistributionGGX>(roughness);
     std::unique_ptr<Lambertian> compLambertian = std::make_unique<Lambertian>(albedo, Kd);
-    std::unique_ptr<TorranceSparrowGTR2> compGGX = std::make_unique<TorranceSparrowGTR2>(roughness, IoR, Ks);
+    std::unique_ptr<TorranceSparrow> compGGX = std::make_unique<TorranceSparrow>(std::move(distribGGX), IoR, Ks);
 
     material->AddBSDFComponent(std::move(compLambertian));
     material->AddBSDFComponent(std::move(compGGX));
@@ -228,7 +254,8 @@ inline std::unique_ptr<Material> MakePlasticMaterial(Float Kd, const Spectrum& a
 inline std::unique_ptr<Material> MakeMicrofacetGGXMaterialDebug(Float roughness, Float IoR = Float(1.5))
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
-    std::unique_ptr<TorranceSparrowGTR2> compGGX = std::make_unique<TorranceSparrowGTR2>(roughness, IoR);
+    std::unique_ptr<DistributionGGX> distribGGX = std::make_unique<DistributionGGX>(roughness);
+    std::unique_ptr<TorranceSparrow> compGGX = std::make_unique<TorranceSparrow>(std::move(distribGGX), IoR);
 
     material->AddBSDFComponent(std::move(compGGX));
 
@@ -237,8 +264,10 @@ inline std::unique_ptr<Material> MakeMicrofacetGGXMaterialDebug(Float roughness,
 
 inline std::unique_ptr<Material> MakeAshikhminAndShirleyGGXMaterial(Float roughness, Float Rd, Float Rs)
 {
+
     std::unique_ptr<Material> material = std::make_unique<Material>();
-    std::unique_ptr<AshikhminAndShirleyGTR2> compGGX = std::make_unique<AshikhminAndShirleyGTR2>(roughness, Rd, Rs);
+    std::unique_ptr<DistributionGGX> distribGGX = std::make_unique<DistributionGGX>(roughness);
+    std::unique_ptr<AshikhminAndShirley> compGGX = std::make_unique<AshikhminAndShirley>(std::move(distribGGX), Rd, Rs);
 
     material->AddBSDFComponent(std::move(compGGX));
 

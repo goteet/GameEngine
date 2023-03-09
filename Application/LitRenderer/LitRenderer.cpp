@@ -37,7 +37,7 @@ namespace
                 SceneBottom + 40,
                 SceneCenterZ + 10);
 
-            const Float roughness = Float(0.01);
+            const Float roughness = Float(0.5);
             const Float IoR = Float(10);
             if (DEBUG)
             {
