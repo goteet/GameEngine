@@ -50,7 +50,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
         Point P_i = ray.calc_offset(biasedDistance);
 
         //Sampling Light Source
-        if(!bIsReflectionTrace)
+        if (!bIsReflectionTrace)
         {
             SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
             if (lightSource != nullptr && lightSource != hitRecord.Object)
@@ -87,21 +87,22 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
 
         //Sampling BSDF
         {
-            BSDFSample BSDFSample;
-
-            if (!bsdf.SampleFCosOverPdf(u, P_i, N, ray, hitRecord.IsOnSurface, BSDFSample))
+            const Direction Wi = bsdf.SampleWi(u, P_i, N, ray);
+            const Float NdotL = math::dot(N, Wi);
+            if (NdotL <= Float(0))
             {
                 break;
             }
-            bIsReflectionTrace = (BSDFSample.SampleMask & BSDFMask::Reflection) != 0;
 
-            const Direction& Wi = BSDFSample.Wi;
+            bIsReflectionTrace = (bsdf.BSDFMask & BSDFMask::ReflectionMask) != 0;
+
             ray.set_origin(P_i);
             ray.set_direction(Wi);
             Float pdf_light = scene.SampleLightPdf(ray);
-            Float pdf_bsdf = bsdf.pdf(N, Wo, Wi);
+            Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
             Float weight = PowerHeuristic(pdf_bsdf, pdf_light);
-            beta *= weight * bsdf.Weight * BSDFSample.F;
+            Spectrum f = material->SampleF(N, Wo, Wi, hitRecord.IsOnSurface);
+            beta *= (weight * bsdf.Weight * NdotL / pdf_bsdf) * f;
         }
 
         if (bounce > 3)
@@ -162,10 +163,10 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
         if (material)
         {
             const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
-            BSDFSample BSDFSample;
-            if (bsdf.SampleFCosOverPdf(u, P_i, N, ray, hitRecord.IsOnSurface, BSDFSample))
+            const Direction Wi = bsdf.SampleWi(u, P_i, N, ray);
+            const Float NdotL = math::dot(N, Wi);
+            if (NdotL > 0)
             {
-                const Direction& Wi = BSDFSample.Wi;
                 return Wi;
 
                 const Direction Half = (Wi + Wo);
