@@ -415,7 +415,7 @@ bool TorranceSparrow::SampleFCosOverPdf(Float u[3], const Point& P, const Direct
     oBSDFSample.F = (f(N, Wo, Wi, IsOnSurface) * NdotL / pdf(N, Wo, Wi));
     oBSDFSample.CosineWi = NdotL;
     oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
-        ? BSDFMask::SpecularMask | BSDFMask::ReflectionMask
+        ? BSDFMask::SpecularMask | BSDFMask::MirrorMask
         : BSDFMask::SpecularMask);
     return NdotL > 0;
 }
@@ -485,7 +485,7 @@ bool AshikhminAndShirley::SampleFCosOverPdf(Float u[3], const Point& P, const Di
         const Direction H = uvw.local_to_world(Ho);
         Wi = math::reflection(Wo, H);
         oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
-            ? BSDFMask::SpecularMask | BSDFMask::ReflectionMask
+            ? BSDFMask::SpecularMask | BSDFMask::MirrorMask
             : BSDFMask::SpecularMask);
     }
 
@@ -622,7 +622,7 @@ bool AshikhminAndShirleySpecular::SampleFCosOverPdf(Float u[3], const Point& P, 
     oBSDFSample.F = f(N, Wo, Wi, IsOnSurface) * NdotL / pdf(N, Wo, Wi);
     oBSDFSample.CosineWi = NdotL;
     oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
-        ? BSDFMask::SpecularMask | BSDFMask::ReflectionMask
+        ? BSDFMask::SpecularMask | BSDFMask::MirrorMask
         : BSDFMask::SpecularMask);
     return NdotL >= Float(0);
 }

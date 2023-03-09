@@ -94,7 +94,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
                 break;
             }
 
-            bIsReflectionTrace = (bsdf.BSDFMask & BSDFMask::ReflectionMask) != 0;
+            bIsReflectionTrace = (bsdf.BSDFMask & BSDFMask::MirrorMask) != 0;
 
             ray.set_origin(P_i);
             ray.set_direction(Wi);

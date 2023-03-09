@@ -32,7 +32,7 @@ enum BSDFMask
     None = 0,
     DiffuseMask = 1 << 0,
     SpecularMask = 1 << 1,
-    ReflectionMask = 1 << 15
+    MirrorMask = 1 << 15
 };
 
 struct BSDFSample
@@ -58,7 +58,7 @@ struct DistributionGGX : DistributionFunction
     Float Roughness;
     Float Alpha, AlphaSquare;
     DistributionGGX(Float roughness = Float(0.5));
-    virtual bool IsNearMirrorReflection() const override { return Roughness < Float(0.05); }
+    virtual bool IsNearMirrorReflection() const override { return Roughness < Float(0.001); }
     virtual Direction SampleWh(const Direction& Wo, Float u1, Float u2) const override;
     virtual Float D(Float NdotH) const override;
     virtual Float G(Float NdotH, Float HdotV, Float HdotL) const override;
@@ -149,8 +149,8 @@ struct TorranceSparrow : public BSDF
     Float RefractiveIndex = Float(2.5);
 
     TorranceSparrow(std::unique_ptr<DistributionFunction>&& distrib, Float IoR, Float weight = Float(1))
-        : BSDF("GGX Microfacet"
-            , (distrib->IsNearMirrorReflection() ? (BSDFMask::ReflectionMask | BSDFMask::SpecularMask) : BSDFMask::SpecularMask)
+        : BSDF("Torrance-Sparrow"
+            , (distrib->IsNearMirrorReflection() ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask) : BSDFMask::SpecularMask)
             , weight)
         , Distribution(std::move(distrib))
         , RefractiveIndex(IoR) { }
@@ -173,9 +173,9 @@ struct AshikhminAndShirley : public BSDF
     Float Rd = Float(0.5);
     Float Rs = Float(0.5);
     AshikhminAndShirley(std::unique_ptr<DistributionFunction>&& distrib, Float diffuse, Float specular, Float weight = Float(1))
-        : BSDF("Ashikhmin-Shirley GGX"
+        : BSDF("Ashikhmin-Shirley"
             , (distrib->IsNearMirrorReflection()
-                ? (BSDFMask::ReflectionMask | BSDFMask::SpecularMask | BSDFMask::DiffuseMask)
+                ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask | BSDFMask::DiffuseMask)
                 : BSDFMask::SpecularMask | BSDFMask::DiffuseMask)
             , weight)
         , Distribution(std::move(distrib)), Rd(diffuse), Rs(specular) { }
@@ -216,8 +216,8 @@ struct AshikhminAndShirleySpecular : public BSDF
     std::unique_ptr<DistributionFunction> Distribution;
     Float Rs = Float(0.5);
     AshikhminAndShirleySpecular(std::unique_ptr<DistributionFunction>&& distrib, Float specular, Float weight = Float(1))
-        : BSDF("Ashikhmin-Shirley GGX"
-            , (distrib->IsNearMirrorReflection() ? (BSDFMask::ReflectionMask | BSDFMask::SpecularMask) : BSDFMask::SpecularMask)
+        : BSDF("Ashikhmin-Shirley Specular"
+            , (distrib->IsNearMirrorReflection() ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask) : BSDFMask::SpecularMask)
             , weight)
         , Distribution(std::move(distrib)), Rs(specular) { }
     virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const override;
