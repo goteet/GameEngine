@@ -49,6 +49,7 @@ namespace math
         constexpr static value_type half_pi = pi * value_type(0.5);
         constexpr static value_type epsilon = math_impl::epsilon_t<value_type>::value;
         constexpr static value_type small_num = math_impl::small_num_t<value_type>::value;
+        constexpr static value_type near_one = value_type(1) - math_impl::small_num_t<value_type>::value;
     };
 
     template<typename value_type>
@@ -69,4 +70,8 @@ namespace math
 
     template<typename value_type>
     constexpr value_type SMALL_NUM = constant_value<value_type>::small_num;
+
+
+    template<typename value_type>
+    constexpr value_type NEAR_ONE = constant_value<value_type>::near_one;
 }

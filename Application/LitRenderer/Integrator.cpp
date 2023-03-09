@@ -48,10 +48,9 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
         const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
         Float biasedDistance = math::max2<Float>(hitRecord.Distance, Float(0));
         Point P_i = ray.calc_offset(biasedDistance);
-        bIsReflectionTrace = (bsdf.BSDFMask & Material::BSDFMask::Reflection) != 0;
 
         //Sampling Light Source
-        if (!bIsReflectionTrace)
+        if(!bIsReflectionTrace)
         {
             SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
             if (lightSource != nullptr && lightSource != hitRecord.Object)
@@ -94,6 +93,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
             {
                 break;
             }
+            bIsReflectionTrace = (BSDFSample.SampleMask & BSDFMask::Reflection) != 0;
 
             const Direction& Wi = BSDFSample.Wi;
             ray.set_origin(P_i);
