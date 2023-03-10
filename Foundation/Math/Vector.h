@@ -56,7 +56,7 @@ namespace math
         constexpr vector_t(value_type _x, value_type _y, value_type _z) : x(_x), y(_y), z(_z) { }
         constexpr vector_t(const vector_t<value_type, EDim::_2>& v2, value_type _z) : vector_t(v2.x, v2.y, _z) { }
         constexpr vector_t(value_type _x, const vector_t<value_type, EDim::_2>& v2) : vector_t(_x, v2.x, v2.y) { }
-        constexpr vector_t(value_type _v) : x(_v), y(_v), z(_v) { }
+        explicit constexpr vector_t(value_type _v) : x(_v), y(_v), z(_v) { }
         value_type& operator[](index_type idx) { return v[idx]; }
         const value_type& operator[](index_type idx) const { return v[idx]; }
         void set(value_type _x, value_type _y, value_type _z) { x = _x, y = _y; z = _z; }
