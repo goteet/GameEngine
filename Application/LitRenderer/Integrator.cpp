@@ -26,6 +26,8 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
     // First hit, on p_1
     SurfaceIntersection hitRecord = recordP1;
     bool bIsMirrorReflectionTrace = false;
+    Float lastWeightMIS = Float(0);
+    LightSource* lastSampledLight = nullptr;
     for (int bounce = 0; hitRecord && !math::near_zero(beta) && bounce < MaxBounces; ++bounce)
     {
         const SceneObject& surface = *hitRecord.Object;
@@ -33,10 +35,13 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
 
         if (bIsLightSource)
         {
-            if (bIsMirrorReflectionTrace)
+            //mitsuba will sample random lightsource while pbr-v3 will sample the same light.
+            // I have no idea which is better.
+            //bool bIsSameLight = lastSampledLight == surface.LightSource.get();
+            //if (bIsSameLight)
             {
                 Spectrum Le = surface.LightSource->Le();
-                Lo += beta * Le;
+                Lo += beta * Le * lastWeightMIS;
             }
             break;
         }
@@ -55,8 +60,9 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
         Float biasedDistance = math::max2<Float>(hitRecord.Distance, Float(0));
         Point P_i = ray.calc_offset(biasedDistance);
 
+        lastSampledLight = nullptr;
         //Sampling Light Source
-        //if (!bIsMirrorReflectionTrace)
+        if (!bIsMirrorReflectionTrace)
         {
             SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
             if (lightSource != nullptr && lightSource != hitRecord.Object)
@@ -80,6 +86,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
                         const Spectrum f = material->SampleF(N, Wo, Wi, true);
                         const Spectrum& Le = lightSource->LightSource->Le();
                         Lo += (weight_mis * beta * NdotL / pdf_light) * f * Le;
+                        lastSampledLight = lightSource->LightSource.get();
                     }
                 }
             }
@@ -101,13 +108,10 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
 
             const Float pdf_light = scene.SampleLightPdf(ray);
             const Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
-            const Float weight_mis = bIsMirrorReflectionTrace
-                ? (pdf_light > Float(0)
-                    ? PowerHeuristic(pdf_bsdf, pdf_light)
-                    : Float(1))
-                : Float(1);
+            lastWeightMIS = bIsMirrorReflectionTrace ? Float(1)
+                : (pdf_light > Float(0) ? PowerHeuristic(pdf_bsdf, pdf_light) : Float(1));
             const Spectrum f = material->SampleF(N, Wo, Wi, hitRecord.IsOnSurface);
-            beta *= (weight_mis * NdotL / pdf_bsdf) * f;
+            beta *= (NdotL / pdf_bsdf) * f;
         }
 
         if (bounce > 3)
