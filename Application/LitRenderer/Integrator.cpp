@@ -69,13 +69,10 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
 
                     if (bIsVisible)
                     {
-                        Float pdf_light = lightSource->SamplePdf(lightSI, lightRay);
+                        Float pdf_light = scene.SampleLightPdf(lightRay);
                         assert(pdf_light > Float(0));
-                        //F pdf_bsdf = bsdf.pdf(N, W_o, W_i);
                         Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
                         Float weight = PowerHeuristic(pdf_light, pdf_bsdf);
-                        //Spectrum f = bsdf.f(N, W_o, W_i, true);
-
                         Spectrum f = material->SampleF(N, Wo, Wi, true);
 
                         const Spectrum& Le = lightSource->LightSource->Le();
@@ -130,11 +127,6 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
         return BackgroundColor;
     }
 
-    const unsigned int MaxBounces = 10;
-    float rrContinueProbability = 1.0f;
-    auto CheckRussiaRoulette = [&](float prob) { return TerminateSampler.value() > prob; };
-
-
     const SurfaceIntersection& hitRecord = recordP1;
     const Ray& ray = cameraRay;
 
@@ -144,6 +136,7 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
     const Direction Wo = -ray.direction();
 
     const bool bIsLightSource = surface.LightSource != nullptr;
+
     if (bIsLightSource)
     {
         Spectrum Le = surface.LightSource->Le();
@@ -173,6 +166,96 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
                 return Half * 0.5 + 0.5;
                 return Spectrum(1, 0, 0) * (math::dot(N, Half));
             }
+        }
+    }
+
+    return Spectrum::zero();
+}
+
+Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1)
+{
+    const SurfaceIntersection& hitRecord = recordP1;
+    if (hitRecord)
+    {
+        const Ray& ray = cameraRay;
+
+        const SceneObject& surface = *hitRecord.Object;
+        const std::unique_ptr<Material>& material = surface.Material;
+        const Direction& N = hitRecord.SurfaceNormal;
+        const Direction Wo = -ray.direction();
+
+        const bool bIsLightSource = surface.LightSource != nullptr;
+
+        if (bIsLightSource)
+        {
+            Spectrum Le = surface.LightSource->Le();
+            return Le;
+        }
+        else
+        {
+            Spectrum Weights = Spectrum::zero();
+            Float biasedDistance = math::max2<Float>(hitRecord.Distance, Float(0));
+            Point P_i = ray.calc_offset(biasedDistance);
+            Float u[3] =
+            {
+                mUniformSamplers[0].value(),
+                mUniformSamplers[1].value(),
+                mUniformSamplers[2].value()
+            };
+
+
+
+            const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
+            const bool bIsMirrorReflection = (bsdf.BSDFMask & BSDFMask::MirrorMask) != 0;
+
+            if (!bIsMirrorReflection)
+            {
+                SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
+                if (lightSource != nullptr)
+                {
+                    Point P_i_1 = lightSource->SampleRandomPoint(u);
+                    Ray lightRay(P_i, P_i_1);
+                    const Direction& Wi = lightRay.direction();
+
+                    SurfaceIntersection lightSI = scene.DetectIntersecting(lightRay, nullptr, math::SMALL_NUM<Float>);
+                    bool bIsVisible = lightSI.Object == lightSource;
+                    if (bIsVisible)
+                    {
+                        Direction N_light = lightSI.SurfaceNormal;
+                        Float cosThetaPrime = math::dot(N_light, -Wi);
+                        bIsVisible = cosThetaPrime > math::SMALL_NUM<Float> || (cosThetaPrime < -math::SMALL_NUM<Float> && lightSource->IsDualface());
+
+                        if (bIsVisible)
+                        {
+                            Float pdf_light = scene.SampleLightPdf(lightRay);
+                            assert(pdf_light > Float(0));
+                            Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
+                            Float weight = PowerHeuristic(pdf_light, pdf_bsdf);
+                            Weights.y = math::saturate(weight);
+                        }
+                    }
+                }
+            }
+
+            {
+                const Direction Wi = bsdf.SampleWi(u, P_i, N, ray);
+                const Float NdotL = math::dot(N, Wi);
+                if (NdotL > Float(0))
+                {
+                    Float weight = Float(1);
+                    if (bIsMirrorReflection)
+                    {
+                        Float pdf_light = scene.SampleLightPdf(Ray{ P_i, Wi });
+                        if (pdf_light > Float(0))
+                        {
+                            Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
+                            weight = PowerHeuristic(pdf_bsdf, pdf_light);
+                        }
+                    }
+                    Weights.x = math::saturate(weight);
+                }
+            }
+            return Weights;
         }
     }
 
