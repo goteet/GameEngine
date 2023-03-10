@@ -409,7 +409,9 @@ Float DistributionGGX::G(Float NdotH, Float HdotV, Float HdotL) const
 
 Float DistributionGGX::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
 {
-    return Float();
+    const Direction H = Wi + Wo;
+    const Float NdotH = math::dot(N, H);
+    return D(NdotH) * NdotH;
 }
 
 
@@ -433,19 +435,12 @@ Direction Lambertian::SampleWi(Float u[3], const Point& P, const Direction& N, c
     return GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
 }
 
-Spectrum Lambertian::f(
-    const Direction& N,
-    const Direction& Wo,
-    const Direction& Wi,
-    bool IsOnSurface) const
+Spectrum Lambertian::f(const Direction& N, const Direction& Wo, const Direction& Wi, bool IsOnSurface) const
 {
     return Albedo * math::InvPI<Float>;
 }
 
-Float Lambertian::pdf(
-    const Direction& N,
-    const Direction& Wo,
-    const Direction& Wi) const
+Float Lambertian::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
 {
     Float NdotL = math::dot(N, Wi);
     return math::saturate(NdotL) * math::InvPI<Float>;
@@ -599,11 +594,9 @@ Float TorranceSparrow::pdf(
     //-----------
     // 4 * HdotV
     const Direction H = Wo + Wi;
-    const Float NdotH = math::dot(N, H);
-    const Float NdotL = math::dot(N, Wi);
     const Float HdotV = math::dot(H, Wo);
-    const Float D = Distribution->D(NdotH);
-    return D * NdotH * Float(0.25) / HdotV;
+    const Float pdf = Distribution->pdf(N, Wo, Wi);
+    return pdf * Float(0.25) / HdotV;
 }
 
 bool AshikhminAndShirley::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, bool IsOnSurface, BSDFSample& oBSDFSample) const
@@ -804,12 +797,9 @@ Float AshikhminAndShirleySpecular::pdf(const Direction& N, const Direction& Wo, 
     {
         return Float(0);
     }
-
-    Float NdotH = math::dot(N, H);
-    Float NdotL = math::dot(N, Wi);
-    Float HdotV = math::dot(H, Wo);
-    Float D = Distribution->D(NdotH);
-    return D * NdotH * Float(0.25) / HdotV;
+    const Float HdotV = math::dot(H, Wo);
+    const Float pdf = Distribution->pdf(N, Wo, Wi);
+    return pdf * Float(0.25) / HdotV;
 }
 
 
