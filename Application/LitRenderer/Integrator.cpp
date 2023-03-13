@@ -25,23 +25,41 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
 
     // First hit, on p_1
     SurfaceIntersection hitRecord = recordP1;
-    bool bIsMirrorReflectionTrace = false;
-    Float lastWeightMIS = Float(0);
-    LightSource* lastSampledLight = nullptr;
-    for (int bounce = 0; hitRecord && !math::near_zero(beta) && bounce < MaxBounces; ++bounce)
+
+    struct MISRecord
+    {
+        bool IsValid(LightSource* light) const
+        {
+            //Note:
+            // Mitsuba will sample random lightsource
+            // while PBR-v3 will sample the same light.
+            // I have no idea which is better.
+            // 
+            //return Weight_bsdf > Float(0) && light == Light;
+            return Weight_bsdf > Float(0);
+        }
+
+        Float Weight_bsdf = Float(0);
+        LightSource* Light = nullptr;
+        bool IsMirrorReflection = false;
+    } lastMISSample;
+
+    for (int bounce = 0; hitRecord && bounce < MaxBounces && !math::near_zero(beta); ++bounce)
     {
         const SceneObject& surface = *hitRecord.Object;
         const bool bIsLightSource = surface.LightSource != nullptr;
 
         if (bIsLightSource)
         {
-            //mitsuba will sample random lightsource while pbr-v3 will sample the same light.
+            //Note:
+            // Mitsuba will sample random lightsource
+            // while PBR-v3 will sample the same light.
             // I have no idea which is better.
-            //bool bIsSameLight = lastSampledLight == surface.LightSource.get();
-            //if (bIsSameLight)
+            // 
+            if (lastMISSample.IsValid(surface.LightSource.get()))
             {
                 Spectrum Le = surface.LightSource->Le();
-                Lo += beta * Le * lastWeightMIS;
+                Lo += beta * Le * lastMISSample.Weight_bsdf;
             }
             break;
         }
@@ -60,9 +78,11 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
         Float biasedDistance = math::max2<Float>(hitRecord.Distance, Float(0));
         Point P_i = ray.calc_offset(biasedDistance);
 
-        lastSampledLight = nullptr;
+        lastMISSample.IsMirrorReflection = (bsdf.BSDFMask & BSDFMask::MirrorMask) != 0;
+        lastMISSample.Light = nullptr;
+
         //Sampling Light Source
-        if (!bIsMirrorReflectionTrace)
+        if (!lastMISSample.IsMirrorReflection)
         {
             SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
             if (lightSource != nullptr && lightSource != hitRecord.Object)
@@ -85,8 +105,11 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
                         const Float NdotL = math::dot(N, Wi);
                         const Spectrum f = material->SampleF(N, Wo, Wi, true);
                         const Spectrum& Le = lightSource->LightSource->Le();
-                        Lo += (weight_mis * beta * NdotL / pdf_light) * f * Le;
-                        lastSampledLight = lightSource->LightSource.get();
+                        //                      f * cos(Wi)
+                        // beta * mis_weight * -------------
+                        //                       pdf_light
+                        Lo += (weight_mis * NdotL / pdf_light) * (beta * f * Le);
+                        lastMISSample.Light = lightSource->LightSource.get();
                     }
                 }
             }
@@ -101,15 +124,15 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
                 break;
             }
 
-            bIsMirrorReflectionTrace = (bsdf.BSDFMask & BSDFMask::MirrorMask) != 0;
 
             ray.set_origin(P_i);
             ray.set_direction(Wi);
 
             const Float pdf_light = scene.SampleLightPdf(ray);
             const Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
-            lastWeightMIS = bIsMirrorReflectionTrace ? Float(1)
-                : (pdf_light > Float(0) ? PowerHeuristic(pdf_bsdf, pdf_light) : Float(1));
+            assert(pdf_bsdf > Float(0));
+            lastMISSample.Weight_bsdf = (!lastMISSample.IsMirrorReflection)
+                ? PowerHeuristic(pdf_bsdf, pdf_light) : Float(1);
             const Spectrum f = material->SampleF(N, Wo, Wi, hitRecord.IsOnSurface);
             beta *= (NdotL / pdf_bsdf) * f;
         }
