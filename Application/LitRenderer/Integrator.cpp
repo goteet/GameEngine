@@ -103,7 +103,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
                         const Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
                         const Float weight_mis = PowerHeuristic(pdf_light, pdf_bsdf);
                         const Float NdotL = math::dot(N, Wi);
-                        const Spectrum f = material->SampleF(N, Wo, Wi, true);
+                        const Spectrum f = material->SampleF(N, Wo, Wi);
                         const Spectrum& Le = lightSource->LightSource->Le();
                         //                      f * cos(Wi)
                         // beta * mis_weight * -------------
@@ -133,7 +133,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
             assert(pdf_bsdf > Float(0));
             lastMISSample.Weight_bsdf = (!lastMISSample.IsMirrorReflection)
                 ? PowerHeuristic(pdf_bsdf, pdf_light) : Float(1);
-            const Spectrum f = material->SampleF(N, Wo, Wi, hitRecord.IsOnSurface);
+            const Spectrum f = material->SampleF(N, Wo, Wi);
             beta *= (NdotL / pdf_bsdf) * f;
         }
 
