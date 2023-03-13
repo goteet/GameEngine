@@ -96,13 +96,13 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
                 {
                     Direction N_light = lightSI.SurfaceNormal;
                     Float cosThetaPrime = math::dot(N_light, -Wi);
-                    if (cosThetaPrime > math::SMALL_NUM<Float>)
+                    const Float NdotL = math::saturate(math::dot(N, Wi));
+                    if (cosThetaPrime > math::SMALL_NUM<Float> && NdotL > Float(0))
                     {
                         const Float pdf_light = scene.SampleLightPdf(lightRay);
                         assert(pdf_light > Float(0));
                         const Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
                         const Float weight_mis = PowerHeuristic(pdf_light, pdf_bsdf);
-                        const Float NdotL = math::dot(N, Wi);
                         const Spectrum f = material->SampleF(N, Wo, Wi);
                         const Spectrum& Le = lightSource->LightSource->Le();
                         //                      f * cos(Wi)
@@ -124,13 +124,11 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
                 break;
             }
 
-
             ray.set_origin(P_i);
             ray.set_direction(Wi);
 
             const Float pdf_light = scene.SampleLightPdf(ray);
             const Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
-            assert(pdf_bsdf > Float(0));
             lastMISSample.Weight_bsdf = (!lastMISSample.IsMirrorReflection)
                 ? PowerHeuristic(pdf_bsdf, pdf_light) : Float(1);
             const Spectrum f = material->SampleF(N, Wo, Wi);

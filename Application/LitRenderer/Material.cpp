@@ -356,43 +356,8 @@ DistributionGGX::DistributionGGX(Float roughness)
 
 Direction DistributionGGX::SampleWh(const Direction& Wo, Float u1, Float u2) const
 {
-    //Direction Wh;
-    //if (!sampleVisibleArea)
-    //{
-    //    Float cosTheta = 0;
-    //    Radian phi(Float(2) * math::PI<Float> *u2);
-    //    //if (alphax == alphay)
-    //    {
-    //        Float tanTheta2 = AlphaSquare * u1 / (1.0f - u1);
-    //        cosTheta = 1 / std::sqrt(1 + tanTheta2);
-    //    }
-    //    //else {
-    //    //    phi =
-    //    //        std::atan(alphay / alphax * std::tan(2 * Pi * u[1] + .5f * Pi));
-    //    //    if (u[1] > .5f) phi += Pi;
-    //    //    Float sinPhi = std::sin(phi), cosPhi = std::cos(phi);
-    //    //    const Float alphax2 = alphax * alphax, alphay2 = alphay * alphay;
-    //    //    const Float alpha2 =
-    //    //        1 / (cosPhi * cosPhi / alphax2 + sinPhi * sinPhi / alphay2);
-    //    //    Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
-    //    //    cosTheta = 1 / std::sqrt(1 + tanTheta2);
-    //    //}
-    //    Float sinTheta =
-    //        std::sqrt(std::max((Float)0., (Float)1. - cosTheta * cosTheta));
-    //    //Vector3f(sinTheta * std::cos(phi), sinTheta * std::sin(phi),cosTheta)
-    //    Wh = Direction(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
-    //    if (math::dot(Wo, Wh) <= Float(0)) Wh = -Wh;
-    //}
-    ////else {
-    ////    bool flip = wo.z < 0;
-    ////    wh = TrowbridgeReitzSample(flip ? -wo : wo, alphax, alphay, u[0], u[1]);
-    ////    if (flip) wh = -wh;
-    ////}
-    //return Wh;
-
     const Direction Wh = SampleGGXVNDF(Wo, Alpha, Alpha, u1, u2);
-    return math::dot(Wo, Wh) > Float(0) ? Wh : -Wh;
-
+    return Wh;
 }
 
 Float DistributionGGX::D(Float NdotH) const
@@ -551,7 +516,6 @@ Direction TorranceSparrow::SampleWi(Float u[3], const Point& P, const Direction&
     const Direction Wo = -Ray.direction();
     const Direction Ho = Distribution->SampleWh(uvw.world_to_local(-Wo), u[1], u[2]);
     const Direction H = uvw.local_to_world(Ho);
-    const Float NdotV = math::dot(Wo, N);
     const Direction Wi = math::reflection(Wo, H);
     return Wi;
 }
