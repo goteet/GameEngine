@@ -29,9 +29,8 @@ public:
     ~LitRenderer();
 
     void Initialize();
-    void GenerateImageProgressive();
+    bool GenerateImageProgressive();
     bool NeedUpdate();
-    void ClearUpdate() { mNeedUpdateSystemWindowRect = false; }
 
 private:
     void InitialSceneTransforms();
@@ -41,7 +40,7 @@ private:
 
     static const int MaxCameraRaySampleCount = 8;
     static const int MaxLightRaySampleCount = -1;
-    static const int MaxSampleCount = MaxCameraRaySampleCount* MaxLightRaySampleCount;
+    static const int MaxSampleCount = MaxCameraRaySampleCount * MaxLightRaySampleCount;
 
     struct Sample
     {
@@ -52,14 +51,11 @@ private:
 
     const int mCanvasLinePitch;
     unsigned char* mSystemCanvasDataPtr;
-
-
-    Spectrum mClearColor;
     LDRFilm mFilm;
     SimpleBackCamera mCamera;
     std::unique_ptr<Scene> mScene;
     Sample* mCameraRaySamples[MaxCameraRaySampleCount];
     int  mCurrentCameraRayIndex = 0;
-    bool mNeedFlushBackbuffer = true;
-    bool mNeedUpdateSystemWindowRect = false;
+
+    Task ResolveSampleTask;
 };

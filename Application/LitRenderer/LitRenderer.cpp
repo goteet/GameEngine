@@ -30,72 +30,95 @@ namespace
             const Float SmallObjectSize = 8;
             const Float BigObjectSize = SmallObjectSize * Float(1.75);
 
-            SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
-            mainSphere->SetRadius(20);
-            mainSphere->SetTranslate(
-                SceneCenterX,
-                SceneBottom + 40,
-                SceneCenterZ + 10);
 
-            const Float roughness = Float(0.1);
-            const Float IoR = Float(1.1);
-            Float Ks = Float(0.999);
-            if (DEBUG)
+            for (int i = 0; i < 16; i++)
             {
-                mainSphere->Material = MakeMicrofacetGGXMaterialDebug(roughness, IoR, Ks);
+                SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
+                mainSphere->SetRadius(10);
+
+                Float OffsetX = Float(-40 + (i % 4) * 25);
+                Float OffsetY = Float((i / 4) * 25);
+                Float OffsetZ = 0;
+                mainSphere->SetTranslate(
+                    SceneCenterX + OffsetX,
+                    SceneBottom + 20 + OffsetY,
+                    SceneCenterZ + OffsetZ);
+
+                const Float roughness = Float(0.1 + 0.05 * i);
+                const Float IoR = Float(1.1);
+                Float Ks = Float(0.5);
+                if (DEBUG)
+                {
+                    mainSphere->Material = MakeMicrofacetGGXMaterialDebug(roughness, IoR, Ks);
+                }
+                else
+                {
+                    Float Kd = Float(1) - Ks;
+                    mainSphere->Material = MakePlasticMaterial(Kd, Spectrum(Float(0.5)), Ks, roughness, IoR);
+                }
             }
-            else
+
+
+            if (!DEBUG)
             {
-                Float Kd = Float(1) - Ks;
-                mainSphere->Material = MakePlasticMaterial(Kd, Spectrum(Float(0.5)), Ks, roughness, IoR);
-                mainSphere->Material = MakeMicrofacetGGXMaterialDebug(roughness, IoR, Float(1));
+                Spectrum Red(Float(0.75), Float(0.2), Float(0.2));
+                Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
+                Spectrum Blue(Float(0.2), Float(0.2), Float(0.75));
+                Spectrum Gray(Float(0.75));
+                Spectrum DarkGray(Float(0.6));
+
+                SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
+                wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
+                wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
+                wallLeft->Material = MakeMatteMaterial(Red);
+
+                SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
+                wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
+                wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
+                wallRight->SetExtends(SceneExtendZ, SceneExtendY);
+                wallRight->Material = MakeMatteMaterial(Blue);
+
+                SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
+                wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
+                wallTop->SetExtends(SceneExtendZ, SceneExtendX);
+                wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
+                wallTop->Material = MakeMatteMaterial(Gray);
+
+                SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
+                wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
+                wallFar->SetExtends(SceneExtendX, SceneExtendY);
+                wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
+                wallFar->Material = MakeMatteMaterial(DarkGray);
+
+                SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
+                wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
+                wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
+                wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
+                wallBottom->Material = MakeMatteMaterial(Green);
+            }
+
+            {
+                SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
+                LightDisk->SetDualFace(true);
+                LightDisk->SetTranslate(SceneCenterX, SceneTop - Float(0.01), SceneCenterZ - Float(10));
+                //LightDisk->SetRadius(50);
+                LightDisk->SetExtends(25, 25);
+                LightDisk->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
+                Float Intensity = 1.0;
+
+                LightDisk->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
             }
 
 
-            Spectrum Red(Float(0.75), Float(0.2), Float(0.2));
-            Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
-            Spectrum Blue(Float(0.2), Float(0.2), Float(0.75));
-            Spectrum Gray(Float(0.75));
-            Spectrum DarkGray(Float(0.6));
-
-            SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
-            wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
-            wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
-            wallLeft->Material = MakeMatteMaterial(Red);
-            
-            SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
-            wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
-            wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
-            wallRight->SetExtends(SceneExtendZ, SceneExtendY);
-            wallRight->Material = MakeMatteMaterial(Blue);
-            
-            SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
-            wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
-            wallTop->SetExtends(SceneExtendZ, SceneExtendX);
-            wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
-            wallTop->Material = MakeMatteMaterial(Gray);
-            
-            SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
-            wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
-            wallFar->SetExtends(SceneExtendX, SceneExtendY);
-            wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
-            wallFar->Material = MakeMatteMaterial(DarkGray);
-            
-            SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
-            wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
-            wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
-            wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
-            wallBottom->Material = MakeMatteMaterial(Green);
-
-            SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
-            LightDisk->SetDualFace(true);
-            LightDisk->SetTranslate(SceneCenterX, SceneTop - Float(0.01), SceneCenterZ + Float(10));
-            //LightDisk->SetRadius(50);
-            LightDisk->SetExtends(25, 25);
-            LightDisk->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
-            Float Intensity = 4.5;
-
-            LightDisk->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
+            {
+                SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
+                LightDisk->SetDualFace(true);
+                LightDisk->SetTranslate(SceneCenterX, SceneCenterY, SceneNear - Float(100));
+                LightDisk->SetExtends(SceneSize * 1.5, SceneSize);
+                LightDisk->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
+                Float Intensity = 2.5;
+                LightDisk->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
+            }
         }
     };
 
@@ -190,7 +213,6 @@ LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canv
     : mCanvasLinePitch(canvasLinePitch)
     , mSystemCanvasDataPtr(canvasDataPtr)
     , mFilm(canvasWidth, canvasHeight)
-    , mClearColor(0, 0, 0)
     , mCamera(50_degd)
     , mScene(std::make_unique<SimpleScene>())
 {
@@ -287,49 +309,77 @@ void LitRenderer::Initialize()
     QueryP1Records();
 }
 
-void LitRenderer::GenerateImageProgressive()
+bool LitRenderer::GenerateImageProgressive()
 {
-    const bool bGenerateInfinite = MaxSampleCount <= 0;
-    const bool bGenerateMore = MaxSampleCount > 0 && mFilm.GetSampleCount() <= MaxSampleCount;
-    if (bGenerateInfinite || bGenerateMore)
+    if (ResolveSampleTask.IsCompleted())
     {
-        ResolveSamples();
-        mNeedFlushBackbuffer = true;
+        const bool bGenerateInfinite = MaxSampleCount <= 0;
+        const bool bGenerateMore = MaxSampleCount > 0 && mFilm.GetSampleCount() <= MaxSampleCount;
+        if (bGenerateInfinite || bGenerateMore)
+        {
+            ResolveSamples();
+            return true;
+        }
     }
+    return false;
 }
 
 bool LitRenderer::NeedUpdate()
 {
-    if (mNeedFlushBackbuffer)
-    {
-        mFilm.FlushTo(mSystemCanvasDataPtr, mCanvasLinePitch);// LinearColorToGammaCorrectedCanvasDataBuffer();
-        mNeedFlushBackbuffer = false;
-        mNeedUpdateSystemWindowRect = true;
-    }
-    return mNeedUpdateSystemWindowRect;
+    return ResolveSampleTask.IsCompleted();
 }
 
 void LitRenderer::ResolveSamples()
 {
     const Sample* Samples = mCameraRaySamples[mCurrentCameraRayIndex];
     mCurrentCameraRayIndex = (mCurrentCameraRayIndex + 1) % MaxCameraRaySampleCount;
-    Spectrum* accumulatedBufferPtr = mFilm.GetBackbufferPtr();
+    Spectrum* AccumulatedBufferPtr = mFilm.GetBackbufferPtr();
 
-    PathIntegrator pathIntegrator;
-    DebugIntegrator debugIntegrator;
-    Integrator& integrator = DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
+    std::vector<Task> PixelIntegrationTasks;
 
-    for (int rowIndex = 0; rowIndex < mFilm.CanvasHeight; rowIndex++)
+    const int BlockSize = 8;
+    const int NumVerticalBlock = mFilm.CanvasHeight / BlockSize + 1;
+    const int NumHorizontalBlock = mFilm.CanvasWidth / BlockSize + 1;
+
+    for (int BlockIndexV = 0; BlockIndexV < NumVerticalBlock; BlockIndexV += 1)
     {
-        int rowOffset = rowIndex * mFilm.CanvasWidth;
-        for (int colIndex = 0; colIndex < mFilm.CanvasWidth; colIndex++)
+        for (int BlockIndexH = 0; BlockIndexH < NumHorizontalBlock; BlockIndexH += 1)
         {
-            const Sample& sample = Samples[colIndex + rowOffset];
-            Spectrum& canvasPixel = accumulatedBufferPtr[colIndex + rowOffset];
-            canvasPixel += integrator.EvaluateLi(*mScene, sample.Ray, sample.RecordP1);
+            Task EvaluateLiTask = Task::Start(ThreadName::Worker,
+                [this, BlockSize, BlockIndexV, BlockIndexH, AccumulatedBufferPtr, Samples](::Task&)
+                {
+                    PathIntegrator pathIntegrator;
+                    DebugIntegrator debugIntegrator;
+                    Integrator& IntegratorRef = DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
+
+                    int RowStart = BlockIndexV * BlockSize;
+                    int RowEnd = math::min2(RowStart + BlockSize, mFilm.CanvasHeight);
+                    int ColStart = BlockIndexH * BlockSize;
+                    int ColEnd = math::min2(ColStart + BlockSize, mFilm.CanvasWidth);
+                    for (int RowIndex = RowStart; RowIndex < RowEnd; RowIndex++)
+                    {
+                        int RowOffset = RowIndex * mFilm.CanvasWidth;
+                        for (int ColIndex = ColStart; ColIndex < ColEnd; ColIndex++)
+                        {
+                            const Sample& Sample = Samples[ColIndex + RowOffset];
+                            Spectrum& CanvasPixel = AccumulatedBufferPtr[ColIndex + RowOffset];
+
+
+                            CanvasPixel += IntegratorRef.EvaluateLi(*mScene, Sample.Ray, Sample.RecordP1);
+                        }
+                    }
+                });
+            PixelIntegrationTasks.push_back(EvaluateLiTask);
         }
     }
-    mFilm.IncreaseSampleCount();
+
+    ResolveSampleTask = Task::WhenAll(ThreadName::Worker, [&](Task&)
+        {
+            mFilm.IncreaseSampleCount();
+            // LinearColorToGammaCorrectedCanvasDataBuffer();
+            mFilm.FlushTo(mSystemCanvasDataPtr, mCanvasLinePitch);
+        }
+    , PixelIntegrationTasks);
 }
 
 SimpleBackCamera::SimpleBackCamera(Degree verticalFov)

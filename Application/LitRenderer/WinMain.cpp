@@ -10,6 +10,7 @@
 #include <malloc.h>
 #include <memory.h>
 #include <Foundation/Base/MemoryHelper.h>
+#include "TaskGraph.h"
 #include "LitRenderer.h"
 
 
@@ -23,6 +24,7 @@ HWND hWindow;
 HDC	hdcBitmapDC = NULL;
 HBITMAP hCanvasDIB = NULL;
 LitRenderer* Renderer = nullptr;
+BOOL WindowRefresh = false;
 
 
 ATOM MyRegisterClass(HINSTANCE hInstance);
@@ -32,6 +34,7 @@ bool Initialize(HWND);
 
 void Uninitialize(HWND)
 {
+    Task::StopSystem();
     ::DeleteDC(hdcBitmapDC);
     ::DeleteObject(hCanvasDIB);
     hdcBitmapDC = NULL;
@@ -63,7 +66,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
     bool running = true;
-    bool generate = false;
     while (running)
     {
         while (::PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
@@ -78,20 +80,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             }
         }
 
-        if (generate)
+        if (WindowRefresh)
         {
-            Renderer->GenerateImageProgressive();
-            generate = false;
+            if (Renderer->GenerateImageProgressive())
+            {
+                WindowRefresh = false;
+            }
         }
 
         if (Renderer->NeedUpdate())
         {
             ::RedrawWindow(hWindow, NULL, NULL, RDW_INVALIDATE);
-            Renderer->ClearUpdate();
-            generate = true;
         }
-
-
+        else
+        {
+            ::Sleep(16);
+        }
     }
 
     Uninitialize(hWindow);
@@ -154,6 +158,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             hdcBitmapDC,
             0, 0, SRCCOPY);
         ::EndPaint(hWnd, &ps);
+        WindowRefresh = true;
     }
     break;
     default:
@@ -216,6 +221,8 @@ HBITMAP CreateDIB(HDC hdcWindowDC, int canvasWidth, int canvasHeight, VOID** can
 bool Initialize(HWND hWindow)
 {
     srand(static_cast<unsigned>(time(0)));
+
+    Task::StartSystem(7);
 
     HDC hdcWindowDC = ::GetDC(hWindow);
     unsigned char* canvasDIBDataPtr = nullptr;

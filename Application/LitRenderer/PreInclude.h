@@ -3,6 +3,7 @@
 #include <Foundation/Math/Vector.h>
 #include <Foundation/Math/Rotation.h>
 #include <Foundation/Math/Geometry.h>
+#include "TaskGraph.h"
 
 using Float = double;
 using Spectrum = math::vector3<Float>;
