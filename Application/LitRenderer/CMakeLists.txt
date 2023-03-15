@@ -17,6 +17,8 @@ set(LitRenderer_SourceFiles
     ${CMAKE_CURRENT_SOURCE_DIR}/Material.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Scene.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Scene.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/TaskGraph.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/TaskGraph.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/WinMain.cpp
     
 #   经过了多种尝试，发现直接加入项目里是最方便的。

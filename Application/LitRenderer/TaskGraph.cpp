@@ -151,9 +151,9 @@ void ReleaseGlobalTaskPool()
 }
 
 
-void Task::StartSystem()
+void Task::StartSystem(uint32_t NumWorker)
 {
-    TaskScheduler::Instance().Start();
+    TaskScheduler::Instance().Start(NumWorker);
 }
 void Task::StopSystem()
 {
@@ -616,13 +616,14 @@ void TaskScheduler::ScheduleTask(TaskGraphNode* task)
     }
 }
 
-void TaskScheduler::Start()
+void TaskScheduler::Start(uint32_t InNumWorkers)
 {
 #ifdef	ENABLE_PROFILING
     sStartTimeStamp = std::chrono::steady_clock::now();
 #endif
-
-    for (uint32_t Index = 0; Index < NumWorkerThread; Index += 1)
+    NumWorkers = InNumWorkers;
+    WorkerThreads = new std::thread[NumWorkers];
+    for (uint32_t Index = 0; Index < NumWorkers; Index += 1)
     {
         WorkerThreads[Index] = std::thread(&TaskScheduler::TaskThreadRoute, this, &WorkerThreadTaskQueue, ThreadName::Worker, Index);
 
@@ -690,9 +691,9 @@ void TaskScheduler::Join()
 {
     DiskIOThreadTaskQueue.Quit();
     WorkerThreadTaskQueue.Quit();
-    for (std::thread& t : WorkerThreads)
+    for (uint32_t Index = 0; Index < NumWorkers; Index++)
     {
-        t.join();
+        WorkerThreads[Index].join();
     }
     DiskIO.join();
 

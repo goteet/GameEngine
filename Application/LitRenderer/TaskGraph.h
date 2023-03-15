@@ -32,7 +32,7 @@ struct Task
 {
     typedef void(Route)(Task&);
 
-    static void StartSystem();
+    static void StartSystem(uint32_t NumWorker = 4);
     static void StopSystem();
     static Task Start(ThreadName Thread, std::function<Task::Route> Route);
     static Task When(ThreadName Thread, std::function<Task::Route> Route, const Task& Prerequisters);
@@ -153,14 +153,13 @@ private:
 class TaskScheduler
 {
 public:
-    static const int NumWorkerThread = 3;
     static TaskScheduler& Instance();
 
 private://internal use.
     friend class TaskGraphNode;
     friend struct Task;
     void ScheduleTask(TaskGraphNode* task);
-    void Start();
+    void Start(uint32_t NumWorkers);
     void Stop();
 
 private:
@@ -184,9 +183,9 @@ private:
         std::mutex QueueLMutex;
     };
     std::atomic_bool SchedulerKeepRunning = true;
-
+    uint32_t NumWorkers;
     std::thread DiskIO;
-    std::thread WorkerThreads[NumWorkerThread];
+    std::thread* WorkerThreads;
 
     TaskQueue DiskIOThreadTaskQueue;
     TaskQueue WorkerThreadTaskQueue;
