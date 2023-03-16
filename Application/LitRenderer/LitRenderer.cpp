@@ -260,7 +260,7 @@ void LitRenderer::GenerateCameraRays()
         //  x = x - 0;
         //  y = y - 0;
         //  z = 0 - camera.position.z
-        return math::vector3<Float>(x, y, CameraZ) + mCamera.Position;
+        return math::vector3<Float>(x * mCamera.Left + y * mCamera.Up + CameraZ * mCamera.Forward + mCamera.Position);
     };
 
 
@@ -320,6 +320,7 @@ void LitRenderer::GenerateCameraRays()
 void LitRenderer::Initialize()
 {
     InitialSceneTransforms();
+    mCamera.PositionBak = mCamera.Position;
 }
 
 bool LitRenderer::GenerateImageProgressive()
@@ -344,9 +345,31 @@ bool LitRenderer::NeedUpdate()
     return ResolveSampleTask.IsCompleted();
 }
 
+void LitRenderer::ResetCamera()
+{
+    mCamera.Position = mCamera.PositionBak;
+    mCamera.Up = Direction::unit_y();
+    mCamera.Forward = Direction::unit_z();
+    mCamera.Left = Direction::unit_x();
+    mCameraDirty = true;
+}
+
 void LitRenderer::MoveCamera(const math::vector3<Float>& Offset)
 {
-    mCamera.Position += Offset;
+    mCamera.Position += Offset.x * mCamera.Left + Offset.z * mCamera.Forward;
+    mCameraDirty = true;
+}
+
+void LitRenderer::RotateCamera(const Radian& Yaw, const Radian& Pitch)
+{
+    math::quaterniond RotationYaw = math::quaterniond(mCamera.Up, Yaw);
+    
+    mCamera.Forward = math::rotate(RotationYaw, mCamera.Forward);
+    mCamera.Left = math::cross(mCamera.Up, mCamera.Forward);
+
+    math::quaterniond RotationPitch = math::quaterniond(mCamera.Left, Pitch);
+    mCamera.Forward = math::rotate(RotationPitch, mCamera.Forward);
+    mCamera.Up = math::cross(mCamera.Forward, mCamera.Left);
     mCameraDirty = true;
 }
 
@@ -363,7 +386,7 @@ void LitRenderer::ResolveSamples()
         return;
     }
 
-    const int RenderBlockSize = 8;
+    const int RenderBlockSize = 2;
     const int NumVerticalBlock = mFilm.CanvasHeight / RenderBlockSize + 1;
     const int NumHorizontalBlock = mFilm.CanvasWidth / RenderBlockSize + 1;
 
@@ -403,9 +426,9 @@ void LitRenderer::ResolveSamples()
         }
     }
 
-    ResolveSampleTask = Task::WhenAll(ThreadName::Worker, [&](Task&)
+    ResolveSampleTask = Task::WhenAll(ThreadName::Worker, [&](Task& Task)
         {
-            mFilm.FlushTo(mSystemCanvasDataPtr, mCanvasLinePitch);
+            mFilm.FlushTo(mSystemCanvasDataPtr, mCanvasLinePitch, Task);
         }
     , PixelIntegrationTasks);
 }

@@ -18,6 +18,10 @@ class SimpleBackCamera
     };
 public:
     SimpleBackCamera(Degree verticalFov);
+    Direction Up = Direction::unit_y();
+    Direction Forward = Direction::unit_z();
+    Direction Left = Direction::unit_x();
+    Point PositionBak;
     Point Position;
     const Radian HalfVerticalFov;
     const Float HalfVerticalFovTangent;
@@ -32,7 +36,9 @@ public:
     void Initialize();
     bool GenerateImageProgressive();
     bool NeedUpdate();
+    void ResetCamera();
     void MoveCamera(const math::vector3<Float>& Offset);
+    void RotateCamera(const Radian& Yaw, const Radian& Pitch);
 
 private:
     void InitialSceneTransforms();

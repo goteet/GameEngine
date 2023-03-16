@@ -18,7 +18,7 @@ public:
     const int CanvasWidth;
     const int CanvasHeight;
     void Clear();
-    void FlushTo(unsigned char* outCanvasDataPtr, int linePitch);
+    void FlushTo(unsigned char* outCanvasDataPtr, int linePitch, Task& Task);
 
 private:
     AccumulatedSpectrum* mBackbuffer = nullptr;

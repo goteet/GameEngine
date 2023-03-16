@@ -54,24 +54,50 @@ void LDRFilm::Clear()
     }
 }
 
-void LDRFilm::FlushTo(unsigned char* outCanvasDataPtr, int linePitch)
+void LDRFilm::FlushTo(unsigned char* outCanvasDataPtr, int linePitch, Task& ParentTask)
 {
-    for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
-    {
-        int bufferRowOffset = rowIndex * CanvasWidth;
-        int canvasRowOffset = rowIndex * linePitch;
-        for (int colIndex = 0; colIndex < CanvasWidth; colIndex++)
-        {
-            int bufferIndex = colIndex + bufferRowOffset;
-            int canvasIndex = colIndex * 3 + canvasRowOffset;
+    const int BlockSize = 16;
+    const int BlockRow = CanvasHeight / BlockSize;
+    const int BlockCol = CanvasWidth / BlockSize;
 
-            const AccumulatedSpectrum& buffer = mBackbuffer[bufferIndex];
-            for (int compIndex = 2; compIndex >= 0; compIndex--)
-            {
-                Float InvNumSample = Float(1) / buffer.Count;
-                Float c = LinearToGamma22Corrected(buffer.Value[compIndex] * InvNumSample);
-                outCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(math::saturate(c) * Float(256.0) - Float(0.0001));
-            }
+    std::vector<Task> FlushTasks;
+    for (int BlockRowIndex = 0; BlockRowIndex < BlockRow; BlockRowIndex++)
+    {
+        for (int BlockColIndex = 0; BlockColIndex < BlockCol; BlockColIndex++)
+        {
+            int BlockRowStart = BlockRowIndex * BlockSize;
+            int BlockRowEnd = math::min2(BlockRowStart + BlockSize, CanvasHeight);
+            int BlockColStart = BlockColIndex * BlockSize;
+            int BlockColEnd = math::min2(BlockColStart + BlockSize, CanvasWidth);
+
+            Task FlushTask = Task::Start(ThreadName::Worker,
+                [this, linePitch, outCanvasDataPtr, BlockRowStart, BlockRowEnd, BlockColStart, BlockColEnd](Task&)
+                {
+                    for (int rowIndex = BlockRowStart; rowIndex < BlockRowEnd; rowIndex++)
+                    {
+                        int bufferRowOffset = rowIndex * CanvasWidth;
+                        int canvasRowOffset = rowIndex * linePitch;
+
+                        for (int colIndex = BlockColStart; colIndex < BlockColEnd; colIndex++)
+                        {
+                            int bufferIndex = colIndex + bufferRowOffset;
+                            int canvasIndex = colIndex * 3 + canvasRowOffset;
+                            const AccumulatedSpectrum& buffer = mBackbuffer[bufferIndex];
+                            for (int compIndex = 2; compIndex >= 0; compIndex--)
+                            {
+                                Float InvNumSample = Float(1) / buffer.Count;
+                                Float c = LinearToGamma22Corrected(buffer.Value[compIndex] * InvNumSample);
+                                outCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(math::saturate(c) * Float(256.0) - Float(0.0001));
+                            }
+                        }
+
+                    }
+                }
+            );
+            FlushTasks.push_back(FlushTask);
         }
     }
+
+    Task FinalJoinTask = Task::WhenAll(ThreadName::Worker, [](auto) {}, FlushTasks);
+    ParentTask.DontCompleteUntil(FinalJoinTask);
 }

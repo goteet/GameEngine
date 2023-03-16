@@ -4,6 +4,7 @@
 // Exclude rarely-used stuff from Windows headers
 // Windows Header Files:
 #include <windows.h>
+#include <windowsx.h>
 
 // C RunTime Header Files
 #include <stdlib.h>
@@ -25,8 +26,8 @@ HDC	hdcBitmapDC = NULL;
 HBITMAP hCanvasDIB = NULL;
 LitRenderer* Renderer = nullptr;
 BOOL WindowRefresh = false;
-
-
+INT32 StartDragX = 0;
+INT32 StartDragY = 0;
 ATOM MyRegisterClass(HINSTANCE hInstance);
 BOOL InitInstance(HINSTANCE, int);
 void CenterWindow(HWND, int, int);
@@ -149,23 +150,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         PostQuitMessage(0);
         break;
     case WM_KEYDOWN:
-    if(Renderer)
     {
-        WORD vkCode = LOWORD(wParam);
-        switch (vkCode)
+        if (Renderer)
         {
-        case 'S':
-            Renderer->MoveCamera(math::vector3<Float>(0, 0, -1));
-            break;
-        case 'W':
-            Renderer->MoveCamera(math::vector3<Float>(0, 0, 1));
-            break;
-        case 'A':
-            Renderer->MoveCamera(math::vector3<Float>(-1, 0, 0));
-            break;
-        case 'D':
-            Renderer->MoveCamera(math::vector3<Float>(1, 0, 0));
-            break;
+            WORD vkCode = LOWORD(wParam);
+            switch (vkCode)
+            {
+            case 'S':
+                Renderer->MoveCamera(math::vector3<Float>(0, 0, -1));
+                break;
+            case 'W':
+                Renderer->MoveCamera(math::vector3<Float>(0, 0, 1));
+                break;
+            case 'A':
+                Renderer->MoveCamera(math::vector3<Float>(-1, 0, 0));
+                break;
+            case 'D':
+                Renderer->MoveCamera(math::vector3<Float>(1, 0, 0));
+                break;
+            case 'R':
+                Renderer->ResetCamera();
+                break;
+            }
         }
     }
     break;
@@ -180,6 +186,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             0, 0, SRCCOPY);
         ::EndPaint(hWnd, &ps);
         WindowRefresh = true;
+    }
+    break;
+    case WM_LBUTTONDOWN:
+        SetCapture(hWindow);
+        StartDragX = GET_X_LPARAM(lParam);
+        StartDragY = GET_Y_LPARAM(lParam);
+        break;
+    case WM_LBUTTONUP:
+        ReleaseCapture();
+        break;
+    case WM_MOUSEMOVE:
+    {
+        bool bIsMousePressL = (DWORD)wParam & MK_LBUTTON;
+        if (bIsMousePressL && Renderer)
+        {
+            INT32 DeltaX = GET_X_LPARAM(lParam) - StartDragX;
+            INT32 DeltaY = GET_Y_LPARAM(lParam) - StartDragY;
+            StartDragX = GET_X_LPARAM(lParam);
+            StartDragY = GET_Y_LPARAM(lParam);
+            if (DeltaX > 0 || DeltaY > 0)
+            {
+                Radian RotationYaw = Degree(DeltaX) * Float(0.1);
+                Radian RotationPitch = Degree(DeltaY) * Float(0.1);
+                Renderer->RotateCamera(RotationYaw, RotationPitch);
+            }
+        }
     }
     break;
     default:
