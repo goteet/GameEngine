@@ -566,14 +566,17 @@ bool TaskGraphNode::AddSubsequent(TaskGraphNode* pNextTask)
         if (!IsCompleted())
         {
             std::lock_guard<std::mutex> guard(mSubseuquentsMutex);
-            pNextTask->mAntecedentDependencyCount.fetch_add(1, std::memory_order_acq_rel);
-            mSubsequents.push_back(pNextTask);
+            if (!IsCompleted())
+            {
+                pNextTask->mAntecedentDependencyCount.fetch_add(1, std::memory_order_acq_rel);
+                mSubsequents.push_back(pNextTask);
 
-            //the function will only be called in constructor and dont-complete-until.
-            // and when we calling dont-complete-until, the task is already created
-            // so we wont miss any newly-add subsequent task.
-            //if(mDontCompleteUntilEmptyTask)
-            return true;
+                //the function will only be called in constructor and dont-complete-until.
+                // and when we calling dont-complete-until, the task is already created
+                // so we wont miss any newly-add subsequent task.
+                //if(mDontCompleteUntilEmptyTask)
+                return true;
+            }
         }
     }
     return false;
