@@ -167,9 +167,19 @@ Scene::~Scene()
 
 void Scene::UpdateWorldTransform()
 {
+    std::vector<Task> UpdateTasks;
     for (auto* object : mSceneObjects)
     {
-        object->UpdateWorldTransform();
+        Task UpdateTask = Task::Start(ThreadName::Worker, [object](auto)
+            {
+                object->UpdateWorldTransform();
+            });
+        UpdateTasks.push_back(UpdateTask);
+    }
+
+    for (auto& Task : UpdateTasks)
+    {
+        Task.SpinWait();
     }
 }
 

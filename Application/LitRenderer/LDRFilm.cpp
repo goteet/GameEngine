@@ -43,7 +43,6 @@ LDRFilm::~LDRFilm()
 
 void LDRFilm::Clear()
 {
-
     for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
     {
         for (int colIndex = 0; colIndex < CanvasWidth; colIndex++)

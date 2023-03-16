@@ -14,6 +14,7 @@ public:
     const int CanvasHeight;
     void Clear();
     void FlushTo(unsigned char* outCanvasDataPtr, int linePitch);
+    void ResetSampleCount() { mSampleCount = 0; }
     void IncreaseSampleCount() { mSampleCount++; }
     int GetSampleCount() const { return mSampleCount; }
 

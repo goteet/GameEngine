@@ -4,8 +4,11 @@
 #include "LitRenderer.h"
 #include "Integrator.h"
 
+
+static const int BlockSize = 64;
 namespace
 {
+
     const bool DEBUG = false;
     class SimpleScene : public Scene
     {
@@ -241,78 +244,96 @@ void LitRenderer::GenerateCameraRays()
 {
     const Float PixelSize = Float(0.1);
     const Float HalfPixelSize = PixelSize * Float(0.5);
-    Float halfWidth = mFilm.CanvasWidth * Float(0.5) * PixelSize;
-    Float halfHeight = mFilm.CanvasHeight * Float(0.5) * PixelSize;
+    Float HalfWidth = mFilm.CanvasWidth * Float(0.5) * PixelSize;
+    Float HalfHeight = mFilm.CanvasHeight * Float(0.5) * PixelSize;
     //     <---> (half height)
     //  .  o----. (o=origin)
     //  |  |  /   Asumed canvas is at origin(0,0,0),
     //  |  | /    and camera is placed at neg-z-axis,
     //  .  |/
     // (z) .      tan(half_fov) = halfHeight / cameraZ.
-    Float cameraZ = halfHeight / mCamera.HalfVerticalFovTangent;
-    mCamera.Position.z = -cameraZ;
-
-    auto CanvasPositionToRay = [&cameraZ](Float x, Float y) -> math::vector3<Float> {
+    Float CameraZ = HalfHeight / mCamera.HalfVerticalFovTangent;
+    //mCamera.Position.z = -CameraZ;
+    auto CanvasPositionToRay = [this, CameraZ](Float x, Float y) -> math::vector3<Float>
+    {
         //vector3<float>(x,y,0) - camera.position;
         //  x = x - 0;
         //  y = y - 0;
         //  z = 0 - camera.position.z
-        return math::vector3<Float>(x, y, cameraZ);
+        return math::vector3<Float>(x, y, CameraZ) + mCamera.Position;
     };
 
-    const Float QuaterPixelSize = Float(0.5) * HalfPixelSize;
-    Spectrum* canvasDataPtr = mFilm.GetBackbufferPtr();
-    random<Float> RandomGeneratorPickingPixel;
-    for (int rowIndex = 0; rowIndex < mFilm.CanvasHeight; rowIndex++)
+
+    const int NumVerticalBlock = mFilm.CanvasHeight / BlockSize + 1;
+    const int NumHorizontalBlock = mFilm.CanvasWidth / BlockSize + 1;
+    std::vector<Task> GenerateSampleTasks;
+    for (int BlockIndexV = 0; BlockIndexV < NumVerticalBlock; BlockIndexV += 1)
     {
-        int rowOffset = rowIndex * mFilm.CanvasWidth;
-        for (int colIndex = 0; colIndex < mFilm.CanvasWidth; colIndex++)
+        for (int BlockIndexH = 0; BlockIndexH < NumHorizontalBlock; BlockIndexH += 1)
         {
-            const Float pixelCenterX = colIndex * PixelSize + HalfPixelSize - halfWidth;
-            const Float pixelCenterY = rowIndex * PixelSize + HalfPixelSize - halfHeight;
+            Task GenerateSampleTask = Task::Start(ThreadName::Worker,
+                [this, PixelSize, HalfPixelSize, HalfHeight, HalfWidth, BlockIndexV, BlockIndexH, CanvasPositionToRay](::Task&)
+                {
 
-            for (int index = 0; index < MaxCameraRaySampleCount; ++index)
-            {
-                Sample& samples = mCameraRaySamples[index][colIndex + rowOffset];
-                samples.PixelRow = rowIndex;
-                samples.PixelCol = colIndex;
+                    random<Float> RandomGeneratorPickingPixel;
+                    int RowStart = BlockIndexV * BlockSize;
+                    int RowEnd = math::min2(RowStart + BlockSize, mFilm.CanvasHeight);
+                    int ColStart = BlockIndexH * BlockSize;
+                    int ColEnd = math::min2(ColStart + BlockSize, mFilm.CanvasWidth);
 
-                Float x = Float(2) * RandomGeneratorPickingPixel.value() - Float(1);
-                Float y = Float(2) * RandomGeneratorPickingPixel.value() - Float(1);
-                samples.Ray.set_origin(mCamera.Position);
-                samples.Ray.set_direction(CanvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
-            }
+                    for (int RowIndex = RowStart; RowIndex < RowEnd; RowIndex++)
+                    {
+                        int RowOffset = RowIndex * mFilm.CanvasWidth;
+                        for (int ColIndex = ColStart; ColIndex < ColEnd; ColIndex++)
+                        {
+                            const Float pixelCenterX = ColIndex * PixelSize + HalfPixelSize - HalfWidth;
+                            const Float pixelCenterY = RowIndex * PixelSize + HalfPixelSize - HalfHeight;
+
+                            for (int index = 0; index < MaxCameraRaySampleCount; ++index)
+                            {
+                                Sample& Samples = mCameraRaySamples[index][ColIndex + RowOffset];
+                                Samples.PixelRow = RowIndex;
+                                Samples.PixelCol = ColIndex;
+
+                                Float x = Float(2) * RandomGeneratorPickingPixel.value() - Float(1);
+                                Float y = Float(2) * RandomGeneratorPickingPixel.value() - Float(1);
+                                Samples.Ray.set_origin(mCamera.Position);
+                                Samples.Ray.set_direction(CanvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
+
+                                Samples.RecordP1 = mScene->DetectIntersecting(Samples.Ray, nullptr, math::SMALL_NUM<Float>);
+                            }
+                        }
+                    }
+
+                }
+            );
+            GenerateSampleTasks.push_back(GenerateSampleTask);
         }
     }
-}
 
-void LitRenderer::QueryP1Records()
-{
-    for (int rowIndex = 0; rowIndex < mFilm.CanvasHeight; rowIndex++)
+    for (auto& Task : GenerateSampleTasks)
     {
-        int rowOffset = rowIndex * mFilm.CanvasWidth;
-        for (int colIndex = 0; colIndex < mFilm.CanvasWidth; colIndex++)
-        {
-            for (int index = 0; index < MaxCameraRaySampleCount; ++index)
-            {
-                Sample& samples = mCameraRaySamples[index][colIndex + rowOffset];
-                samples.RecordP1 = mScene->DetectIntersecting(samples.Ray, nullptr, math::SMALL_NUM<Float>);
-            }
-        }
+        Task.SpinWait();
     }
 }
 
 void LitRenderer::Initialize()
 {
     InitialSceneTransforms();
-    GenerateCameraRays();
-    QueryP1Records();
 }
 
 bool LitRenderer::GenerateImageProgressive()
 {
     if (ResolveSampleTask.IsCompleted())
     {
+        if (mCameraDirty)
+        {
+            mFilm.Clear();
+            mFilm.ResetSampleCount();
+            GenerateCameraRays();
+            mCameraDirty = false;
+        }
+
         const bool bGenerateInfinite = MaxSampleCount <= 0;
         const bool bGenerateMore = MaxSampleCount > 0 && mFilm.GetSampleCount() <= MaxSampleCount;
         if (bGenerateInfinite || bGenerateMore)
@@ -329,6 +350,12 @@ bool LitRenderer::NeedUpdate()
     return ResolveSampleTask.IsCompleted();
 }
 
+void LitRenderer::MoveCamera(const math::vector3<Float>& Offset)
+{
+    mCamera.Position += Offset;
+    mCameraDirty = true;
+}
+
 void LitRenderer::ResolveSamples()
 {
     const Sample* Samples = mCameraRaySamples[mCurrentCameraRayIndex];
@@ -337,7 +364,6 @@ void LitRenderer::ResolveSamples()
 
     std::vector<Task> PixelIntegrationTasks;
 
-    const int BlockSize = 8;
     const int NumVerticalBlock = mFilm.CanvasHeight / BlockSize + 1;
     const int NumHorizontalBlock = mFilm.CanvasWidth / BlockSize + 1;
 
@@ -346,7 +372,7 @@ void LitRenderer::ResolveSamples()
         for (int BlockIndexH = 0; BlockIndexH < NumHorizontalBlock; BlockIndexH += 1)
         {
             Task EvaluateLiTask = Task::Start(ThreadName::Worker,
-                [this, BlockSize, BlockIndexV, BlockIndexH, AccumulatedBufferPtr, Samples](::Task&)
+                [this, BlockSize = BlockSize, BlockIndexV, BlockIndexH, AccumulatedBufferPtr, Samples](::Task&)
                 {
                     PathIntegrator pathIntegrator;
                     DebugIntegrator debugIntegrator;

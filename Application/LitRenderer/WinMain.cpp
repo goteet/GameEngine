@@ -92,10 +92,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         {
             ::RedrawWindow(hWindow, NULL, NULL, RDW_INVALIDATE);
         }
-        else
-        {
-            ::Sleep(16);
-        }
+        //else
+        //{
+        //    ::Sleep(16);
+        //}
     }
 
     Uninitialize(hWindow);
@@ -148,6 +148,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
+    case WM_KEYDOWN:
+    if(Renderer)
+    {
+        WORD vkCode = LOWORD(wParam);
+        switch (vkCode)
+        {
+        case 'S':
+            Renderer->MoveCamera(math::vector3<Float>(0, 0, -1));
+            break;
+        case 'W':
+            Renderer->MoveCamera(math::vector3<Float>(0, 0, 1));
+            break;
+        case 'A':
+            Renderer->MoveCamera(math::vector3<Float>(-1, 0, 0));
+            break;
+        case 'D':
+            Renderer->MoveCamera(math::vector3<Float>(1, 0, 0));
+            break;
+        }
+    }
+    break;
     case WM_PAINT:
     {
         PAINTSTRUCT ps;

@@ -1,4 +1,5 @@
 #pragma once
+#pragma once
 #include <memory>
 #include <vector>
 #include "PreInclude.h"
@@ -31,11 +32,11 @@ public:
     void Initialize();
     bool GenerateImageProgressive();
     bool NeedUpdate();
+    void MoveCamera(const math::vector3<Float>& Offset);
 
 private:
     void InitialSceneTransforms();
     void GenerateCameraRays();
-    void QueryP1Records();
     void ResolveSamples();
 
     static const int MaxCameraRaySampleCount = 8;
@@ -56,6 +57,6 @@ private:
     std::unique_ptr<Scene> mScene;
     Sample* mCameraRaySamples[MaxCameraRaySampleCount];
     int  mCurrentCameraRayIndex = 0;
-
+    bool mCameraDirty = true;
     Task ResolveSampleTask;
 };
