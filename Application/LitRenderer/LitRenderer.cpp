@@ -15,8 +15,8 @@ namespace
         virtual void CreateScene(Float aspect, std::vector<SceneObject*>& OutSceneObjects) override
         {
             const Float SceneSize = 60;
-            const Float SceneNear = 1;
-            const Float SceneFar = SceneSize * Float(2.5);
+            const Float SceneNear = -30;
+            const Float SceneFar = 30;
             const Float SceneBottom = -SceneSize;
             const Float SceneTop = SceneSize;
             const Float SceneLeft = -SceneSize * aspect;
@@ -116,7 +116,7 @@ namespace
             {
                 SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
                 LightDisk->SetDualFace(true);
-                LightDisk->SetTranslate(SceneCenterX, SceneCenterY, SceneNear - Float(100));
+                LightDisk->SetTranslate(SceneCenterX, SceneCenterY, SceneNear - Float(200));
                 LightDisk->SetExtends(SceneSize * 1.5, SceneSize);
                 LightDisk->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
                 Float Intensity = 2.5;
@@ -219,6 +219,7 @@ LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canv
     , mCamera(50_degd)
     , mScene(std::make_unique<SimpleScene>())
 {
+    mCamera.Position.set(0, 0, -130);
     mScene->Create(Float(canvasWidth) / Float(canvasHeight));
     int sampleCount = canvasWidth * canvasHeight;
     for (int index = 0; index < MaxCameraRaySampleCount; index++)
@@ -242,7 +243,7 @@ void LitRenderer::InitialSceneTransforms()
 
 void LitRenderer::GenerateCameraRays()
 {
-    const Float PixelSize = Float(0.1);
+    const Float PixelSize = Float(1);
     const Float HalfPixelSize = PixelSize * Float(0.5);
     Float HalfWidth = mFilm.CanvasWidth * Float(0.5) * PixelSize;
     Float HalfHeight = mFilm.CanvasHeight * Float(0.5) * PixelSize;
@@ -253,7 +254,6 @@ void LitRenderer::GenerateCameraRays()
     //  .  |/
     // (z) .      tan(half_fov) = halfHeight / cameraZ.
     Float CameraZ = HalfHeight / mCamera.HalfVerticalFovTangent;
-    //mCamera.Position.z = -CameraZ;
     auto CanvasPositionToRay = [this, CameraZ](Float x, Float y) -> math::vector3<Float>
     {
         //vector3<float>(x,y,0) - camera.position;
@@ -328,19 +328,13 @@ bool LitRenderer::GenerateImageProgressive()
     {
         if (mCameraDirty)
         {
+            Frame = 0;
             mFilm.Clear();
-            mFilm.ResetSampleCount();
             GenerateCameraRays();
             mCameraDirty = false;
         }
-
-        const bool bGenerateInfinite = MaxSampleCount <= 0;
-        const bool bGenerateMore = MaxSampleCount > 0 && mFilm.GetSampleCount() <= MaxSampleCount;
-        if (bGenerateInfinite || bGenerateMore)
-        {
-            ResolveSamples();
-            return true;
-        }
+        ResolveSamples();
+        return true;
     }
     return false;
 }
@@ -360,19 +354,25 @@ void LitRenderer::ResolveSamples()
 {
     const Sample* Samples = mCameraRaySamples[mCurrentCameraRayIndex];
     mCurrentCameraRayIndex = (mCurrentCameraRayIndex + 1) % MaxCameraRaySampleCount;
-    Spectrum* AccumulatedBufferPtr = mFilm.GetBackbufferPtr();
+    AccumulatedSpectrum* AccumulatedBufferPtr = mFilm.GetBackbufferPtr();
 
     std::vector<Task> PixelIntegrationTasks;
 
-    const int NumVerticalBlock = mFilm.CanvasHeight / BlockSize + 1;
-    const int NumHorizontalBlock = mFilm.CanvasWidth / BlockSize + 1;
-
-    for (int BlockIndexV = 0; BlockIndexV < NumVerticalBlock; BlockIndexV += 1)
+    if (MaxSampleCount > 0 && (Frame / 4) >= MaxSampleCount)
     {
-        for (int BlockIndexH = 0; BlockIndexH < NumHorizontalBlock; BlockIndexH += 1)
+        return;
+    }
+
+    const int RenderBlockSize = 8;
+    const int NumVerticalBlock = mFilm.CanvasHeight / RenderBlockSize + 1;
+    const int NumHorizontalBlock = mFilm.CanvasWidth / RenderBlockSize + 1;
+
+    for (int BlockIndexV = (Frame++ + 1) / 2 % 2; BlockIndexV < NumVerticalBlock; BlockIndexV += 2)
+    {
+        for (int BlockIndexH = Frame % 2; BlockIndexH < NumHorizontalBlock; BlockIndexH += 2)
         {
             Task EvaluateLiTask = Task::Start(ThreadName::Worker,
-                [this, BlockSize = BlockSize, BlockIndexV, BlockIndexH, AccumulatedBufferPtr, Samples](::Task&)
+                [this, BlockSize = RenderBlockSize, MaxSampleCount = MaxSampleCount, BlockIndexV, BlockIndexH, AccumulatedBufferPtr, Samples](::Task&)
                 {
                     PathIntegrator pathIntegrator;
                     DebugIntegrator debugIntegrator;
@@ -388,10 +388,14 @@ void LitRenderer::ResolveSamples()
                         for (int ColIndex = ColStart; ColIndex < ColEnd; ColIndex++)
                         {
                             const Sample& Sample = Samples[ColIndex + RowOffset];
-                            Spectrum& CanvasPixel = AccumulatedBufferPtr[ColIndex + RowOffset];
+                            AccumulatedSpectrum& CanvasPixel = AccumulatedBufferPtr[ColIndex + RowOffset];
 
-
-                            CanvasPixel += IntegratorRef.EvaluateLi(*mScene, Sample.Ray, Sample.RecordP1);
+                            const bool bGenerateMore = MaxSampleCount <= 0 || MaxSampleCount > (int)CanvasPixel.Count;
+                            if (bGenerateMore)
+                            {
+                                CanvasPixel.Value += IntegratorRef.EvaluateLi(*mScene, Sample.Ray, Sample.RecordP1);
+                                CanvasPixel.Count += 1;
+                            }
                         }
                     }
                 });
@@ -401,8 +405,6 @@ void LitRenderer::ResolveSamples()
 
     ResolveSampleTask = Task::WhenAll(ThreadName::Worker, [&](Task&)
         {
-            mFilm.IncreaseSampleCount();
-            // LinearColorToGammaCorrectedCanvasDataBuffer();
             mFilm.FlushTo(mSystemCanvasDataPtr, mCanvasLinePitch);
         }
     , PixelIntegrationTasks);

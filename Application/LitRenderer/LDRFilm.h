@@ -3,22 +3,23 @@
 #include <Foundation/Math/Vector.h>
 #include "Material.h"
 
+struct AccumulatedSpectrum
+{
+    Spectrum Value = Spectrum::zero();
+    uint32_t Count = 0;
+};
 class LDRFilm
 {
 public:
     LDRFilm(int width, int height);
     ~LDRFilm();
 
-    Spectrum* GetBackbufferPtr() { return mBackbuffer; }
+    AccumulatedSpectrum* GetBackbufferPtr() { return mBackbuffer; }
     const int CanvasWidth;
     const int CanvasHeight;
     void Clear();
     void FlushTo(unsigned char* outCanvasDataPtr, int linePitch);
-    void ResetSampleCount() { mSampleCount = 0; }
-    void IncreaseSampleCount() { mSampleCount++; }
-    int GetSampleCount() const { return mSampleCount; }
 
 private:
-    Spectrum* mBackbuffer = nullptr;
-    int mSampleCount = 0;
+    AccumulatedSpectrum* mBackbuffer = nullptr;
 };

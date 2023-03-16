@@ -57,6 +57,7 @@ private:
     std::unique_ptr<Scene> mScene;
     Sample* mCameraRaySamples[MaxCameraRaySampleCount];
     int  mCurrentCameraRayIndex = 0;
+    int Frame = 0;
     bool mCameraDirty = true;
     Task ResolveSampleTask;
 };

@@ -32,7 +32,7 @@ LDRFilm::LDRFilm(int width, int height)
     , CanvasHeight(height)
 {
     int count = CanvasWidth * CanvasHeight;
-    mBackbuffer = new Spectrum[count];
+    mBackbuffer = new AccumulatedSpectrum[count];
     Clear();
 }
 
@@ -48,14 +48,14 @@ void LDRFilm::Clear()
         for (int colIndex = 0; colIndex < CanvasWidth; colIndex++)
         {
             int pixelIndex = colIndex + rowIndex * CanvasWidth;
-            mBackbuffer[pixelIndex].set(Float(0.0), Float(0.0), Float(0.0));
+            mBackbuffer[pixelIndex].Value.set(Float(0.0), Float(0.0), Float(0.0));
+            mBackbuffer[pixelIndex].Count = 0;
         }
     }
 }
 
 void LDRFilm::FlushTo(unsigned char* outCanvasDataPtr, int linePitch)
 {
-    Float invSampleCout = Float(1) / mSampleCount;
     for (int rowIndex = 0; rowIndex < CanvasHeight; rowIndex++)
     {
         int bufferRowOffset = rowIndex * CanvasWidth;
@@ -65,10 +65,11 @@ void LDRFilm::FlushTo(unsigned char* outCanvasDataPtr, int linePitch)
             int bufferIndex = colIndex + bufferRowOffset;
             int canvasIndex = colIndex * 3 + canvasRowOffset;
 
-            const Spectrum& buffer = mBackbuffer[bufferIndex];
+            const AccumulatedSpectrum& buffer = mBackbuffer[bufferIndex];
             for (int compIndex = 2; compIndex >= 0; compIndex--)
             {
-                Float c = LinearToGamma22Corrected(buffer[compIndex] * invSampleCout);
+                Float InvNumSample = Float(1) / buffer.Count;
+                Float c = LinearToGamma22Corrected(buffer.Value[compIndex] * InvNumSample);
                 outCanvasDataPtr[canvasIndex++] = math::floor2<unsigned char>(math::saturate(c) * Float(256.0) - Float(0.0001));
             }
         }
