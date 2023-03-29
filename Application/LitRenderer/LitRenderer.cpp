@@ -8,7 +8,6 @@
 static const int BlockSize = 64;
 namespace
 {
-
     const bool DEBUG = false;
     class SimpleScene : public Scene
     {
@@ -221,19 +220,12 @@ LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canv
 {
     mCamera.Position.set(0, 0, -130);
     mScene->Create(Float(canvasWidth) / Float(canvasHeight));
-    int sampleCount = canvasWidth * canvasHeight;
-    for (int index = 0; index < MaxCameraRaySampleCount; index++)
-    {
-        mCameraRaySamples[index] = new Sample[sampleCount];
-    }
+    mCameraRaySamples = new Sample[canvasWidth * canvasHeight];
 }
 
 LitRenderer::~LitRenderer()
 {
-    for (int index = 0; index < MaxCameraRaySampleCount; index++)
-    {
-        SafeDeleteArray(mCameraRaySamples[index]);
-    }
+    SafeDeleteArray(mCameraRaySamples);
 }
 
 void LitRenderer::InitialSceneTransforms()
@@ -289,19 +281,13 @@ void LitRenderer::GenerateCameraRays()
                             const Float pixelCenterX = ColIndex * PixelSize + HalfPixelSize - HalfWidth;
                             const Float pixelCenterY = RowIndex * PixelSize + HalfPixelSize - HalfHeight;
 
-                            for (int index = 0; index < MaxCameraRaySampleCount; ++index)
-                            {
-                                Sample& Samples = mCameraRaySamples[index][ColIndex + RowOffset];
-                                Samples.PixelRow = RowIndex;
-                                Samples.PixelCol = ColIndex;
+                            Sample& Samples = mCameraRaySamples[ColIndex + RowOffset];
+                            Samples.PixelRow = RowIndex;
+                            Samples.PixelCol = ColIndex;
+                            Samples.Ray.set_origin(mCamera.Position);
+                            Samples.Ray.set_direction(CanvasPositionToRay(pixelCenterX, pixelCenterY));
 
-                                Float x = Float(2) * RandomGeneratorPickingPixel.value() - Float(1);
-                                Float y = Float(2) * RandomGeneratorPickingPixel.value() - Float(1);
-                                Samples.Ray.set_origin(mCamera.Position);
-                                Samples.Ray.set_direction(CanvasPositionToRay(pixelCenterX + x * HalfPixelSize, pixelCenterY + y * HalfPixelSize));
-
-                                Samples.RecordP1 = mScene->DetectIntersecting(Samples.Ray, nullptr, math::SMALL_NUM<Float>);
-                            }
+                            Samples.RecordP1 = mScene->DetectIntersecting(Samples.Ray, nullptr, math::SMALL_NUM<Float>);
                         }
                     }
 
@@ -363,7 +349,7 @@ void LitRenderer::MoveCamera(const math::vector3<Float>& Offset)
 void LitRenderer::RotateCamera(const Radian& Yaw, const Radian& Pitch)
 {
     math::quaterniond RotationYaw = math::quaterniond(mCamera.Up, Yaw);
-    
+
     mCamera.Forward = math::rotate(RotationYaw, mCamera.Forward);
     mCamera.Left = math::cross(mCamera.Up, mCamera.Forward);
 
@@ -375,8 +361,7 @@ void LitRenderer::RotateCamera(const Radian& Yaw, const Radian& Pitch)
 
 void LitRenderer::ResolveSamples()
 {
-    const Sample* Samples = mCameraRaySamples[mCurrentCameraRayIndex];
-    mCurrentCameraRayIndex = (mCurrentCameraRayIndex + 1) % MaxCameraRaySampleCount;
+    const Sample* Samples = mCameraRaySamples;
     AccumulatedSpectrum* AccumulatedBufferPtr = mFilm.GetBackbufferPtr();
 
     std::vector<Task> PixelIntegrationTasks;

@@ -45,9 +45,8 @@ private:
     void GenerateCameraRays();
     void ResolveSamples();
 
-    static const int MaxCameraRaySampleCount = 8;
     static const int MaxLightRaySampleCount = -1;
-    static const int MaxSampleCount = MaxCameraRaySampleCount * MaxLightRaySampleCount;
+    static const int MaxSampleCount = MaxLightRaySampleCount;
 
     struct Sample
     {
@@ -61,8 +60,7 @@ private:
     LDRFilm mFilm;
     SimpleBackCamera mCamera;
     std::unique_ptr<Scene> mScene;
-    Sample* mCameraRaySamples[MaxCameraRaySampleCount];
-    int  mCurrentCameraRayIndex = 0;
+    Sample* mCameraRaySamples;
     int Frame = 0;
     bool mCameraDirty = true;
     Task ResolveSampleTask;
