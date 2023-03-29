@@ -61,6 +61,6 @@ void LDRFilm::FlushTo(const AccumulatedSpectrum& Spectrum, uint32_t Row, uint32_
     for (int SpectrumComponentIndex = 2; SpectrumComponentIndex >= 0; SpectrumComponentIndex--)
     {
         Float sRGB = LinearToGamma22Corrected(Spectrum.Value[SpectrumComponentIndex] * InvNumSample);
-        CanvasDataPtr[CanvasOffset + SpectrumComponentIndex] = math::floor2<unsigned char>(math::saturate(sRGB) * Float(256.0) - Float(0.0001));
+        CanvasDataPtr[CanvasOffset++] = math::floor2<unsigned char>(math::saturate(sRGB) * Float(256.0) - Float(0.0001));
     }
 }
