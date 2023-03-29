@@ -205,7 +205,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             INT32 DeltaY = GET_Y_LPARAM(lParam) - StartDragY;
             StartDragX = GET_X_LPARAM(lParam);
             StartDragY = GET_Y_LPARAM(lParam);
-            if (DeltaX > 0 || DeltaY > 0)
+            if (DeltaX != 0 || DeltaY != 0)
             {
                 Radian RotationYaw = Degree(DeltaX) * Float(0.1);
                 Radian RotationPitch = Degree(DeltaY) * Float(0.1);
