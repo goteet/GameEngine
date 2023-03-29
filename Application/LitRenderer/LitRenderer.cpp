@@ -256,12 +256,12 @@ void LitRenderer::GenerateCameraRays()
     };
 
 
-    const int NumVerticalBlock = mFilm.CanvasHeight / BlockSize + 1;
-    const int NumHorizontalBlock = mFilm.CanvasWidth / BlockSize + 1;
     std::vector<Task> GenerateSampleTasks;
-    for (int BlockIndexV = 0; BlockIndexV < NumVerticalBlock; BlockIndexV += 1)
+    const int NumBlockX = (mFilm.CanvasWidth + BlockSize - 1) / BlockSize;
+    const int NumBlockY = (mFilm.CanvasHeight + BlockSize - 1) / BlockSize;
+    for (int BlockIndexV = 0; BlockIndexV < NumBlockY; BlockIndexV += 1)
     {
-        for (int BlockIndexH = 0; BlockIndexH < NumHorizontalBlock; BlockIndexH += 1)
+        for (int BlockIndexH = 0; BlockIndexH < NumBlockX; BlockIndexH += 1)
         {
             Task GenerateSampleTask = Task::Start(ThreadName::Worker,
                 [this, PixelSize, HalfPixelSize, HalfHeight, HalfWidth, BlockIndexV, BlockIndexH, CanvasPositionToRay](::Task&)
@@ -372,23 +372,22 @@ void LitRenderer::ResolveSamples()
     }
 
     const int RenderBlockSize = 2;
-    const int NumVerticalBlock = mFilm.CanvasHeight / RenderBlockSize + 1;
-    const int NumHorizontalBlock = mFilm.CanvasWidth / RenderBlockSize + 1;
-
-    for (int BlockIndexV = (Frame++ + 1) / 2 % 2; BlockIndexV < NumVerticalBlock; BlockIndexV += 2)
+    const int NumBlockX = (mFilm.CanvasWidth + RenderBlockSize - 1) / RenderBlockSize;
+    const int NumBlockY = (mFilm.CanvasHeight + RenderBlockSize - 1) / RenderBlockSize;
+    for (int BlockIndexY = (Frame++ + 1) / 2 % 2; BlockIndexY < NumBlockY; BlockIndexY += 2)
     {
-        for (int BlockIndexH = Frame % 2; BlockIndexH < NumHorizontalBlock; BlockIndexH += 2)
+        for (int BlockIndexX = Frame % 2; BlockIndexX < NumBlockX; BlockIndexX += 2)
         {
             Task EvaluateLiTask = Task::Start(ThreadName::Worker,
-                [this, BlockSize = RenderBlockSize, MaxSampleCount = MaxSampleCount, BlockIndexV, BlockIndexH, AccumulatedBufferPtr, Samples](::Task&)
+                [this, BlockSize = RenderBlockSize, MaxSampleCount = MaxSampleCount, BlockIndexY, BlockIndexX, AccumulatedBufferPtr, Samples](::Task&)
                 {
                     PathIntegrator pathIntegrator;
                     DebugIntegrator debugIntegrator;
                     Integrator& IntegratorRef = DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
 
-                    int RowStart = BlockIndexV * BlockSize;
+                    int RowStart = BlockIndexY * BlockSize;
                     int RowEnd = math::min2(RowStart + BlockSize, mFilm.CanvasHeight);
-                    int ColStart = BlockIndexH * BlockSize;
+                    int ColStart = BlockIndexX * BlockSize;
                     int ColEnd = math::min2(ColStart + BlockSize, mFilm.CanvasWidth);
                     for (int RowIndex = RowStart; RowIndex < RowEnd; RowIndex++)
                     {
@@ -403,6 +402,8 @@ void LitRenderer::ResolveSamples()
                             {
                                 CanvasPixel.Value += IntegratorRef.EvaluateLi(*mScene, Sample.Ray, Sample.RecordP1);
                                 CanvasPixel.Count += 1;
+
+                                mFilm.FlushTo(CanvasPixel, RowIndex, ColIndex, this->mSystemCanvasDataPtr, mCanvasLinePitch);
                             }
                         }
                     }
@@ -411,11 +412,7 @@ void LitRenderer::ResolveSamples()
         }
     }
 
-    ResolveSampleTask = Task::WhenAll(ThreadName::Worker, [&](Task& Task)
-        {
-            mFilm.FlushTo(mSystemCanvasDataPtr, mCanvasLinePitch, Task);
-        }
-    , PixelIntegrationTasks);
+    ResolveSampleTask = Task::WhenAll(ThreadName::Worker, [](auto) {}, PixelIntegrationTasks);
 }
 
 SimpleBackCamera::SimpleBackCamera(Degree verticalFov)
