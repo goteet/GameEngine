@@ -38,7 +38,7 @@ enum BSDFMask : uint32_t
 struct BSDFSample
 {
     Direction Wi = Direction::unit_y();
-    Spectrum Fresnel = Spectrum::zero();
+    Spectrum F = Spectrum::zero();
     Float CosineWi = Float(0);
     uint32_t SampleMask = BSDFMask::None;
 };

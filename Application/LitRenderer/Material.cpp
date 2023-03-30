@@ -380,7 +380,7 @@ bool Lambertian::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& 
     const Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.Fresnel = Albedo;
+    oBSDFSample.F = Albedo;
     oBSDFSample.CosineWi = NdotL;
     oBSDFSample.SampleMask = BSDFMask::DiffuseMask;
     return NdotL >= Float(0);
@@ -451,7 +451,7 @@ bool OrenNayar::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N
     Float factor, CosineWi;
     std::tie(factor, CosineWi) = CalculateFactorAndCosineWi(N, Wi, Wo, A, B);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.Fresnel = f(N, Wo, Wi);
+    oBSDFSample.F = f(N, Wo, Wi);
     oBSDFSample.CosineWi = CosineWi;
     oBSDFSample.SampleMask = BSDFMask::DiffuseMask;
     return CosineWi >= Float(0);
@@ -502,7 +502,7 @@ bool TorranceSparrow::SampleFCosOverPdf(Float u[3], const Point& P, const Direct
     const Direction Wi = math::reflection(Wo, H);
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.Fresnel = (f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi));
+    oBSDFSample.F = (f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi));
     oBSDFSample.CosineWi = NdotL;
     oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
         ? BSDFMask::SpecularMask | BSDFMask::MirrorMask
@@ -571,7 +571,7 @@ bool AshikhminAndShirley::SampleFCosOverPdf(Float u[3], const Point& P, const Di
 
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.Fresnel = f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi);
+    oBSDFSample.F = f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi);
     oBSDFSample.CosineWi = NdotL;
     return NdotL >= Float(0);
 }
@@ -653,7 +653,7 @@ bool AshikhminAndShirleyDiffuse::SampleFCosOverPdf(Float u[3], const Point& P, c
     const Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.Fresnel = f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi);
+    oBSDFSample.F = f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi);
     oBSDFSample.CosineWi = NdotL;
     oBSDFSample.SampleMask = BSDFMask::DiffuseMask;
     return NdotL >= Float(0);
@@ -697,7 +697,7 @@ bool AshikhminAndShirleySpecular::SampleFCosOverPdf(Float u[3], const Point& P, 
 
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.Fresnel = f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi);
+    oBSDFSample.F = f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi);
     oBSDFSample.CosineWi = NdotL;
     oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
         ? BSDFMask::SpecularMask | BSDFMask::MirrorMask
