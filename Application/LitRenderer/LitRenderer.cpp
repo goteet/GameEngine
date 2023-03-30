@@ -48,13 +48,10 @@ namespace
 
                 const Float roughness = Float(0.1 + 0.05 * i);
                 const Float IoR = Float(1.8 - i * 0.05);
-                Float Ks = Float(0.5);
-                Float Kd = Float(1) - Ks;
-                mainSphere->Material = Material::CreatePlastic(Kd, Spectrum(Float(0.5)), Ks, roughness, RefractionIndex::Plastic());
-                mainSphere->Material = Material::CreateMicrofacetGGX_Debug(roughness, RefractionIndex::Gold());
-                mainSphere->Material = Material::CreateAshikhminAndShirley(roughness, Spectrum(0.1), RefractionIndex::Gold().SpecularColor());
 
-
+                mainSphere->Material = Material::CreatePlastic(Spectrum(Float(0.5)), roughness, Spectrum(1));
+                mainSphere->Material = Material::CreateMicrofacetGGX_Debug(roughness, SpecularColor::Gold());
+                mainSphere->Material = Material::CreateAshikhminAndShirley(roughness, Spectrum(0.1), SpecularColor::Gold());
             }
 
 

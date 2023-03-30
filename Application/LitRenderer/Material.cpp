@@ -23,7 +23,7 @@ Float BalanceHeuristic(Float pdfA, Float pdfB)
 }
 
 // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
-const Float RefractionIndex::AirRefractiveIndex = Float(1.0003);
+const Float RefractionIndexSetting::AirRefractiveIndex = Float(1.0003);
 
 Spectrum FresnelSchlick(Float CosTheta, const Spectrum& R0)
 {
@@ -39,7 +39,7 @@ Float ConductorFresnelR0(Float Nt, Float Kt, Float Ni)
     return (math::square(Nt - Ni) + math::square(Kt)) / (math::square(Nt + Ni) + math::square(Kt));
 }
 
-RefractionIndex::RefractionIndex(Float Nt, Float Kt, Float Ni)
+RefractionIndexSetting::RefractionIndexSetting(Float Nt, Float Kt, Float Ni)
     : Nt(Nt), Kt(Kt), Ni(Ni)
     , R0(Kt > Float(0)
         ? ConductorFresnelR0(Nt, Kt, Ni)
@@ -47,7 +47,7 @@ RefractionIndex::RefractionIndex(Float Nt, Float Kt, Float Ni)
 {
 }
 
-Spectrum RefractionIndex::Fresnel(Float CosineThetaI) const
+Spectrum RefractionIndexSetting::Fresnel(Float CosineThetaI) const
 {
     return FresnelSchlick(CosineThetaI, R0);
 }
@@ -404,8 +404,8 @@ Float Lambertian::pdf(const Direction& N, const Direction& Wo, const Direction& 
 
 
 
-OrenNayar::OrenNayar(const Spectrum& albedo, Radian sigma, Float weight)
-    : BSDF("Oren-Nayer", BSDFMask::DiffuseMask, weight)
+OrenNayar::OrenNayar(const Spectrum& albedo, Radian sigma)
+    : BSDF("Oren-Nayer", BSDFMask::DiffuseMask)
     , Albedo(albedo)
     , Sigma(sigma)
     , SigmaSquare(math::square(sigma.value))
@@ -475,13 +475,13 @@ Float OrenNayar::pdf(const Direction& N, const Direction& Wo, const Direction& W
     return math::saturate(NdotL) * math::InvPI<Float>;
 }
 
-TorranceSparrow::TorranceSparrow(std::unique_ptr<DistributionFunction>&& distrib, const RefractionIndex& fresnel, Float s, Float weight)
+TorranceSparrow::TorranceSparrow(std::unique_ptr<DistributionFunction>&& distrib, const Spectrum& Rs)
     : BSDF("Torrance-Sparrow"
-        , (distrib->IsNearMirrorReflection() ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask) : BSDFMask::SpecularMask)
-        , weight)
+        , (distrib->IsNearMirrorReflection() 
+            ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask) 
+            : BSDFMask::SpecularMask))
     , Distribution(std::move(distrib))
-    , Fresnel(std::move(fresnel))
-    , Ks(s)
+    , Rs(Rs)
 {
 
 }
@@ -530,7 +530,7 @@ Spectrum TorranceSparrow::f(const Direction& N, const Direction& Wo, const Direc
     const Float HdotL = math::saturate(math::dot(H, Wi));
     const Float D = Distribution->D(NdotH);
     const Float G = Distribution->G(NdotH, HdotL, HdotV);
-    const Spectrum F = Fresnel.Fresnel(HdotL);
+    const Spectrum F = FresnelSchlick(HdotL, Rs);
     const Spectrum BRDF = Float(0.25) * D * F * G / (NdotV * NdotL);
     return NdotL > Float(0) ? BRDF : Spectrum::zero();
 }
@@ -545,6 +545,16 @@ Float TorranceSparrow::pdf(const Direction& N, const Direction& Wo, const Direct
     const Float HdotV = math::dot(H, Wo);
     const Float pdf = Distribution->pdf(N, Wo, Wi);
     return pdf * Float(0.25) / HdotV;
+}
+
+AshikhminAndShirley::AshikhminAndShirley(std::unique_ptr<DistributionFunction>&& distrib, const Spectrum& Rd, const Spectrum& Rs)
+    : BSDF("Ashikhmin-Shirley"
+        , (distrib->IsNearMirrorReflection()
+            ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask | BSDFMask::DiffuseMask)
+            : BSDFMask::SpecularMask | BSDFMask::DiffuseMask))
+    , Distribution(std::move(distrib)), Rd(Rd), Rs(Rs)
+    , DiffuseWeight((Float(28)* math::InvPI<Float> / Float(23))* (Rd* (Spectrum::one() - Rs)))
+{
 }
 
 bool AshikhminAndShirley::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const
@@ -646,6 +656,11 @@ Float AshikhminAndShirley::pdf(const Direction& N, const Direction& Wo, const Di
     return Float(0.5) * (SpecularPdf + DiffusePdf);
 }
 
+AshikhminAndShirleyDiffuse::AshikhminAndShirleyDiffuse(const Spectrum& Rd, const Spectrum& Rs)
+    : BSDF("Ashikhmin-Shirley Diffuse", BSDFMask::DiffuseMask), Rd(Rd)
+    , DiffuseWeight((Float(28) / Float(23) * math::InvPI<Float>)* (Rd* (Spectrum::one() - Rs)))
+{
+}
 
 bool AshikhminAndShirleyDiffuse::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const
 {
@@ -684,6 +699,15 @@ Float AshikhminAndShirleyDiffuse::pdf(const Direction& N, const Direction& Wo, c
 {
     Float NdotL = math::dot(N, Wi);
     return math::saturate(NdotL) * math::InvPI<Float>;
+}
+
+AshikhminAndShirleySpecular::AshikhminAndShirleySpecular(std::unique_ptr<DistributionFunction>&& distrib, const Spectrum& Rs)
+    : BSDF("Ashikhmin-Shirley Specular"
+        , (distrib->IsNearMirrorReflection()
+            ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask)
+            : BSDFMask::SpecularMask))
+    , Distribution(std::move(distrib)), Rs(Rs)
+{
 }
 
 bool AshikhminAndShirleySpecular::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const
@@ -820,12 +844,12 @@ std::unique_ptr<Material> Material::CreateMatte(const Spectrum& albedo, Radian s
 }
 
 
-std::unique_ptr<Material> Material::CreatePlastic(Float Kd, const Spectrum& albedo, Float Ks, Float roughness, const RefractionIndex& fresnel)
+std::unique_ptr<Material> Material::CreatePlastic(const Spectrum& albedo, Float roughness, const Spectrum& Rs)
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
     std::unique_ptr<DistributionGGX> distribGGX = std::make_unique<DistributionGGX>(roughness);
-    std::unique_ptr<Lambertian> compLambertian = std::make_unique<Lambertian>(albedo * Kd);
-    std::unique_ptr<TorranceSparrow> compSpecular = std::make_unique<TorranceSparrow>(std::move(distribGGX), fresnel, Ks);
+    std::unique_ptr<Lambertian> compLambertian = std::make_unique<Lambertian>(albedo);
+    std::unique_ptr<TorranceSparrow> compSpecular = std::make_unique<TorranceSparrow>(std::move(distribGGX), Rs);
 
     material->AddBSDFComponent(std::move(compLambertian));
     material->AddBSDFComponent(std::move(compSpecular));
@@ -851,11 +875,11 @@ std::unique_ptr<Material> Material::CreateAshikhminAndShirley(Float roughness, c
 }
 
 
-std::unique_ptr<Material> Material::CreateMicrofacetGGX_Debug(Float roughness, const RefractionIndex& fresnel)
+std::unique_ptr<Material> Material::CreateMicrofacetGGX_Debug(Float roughness, const Spectrum& Rs)
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
     std::unique_ptr<DistributionGGX> distribGGX = std::make_unique<DistributionGGX>(roughness);
-    std::unique_ptr<TorranceSparrow> compGGX = std::make_unique<TorranceSparrow>(std::move(distribGGX), fresnel);
+    std::unique_ptr<TorranceSparrow> compGGX = std::make_unique<TorranceSparrow>(std::move(distribGGX), Rs);
 
     material->AddBSDFComponent(std::move(compGGX));
 
