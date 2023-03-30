@@ -25,10 +25,9 @@ Float BalanceHeuristic(Float pdfA, Float pdfB)
 // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
 const Float RefractionIndex::AirRefractiveIndex = Float(1.0003);
 
-template<typename RType>
-RType FresnelSchlick(Float CosTheta, RType R0)
+Spectrum FresnelSchlick(Float CosTheta, const Spectrum& R0)
 {
-    return R0 + (RType(1) - R0) * math::power<5>(Float(1) - CosTheta);
+    return R0 + (Spectrum::one() - R0) * math::power<5>(Float(1) - CosTheta);
 }
 
 Float DieletricFresnelR0(Float tEta, Float iEta)
@@ -608,23 +607,21 @@ Spectrum AshikhminAndShirley::f(const Direction& N, const Direction& Wo, const D
     const Float NdotV = math::dot(N, Wo);
     const Float NdotH = math::dot(N, H);
     const Float D = Distribution->D(NdotH);
-    const Float Fresnel = FresnelSchlick(HdotL, Rs);
+    const Spectrum Fresnel = FresnelSchlick(HdotL, Rs);
 
-    // 28*Rd 
-    //------- * (1-Rs) *(1 - pow5(1 - 0.5 * NdotL)) * (1 - pow5(1 - 0.5 * NdotV))
+    //  28 
+    //------- * Rd * (1-Rs) * (1 - pow5(1 - 0.5 * NdotL)) * (1 - pow5(1 - 0.5 * NdotV))
     // 23*Pi
-    Spectrum Diffse = (Float(28) * Rd * math::InvPI<Float> / Float(23))
-        * (Float(1) - Rs)
+    Spectrum Diffuse = DiffuseWeight
         * (Float(1) - math::power<5>(Float(1) - Float(0.5) * NdotL))
-        * (Float(1) - math::power<5>(Float(1) - Float(0.5) * NdotV))
-        * Spectrum::one();
+        * (Float(1) - math::power<5>(Float(1) - Float(0.5) * NdotV));
 
     //         D * F
     //-------------------------------
     // 4 * HdotL * max(NdotL, NdotV)
     Spectrum SpecularMask = (D * Fresnel * Float(0.25)) / (HdotL * math::max2(NdotL, NdotV)) * Spectrum::one();
 
-    return Diffse + SpecularMask;
+    return Diffuse + SpecularMask;
 }
 
 Float AshikhminAndShirley::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
@@ -731,7 +728,7 @@ Spectrum AshikhminAndShirleySpecular::f(const Direction& N, const Direction& Wo,
     const Float NdotV = math::dot(N, Wo);
     const Float NdotH = math::dot(N, H);
     const Float D = Distribution->D(NdotH);
-    const Float Fresnel = FresnelSchlick(HdotL, Rs);
+    const Spectrum Fresnel = FresnelSchlick(HdotL, Rs);
     //         D * F
     //-------------------------------
     // 4 * HdotL * max(NdotL, NdotV)
@@ -836,7 +833,7 @@ std::unique_ptr<Material> Material::CreatePlastic(Float Kd, const Spectrum& albe
     return material;
 }
 
-std::unique_ptr<Material> Material::CreateAshikhminAndShirley(Float roughness, Float Rd, Float Rs)
+std::unique_ptr<Material> Material::CreateAshikhminAndShirley(Float roughness, const Spectrum& Rd, const Spectrum& Rs)
 {
 
     std::unique_ptr<Material> material = std::make_unique<Material>();

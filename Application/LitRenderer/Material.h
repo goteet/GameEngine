@@ -109,7 +109,7 @@ struct Material
     static std::unique_ptr<Material> CreateMatte(const Spectrum& albedo = Spectrum::one());
     static std::unique_ptr<Material> CreateMatte(const Spectrum& albedo, Radian sigma);
     static std::unique_ptr<Material> CreatePlastic(Float Kd, const Spectrum& albedo, Float Ks, Float roughness, const RefractionIndex& fresnel = RefractionIndex::Dielectric(Float(1.5)));
-    static std::unique_ptr<Material> CreateAshikhminAndShirley(Float roughness, Float Rd, Float Rs);
+    static std::unique_ptr<Material> CreateAshikhminAndShirley(Float roughness, const Spectrum& Rd, const Spectrum& Rs);
     static std::unique_ptr<Material> CreateMicrofacetGGX_Debug(Float roughness, const RefractionIndex& fresnel);
 
     Material() = default;
@@ -168,15 +168,18 @@ struct TorranceSparrow : public BSDF
 struct AshikhminAndShirley : public BSDF
 {
     std::unique_ptr<DistributionFunction> Distribution;
-    Float Rd = Float(0.5);
-    Float Rs = Float(0.5);
-    AshikhminAndShirley(std::unique_ptr<DistributionFunction>&& distrib, Float diffuse, Float specular, Float weight = Float(1))
+    Spectrum Rd = Spectrum::one();
+    Spectrum Rs = Spectrum::one();
+    Spectrum OneMinusRs = Spectrum::zero();
+    Spectrum DiffuseWeight = (Float(28) / Float(23) * math::InvPI<Float>) * Spectrum::one();
+    AshikhminAndShirley(std::unique_ptr<DistributionFunction>&& distrib, const Spectrum& Rd, const Spectrum& Rs, Float weight = Float(1))
         : BSDF("Ashikhmin-Shirley"
             , (distrib->IsNearMirrorReflection()
                 ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask | BSDFMask::DiffuseMask)
                 : BSDFMask::SpecularMask | BSDFMask::DiffuseMask)
             , weight)
-        , Distribution(std::move(distrib)), Rd(diffuse), Rs(specular) { }
+        , Distribution(std::move(distrib)), Rd(Rd), Rs(Rs)
+        , DiffuseWeight((Float(28)* math::InvPI<Float> / Float(23)) * (Rd * (Spectrum::one() - Rs))) { }
     virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const override;
     virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const override;
     virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
@@ -185,10 +188,11 @@ struct AshikhminAndShirley : public BSDF
 
 struct AshikhminAndShirleyDiffuse : public BSDF
 {
-    Float Rd;
-    AshikhminAndShirleyDiffuse(Float Rd, Float Rs, Float weight = Float(1))
-        : BSDF("Ashikhmin-Shirley Diffuse", BSDFMask::DiffuseMask, weight)
-        , Rd((Float(28)* Rd* math::InvPI<Float> / Float(23))* (Float(1) - Rs)) { }
+    Spectrum Rd = Spectrum::one();
+    Spectrum DiffuseWeight = (Float(28) / Float(23) * math::InvPI<Float>) * Spectrum::one();
+    AshikhminAndShirleyDiffuse(const Spectrum& Rd, const Spectrum& Rs, Float weight = Float(1))
+        : BSDF("Ashikhmin-Shirley Diffuse", BSDFMask::DiffuseMask, weight), Rd(Rd)
+        , DiffuseWeight((Float(28) / Float(23) * math::InvPI<Float> ) * (Rd * (Spectrum::one() - Rs))) { }
     virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const override;
     virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const override;
     virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
@@ -198,8 +202,8 @@ struct AshikhminAndShirleyDiffuse : public BSDF
 struct AshikhminAndShirleySpecular : public BSDF
 {
     std::unique_ptr<DistributionFunction> Distribution;
-    Float Rs = Float(0.5);
-    AshikhminAndShirleySpecular(std::unique_ptr<DistributionFunction>&& distrib, Float Rs, Float weight = Float(1))
+    Spectrum Rs = Spectrum::one();
+    AshikhminAndShirleySpecular(std::unique_ptr<DistributionFunction>&& distrib, const Spectrum& Rs, Float weight = Float(1))
         : BSDF("Ashikhmin-Shirley Specular"
             , (distrib->IsNearMirrorReflection() ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask) : BSDFMask::SpecularMask)
             , weight)

@@ -52,6 +52,8 @@ namespace
                 Float Kd = Float(1) - Ks;
                 mainSphere->Material = Material::CreatePlastic(Kd, Spectrum(Float(0.5)), Ks, roughness, RefractionIndex::Plastic());
                 mainSphere->Material = Material::CreateMicrofacetGGX_Debug(roughness, RefractionIndex::Gold());
+                mainSphere->Material = Material::CreateAshikhminAndShirley(roughness, Spectrum(0.1), RefractionIndex::Gold().SpecularColor());
+
 
             }
 
