@@ -2,6 +2,8 @@
 #include "Material.h"
 #include "LitRenderer.h"
 
+using UVW = math::normal_space<Float>;
+
 template<int E> Float Ws(Float p1, Float p2)
 {
     return Ws<1>(math::power<E>(p1), math::power<E>(p2));
@@ -100,15 +102,14 @@ Float DistributionBerry(Float roughness, Float NdotH)
 
 Float ShadowingGGX(Float AlphaSquare, Float HdotV, Float NdotH)
 {
-    Float cos = math::saturate(HdotV);
-    Float cos2 = math::square(cos);
+    Float CosineSquare = math::square(HdotV);
     Float X = (NdotH / HdotV) > 0 ? Float(1) : Float(0);
     //          2 * X                                       2 * cos * X                                     2 * cos * X
     //--------------------------------- = ------------------------------------------- = ---------------------------------------------
     // 1 + sqrt(1 + AlphaG^2 * tan^2)      cos + sqrt(cos^2 + alpha^2 * (1 - cos^2))     cos + sqrt(cos^2 * (1 - alpha^2) + alpha^2)
     //
-    Float numerator = Float(2) * cos * X;
-    Float denominator = cos + sqrt(cos2 * (Float(1) - AlphaSquare) + AlphaSquare);
+    Float numerator = Float(2) * HdotV;
+    Float denominator = HdotV + sqrt(CosineSquare * (Float(1) - AlphaSquare) + AlphaSquare);
     return numerator / denominator;
 }
 
@@ -120,37 +121,7 @@ Float GeometryGGX(Float roughness, Float NdotH, Float HdotV, Float HdotL)
     return math::min2(G1, G2);
 }
 
-struct UVW
-{
-    Direction u, v, w;
 
-    UVW(const Direction& normal) { from_normal(normal); }
-
-    void from_normal(const Direction& normal)
-    {
-        w = normal;
-        v = fabs(w.x) > Float(0.95) ? Direction::unit_y() : Direction::unit_x();
-        v = math::cross(w, v);
-        u = math::cross(w, v);
-    }
-
-    Direction local_to_world(Float x, Float y, Float z)
-    {
-        return x * u + y * v + z * w;
-    }
-    Direction local_to_world(const Direction& dir)
-    {
-        return local_to_world(dir.x, dir.y, dir.z);
-    }
-
-    Direction world_to_local(const Direction& dir)
-    {
-        Spectrum x = math::projection(dir, u);
-        Spectrum y = math::projection(dir, v);
-        Spectrum z = math::projection(dir, w);
-        return x + y + z;
-    }
-};
 
 Spectrum GenerateUnitSphereVector()
 {
@@ -168,7 +139,7 @@ Spectrum GenerateUnitSphereVector()
     }
 }
 
-Direction GenerateHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& normal)
+Direction GenerateHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& n, const Direction& t)
 {
     Float cosTheta = Float(1) - Float(2) * uTheta;
     Float sinTheta = sqrt(Float(1) - cosTheta * cosTheta);
@@ -180,11 +151,10 @@ Direction GenerateHemisphereDirection(const Float uTheta, const Float uPhi, cons
     Float y = sinTheta * sinPhi;
     Float z = cosTheta;
 
-    UVW uvw(normal);
-    return uvw.local_to_world(x, y, z);
+    return UVW(n, t).local_2_world(x, y, z);
 }
 
-Direction GenerateUniformHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& normal)
+Direction GenerateUniformHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& n, const Direction& t)
 {
     // pdf = 1/2PI
     // => cdf = 1/2PI*phi*(1-cos_theta)
@@ -200,7 +170,7 @@ Direction GenerateUniformHemisphereDirection(const Float uTheta, const Float uPh
     Float y = sinTheta * sinPhi;
     Float z = cosTheta;
 
-    return UVW(normal).local_to_world(x, y, z);
+    return UVW(n, t).local_2_world(x, y, z);
 }
 
 Direction SampleGGXVNDF(
@@ -320,7 +290,7 @@ Direction TrowbridgeReitzSample(const Direction& wi, Float alpha_x, Float alpha_
     return math::vector3<Float>(-slope_x, -slope_y, Float(1));
 }
 
-Spectrum GenerateCosineWeightedHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& normal)
+Spectrum GenerateCosineWeightedHemisphereDirection(const Float uTheta, const Float uPhi, const Direction& n, const Direction& t)
 {
     // pdf = cos(theta) / Pi.
     Float cosTheta_sqr = uTheta; //replace 1-e to e'
@@ -334,8 +304,7 @@ Spectrum GenerateCosineWeightedHemisphereDirection(const Float uTheta, const Flo
     Float y = sinTheta * sinPhi;
     Float z = cosTheta;
 
-    UVW uvw(normal);
-    return uvw.local_to_world(x, y, z);
+    return UVW(n, t).local_2_world(x, y, z);
 }
 
 DistributionGGX::DistributionGGX(Float roughness)
@@ -367,17 +336,18 @@ Float DistributionGGX::pdf(const Direction& N, const Direction& Wo, const Direct
 {
     const Direction H = Wi + Wo;
     const Float NdotH = math::dot(N, H);
-    return D(NdotH) * NdotH;
+    const Float D = this->D(NdotH);
+    return D * NdotH;
 }
 
 
 
-bool Lambertian::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const
+bool Lambertian::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const
 {
     //  f * cos(theta)     rho * cos(theta)        Pi
     // ---------------- = ----------------- * ------------ = rho
     //      pdf                 Pi             cos(theta)
-    const Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
+    const Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N, T);
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
     oBSDFSample.F = Albedo;
@@ -386,17 +356,17 @@ bool Lambertian::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& 
     return NdotL >= Float(0);
 }
 
-Direction Lambertian::SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const
+Direction Lambertian::SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const
 {
-    return GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
+    return GenerateCosineWeightedHemisphereDirection(u[1], u[2], N, T);
 }
 
-Spectrum Lambertian::f(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Spectrum Lambertian::f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     return Albedo * math::InvPI<Float>;
 }
 
-Float Lambertian::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Float Lambertian::pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     Float NdotL = math::dot(N, Wi);
     return math::saturate(NdotL) * math::InvPI<Float>;
@@ -439,37 +409,37 @@ std::tuple<Float, Float> CalculateFactorAndCosineWi(const Direction& N, const Di
     return { factor, CosineWi };
 }
 
-bool OrenNayar::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const
+bool OrenNayar::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const
 {
     //  f * cos(theta)                           rho                     Pi
     // ---------------- = factor * cosine(Wi) * ----- * cos(theta) * ------------ = factor * cosine(Wi) * rho
     //      pdf                                   Pi                  cos(theta) 
     // *  Float NdotL = math::dot(N, Wi);
 
-    const Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
+    const Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N, T);
     const Direction Wo = -Ray.direction();
     Float factor, CosineWi;
     std::tie(factor, CosineWi) = CalculateFactorAndCosineWi(N, Wi, Wo, A, B);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.F = f(N, Wo, Wi);
+    oBSDFSample.F = f(N, T, Wo, Wi);
     oBSDFSample.CosineWi = CosineWi;
     oBSDFSample.SampleMask = BSDFMask::DiffuseMask;
     return CosineWi >= Float(0);
 }
 
-Direction OrenNayar::SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const
+Direction OrenNayar::SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const
 {
-    return  GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
+    return  GenerateCosineWeightedHemisphereDirection(u[1], u[2], N, T);
 }
 
-Spectrum OrenNayar::f(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Spectrum OrenNayar::f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     Float factor, CosineWi;
     std::tie(factor, CosineWi) = CalculateFactorAndCosineWi(N, Wi, Wo, A, B);
     return (factor * CosineWi * math::InvPI<Float>) * Albedo;
 }
 
-Float OrenNayar::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Float OrenNayar::pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     Float NdotL = math::dot(N, Wi);
     return math::saturate(NdotL) * math::InvPI<Float>;
@@ -477,8 +447,8 @@ Float OrenNayar::pdf(const Direction& N, const Direction& Wo, const Direction& W
 
 TorranceSparrow::TorranceSparrow(std::unique_ptr<DistributionFunction>&& distrib, const Spectrum& Rs)
     : BSDF("Torrance-Sparrow"
-        , (distrib->IsNearMirrorReflection() 
-            ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask) 
+        , (distrib->IsNearMirrorReflection()
+            ? (BSDFMask::MirrorMask | BSDFMask::SpecularMask)
             : BSDFMask::SpecularMask))
     , Distribution(std::move(distrib))
     , Rs(Rs)
@@ -486,7 +456,7 @@ TorranceSparrow::TorranceSparrow(std::unique_ptr<DistributionFunction>&& distrib
 
 }
 
-bool TorranceSparrow::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const
+bool TorranceSparrow::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const
 {
     // f * cos(theta)        D * F * G                      4 * HdotV     F * G * HdotV
     //--------------- = ------------------- * cos(theta) * ----------- = ---------------
@@ -495,14 +465,14 @@ bool TorranceSparrow::SampleFCosOverPdf(Float u[3], const Point& P, const Direct
     // Note that cos(theta) = NdotL
     //           Distribution::Pdf  = D * cos(theta),
     //           Distribution::Pdf' = D * G1 * HdotV / NdotV, this will be special due to sampling visible area.
-    UVW uvw(N);
+    UVW uvw(N, T);
     const Direction Wo = -Ray.direction();
-    const Direction Ho = Distribution->SampleWh(uvw.world_to_local(-Wo), u[1], u[2]);
-    const Direction H = uvw.local_to_world(Ho);
+    const Direction Ho = Distribution->SampleWh(uvw.world_2_local(-Wo), u[1], u[2]);
+    const Direction H = uvw.local_2_world(Ho);
     const Direction Wi = math::reflection(Wo, H);
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.F = (f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi));
+    oBSDFSample.F = (f(N, T, Wo, Wi) * NdotL / pdf(N, T, Wo, Wi));
     oBSDFSample.CosineWi = NdotL;
     oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
         ? BSDFMask::SpecularMask | BSDFMask::MirrorMask
@@ -510,32 +480,40 @@ bool TorranceSparrow::SampleFCosOverPdf(Float u[3], const Point& P, const Direct
     return NdotL > 0;
 }
 
-Direction TorranceSparrow::SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const
+Direction TorranceSparrow::SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const
 {
-    UVW uvw(N);
+    UVW uvw(N, T);
     const Direction Wo = -Ray.direction();
-    const Direction Ho = Distribution->SampleWh(uvw.world_to_local(-Wo), u[1], u[2]);
-    const Direction H = uvw.local_to_world(Ho);
+    const Direction WoLocal = uvw.world_2_local(Wo);
+    const Direction Ho = Distribution->SampleWh(WoLocal, u[1], u[2]);
+    const Direction H = uvw.local_2_world(Ho);
     const Direction Wi = math::reflection(Wo, H);
     return Wi;
 }
 
-Spectrum TorranceSparrow::f(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Spectrum TorranceSparrow::f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
-    const Direction H = Wo + Wi;
     const Float NdotL = math::saturate(math::dot(N, Wi));
-    const Float NdotH = math::saturate(math::dot(N, H));
     const Float NdotV = math::saturate(math::dot(N, Wo));
-    const Float HdotV = math::saturate(math::dot(H, Wo));
-    const Float HdotL = math::saturate(math::dot(H, Wi));
-    const Float D = Distribution->D(NdotH);
-    const Float G = Distribution->G(NdotH, HdotL, HdotV);
-    const Spectrum F = FresnelSchlick(HdotL, Rs);
-    const Spectrum BRDF = Float(0.25) * D * F * G / (NdotV * NdotL);
-    return NdotL > Float(0) ? BRDF : Spectrum::zero();
+    if (NdotL > Float(0) && NdotV > Float(0))
+    {
+        const Direction H = Wo + Wi;
+        const Float NdotH = math::saturate(math::dot(N, H));
+        const Float HdotV = math::saturate(math::dot(H, Wo));
+        const Float HdotL = math::saturate(math::dot(H, Wi));
+        const Float D = Distribution->D(NdotH);
+        const Float G = Distribution->G(NdotH, HdotL, HdotV);
+        const Spectrum F = FresnelSchlick(HdotL, Rs);
+        const Spectrum f = Float(0.25) * D * F * G / (NdotV * NdotL);
+        return f;
+    }
+    else
+    {
+        return Spectrum::zero();
+    }
 }
 
-Float TorranceSparrow::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Float TorranceSparrow::pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     //copy from Pbrt, same with UE4.
     // D * NdotH
@@ -557,22 +535,22 @@ AshikhminAndShirley::AshikhminAndShirley(std::unique_ptr<DistributionFunction>&&
 {
 }
 
-bool AshikhminAndShirley::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const
+bool AshikhminAndShirley::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const
 {
     const Direction Wo = -Ray.direction();
     Direction Wi;
     if (u[0] < Float(0.5))
     {
         //sample diffuse
-        Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
+        Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N, T);
         oBSDFSample.SampleMask = BSDFMask::DiffuseMask;
     }
     else
     {
         //sample specular
-        UVW uvw(N);
-        const Direction Ho = Distribution->SampleWh(uvw.world_to_local(-Wo), u[1], u[2]);
-        const Direction H = uvw.local_to_world(Ho);
+        UVW uvw(N, T);
+        const Direction Ho = Distribution->SampleWh(uvw.world_2_local(-Wo), u[1], u[2]);
+        const Direction H = uvw.local_2_world(Ho);
         Wi = math::reflection(Wo, H);
         oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
             ? BSDFMask::SpecularMask | BSDFMask::MirrorMask
@@ -581,31 +559,31 @@ bool AshikhminAndShirley::SampleFCosOverPdf(Float u[3], const Point& P, const Di
 
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.F = f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi);
+    oBSDFSample.F = f(N, T, Wo, Wi) * NdotL / pdf(N, T, Wo, Wi);
     oBSDFSample.CosineWi = NdotL;
     return NdotL >= Float(0);
 }
 
-Direction AshikhminAndShirley::SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const
+Direction AshikhminAndShirley::SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const
 {
     Direction Wi;
     if (u[0] < Float(0.5))
     {
         //sample diffuse
-        return GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
+        return GenerateCosineWeightedHemisphereDirection(u[1], u[2], N, T);
     }
     else
     {
         //sample specular
-        UVW uvw(N);
+        UVW uvw(N, T);
         const Direction Wo = -Ray.direction();
-        const Direction Ho = Distribution->SampleWh(uvw.world_to_local(-Wo), u[1], u[2]);
-        const Direction H = uvw.local_to_world(Ho);
+        const Direction Ho = Distribution->SampleWh(uvw.world_2_local(-Wo), u[1], u[2]);
+        const Direction H = uvw.local_2_world(Ho);
         return math::reflection(Wo, H);
     }
 }
 
-Spectrum AshikhminAndShirley::f(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Spectrum AshikhminAndShirley::f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     const Direction H = Wo + Wi;
     if (math::near_zero(H))
@@ -634,7 +612,7 @@ Spectrum AshikhminAndShirley::f(const Direction& N, const Direction& Wo, const D
     return Diffuse + SpecularMask;
 }
 
-Float AshikhminAndShirley::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Float AshikhminAndShirley::pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     const Direction H = Wo + Wi;
     if (math::near_zero(H))
@@ -662,26 +640,26 @@ AshikhminAndShirleyDiffuse::AshikhminAndShirleyDiffuse(const Spectrum& Rd, const
 {
 }
 
-bool AshikhminAndShirleyDiffuse::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const
+bool AshikhminAndShirleyDiffuse::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const
 {
     const Direction Wo = -Ray.direction();
-    const Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
+    const Direction Wi = GenerateCosineWeightedHemisphereDirection(u[1], u[2], N, T);
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.F = f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi);
+    oBSDFSample.F = f(N, T, Wo, Wi) * NdotL / pdf(N, T, Wo, Wi);
     oBSDFSample.CosineWi = NdotL;
     oBSDFSample.SampleMask = BSDFMask::DiffuseMask;
     return NdotL >= Float(0);
 }
 
 
-Direction AshikhminAndShirleyDiffuse::SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const
+Direction AshikhminAndShirleyDiffuse::SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const
 {
-    return GenerateCosineWeightedHemisphereDirection(u[1], u[2], N);
+    return GenerateCosineWeightedHemisphereDirection(u[1], u[2], N, T);
 }
 
 
-Spectrum AshikhminAndShirleyDiffuse::f(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Spectrum AshikhminAndShirleyDiffuse::f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     const Float NdotL = math::dot(N, Wi);
     const Float NdotV = math::dot(N, Wo);
@@ -695,7 +673,7 @@ Spectrum AshikhminAndShirleyDiffuse::f(const Direction& N, const Direction& Wo, 
     return Diffse;
 }
 
-Float AshikhminAndShirleyDiffuse::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Float AshikhminAndShirleyDiffuse::pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     Float NdotL = math::dot(N, Wi);
     return math::saturate(NdotL) * math::InvPI<Float>;
@@ -710,18 +688,18 @@ AshikhminAndShirleySpecular::AshikhminAndShirleySpecular(std::unique_ptr<Distrib
 {
 }
 
-bool AshikhminAndShirleySpecular::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const
+bool AshikhminAndShirleySpecular::SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const
 {
-    UVW uvw(N);
+    UVW uvw(N, T);
 
     const Direction Wo = -Ray.direction();
-    const Direction Ho = Distribution->SampleWh(uvw.world_to_local(-Wo), u[1], u[2]);
-    const Direction H = uvw.local_to_world(Ho);
+    const Direction Ho = Distribution->SampleWh(uvw.world_2_local(-Wo), u[1], u[2]);
+    const Direction H = uvw.local_2_world(Ho);
     const Direction Wi = math::reflection(Wo, H);
 
     const Float NdotL = math::dot(Wi, N);
     oBSDFSample.Wi = Wi;
-    oBSDFSample.F = f(N, Wo, Wi) * NdotL / pdf(N, Wo, Wi);
+    oBSDFSample.F = f(N, T, Wo, Wi) * NdotL / pdf(N, T, Wo, Wi);
     oBSDFSample.CosineWi = NdotL;
     oBSDFSample.SampleMask = (Distribution->IsNearMirrorReflection()
         ? BSDFMask::SpecularMask | BSDFMask::MirrorMask
@@ -730,17 +708,17 @@ bool AshikhminAndShirleySpecular::SampleFCosOverPdf(Float u[3], const Point& P, 
 }
 
 
-Direction AshikhminAndShirleySpecular::SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const
+Direction AshikhminAndShirleySpecular::SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const
 {
     const Direction Wo = -Ray.direction();
-    UVW uvw(N);
-    const Direction Ho = Distribution->SampleWh(uvw.world_to_local(-Wo), u[1], u[2]);
-    const Direction H = uvw.local_to_world(Ho);
+    UVW uvw(N, T);
+    const Direction Ho = Distribution->SampleWh(uvw.world_2_local(-Wo), u[1], u[2]);
+    const Direction H = uvw.local_2_world(Ho);
     const Direction Wi = math::reflection(Wo, H);
     return Wi;
 }
 
-Spectrum AshikhminAndShirleySpecular::f(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Spectrum AshikhminAndShirleySpecular::f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     const Direction H = Wo + Wi;
     if (math::near_zero(H))
@@ -760,7 +738,7 @@ Spectrum AshikhminAndShirleySpecular::f(const Direction& N, const Direction& Wo,
     return f;
 }
 
-Float AshikhminAndShirleySpecular::pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Float AshikhminAndShirleySpecular::pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     const Direction H = Wo + Wi;
     if (math::near_zero(H))
@@ -799,22 +777,22 @@ const std::unique_ptr<BSDF>& Material::GetRandomBSDFComponent(Float u) const
     return GetBSDFComponentByIndex(index);
 }
 
-Spectrum Material::SampleF(const Direction& N, const Direction& Wo, const Direction& Wi) const
+Spectrum Material::SampleF(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const
 {
     Spectrum f = Spectrum::zero();
     for (auto& bsdf : mBSDFComponents)
     {
-        f += bsdf->Weight * bsdf->f(N, Wo, Wi);
+        f += bsdf->Weight * bsdf->f(N, T, Wo, Wi);
     }
     return f;
 }
 
-Float Material::SamplePdf(const Direction& N, const Direction& Wo, const Direction& Wi) const {
+Float Material::SamplePdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const {
     Float pdf = 0;
     size_t Num = mBSDFComponents.size();
     for (auto& bsdf : mBSDFComponents)
     {
-        pdf += bsdf->pdf(N, Wo, Wi);
+        pdf += bsdf->pdf(N, T, Wo, Wi);
     }
     return pdf / static_cast<Float>(Num);
 }
@@ -849,7 +827,7 @@ std::unique_ptr<Material> Material::CreatePlastic(const Spectrum& albedo, Float 
     std::unique_ptr<Material> material = std::make_unique<Material>();
     std::unique_ptr<DistributionGGX> distribGGX = std::make_unique<DistributionGGX>(roughness);
     std::unique_ptr<Lambertian> compLambertian = std::make_unique<Lambertian>(albedo);
-    std::unique_ptr<TorranceSparrow> compSpecular = std::make_unique<TorranceSparrow>(std::move(distribGGX), Rs);
+    std::unique_ptr<Mircofacet> compSpecular = std::make_unique<Mircofacet>(std::move(distribGGX), Rs);
 
     material->AddBSDFComponent(std::move(compLambertian));
     material->AddBSDFComponent(std::move(compSpecular));
@@ -879,7 +857,7 @@ std::unique_ptr<Material> Material::CreateMicrofacetGGX_Debug(Float roughness, c
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();
     std::unique_ptr<DistributionGGX> distribGGX = std::make_unique<DistributionGGX>(roughness);
-    std::unique_ptr<TorranceSparrow> compGGX = std::make_unique<TorranceSparrow>(std::move(distribGGX), Rs);
+    std::unique_ptr<Mircofacet> compGGX = std::make_unique<Mircofacet>(std::move(distribGGX), Rs);
 
     material->AddBSDFComponent(std::move(compGGX));
 

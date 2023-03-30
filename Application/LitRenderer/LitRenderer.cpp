@@ -32,26 +32,36 @@ namespace
             const Float SmallObjectSize = 8;
             const Float BigObjectSize = SmallObjectSize * Float(1.75);
 
-
-            for (int i = 0; i < 16; i++)
+            //if(false)
+            if (DEBUG)
             {
                 SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
-                mainSphere->SetRadius(10);
+                mainSphere->SetRadius(30);
+                mainSphere->SetTranslate(SceneCenterX, SceneCenterY, SceneCenterZ);
+                mainSphere->Material = Material::CreateMicrofacetGGX_Debug(Float(0.01), SpecularColor::Gold());
+            }
+            else
+            {
+                for (int i = 0; i < 16; i++)
+                {
+                    SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
+                    mainSphere->SetRadius(10);
 
-                Float OffsetX = Float(-40 + (i % 4) * 25);
-                Float OffsetY = Float((i / 4) * 25);
-                Float OffsetZ = 0;
-                mainSphere->SetTranslate(
-                    SceneCenterX + OffsetX,
-                    SceneBottom + 20 + OffsetY,
-                    SceneCenterZ + OffsetZ);
+                    Float OffsetX = Float(-40 + (i % 4) * 25);
+                    Float OffsetY = Float((i / 4) * 25);
+                    Float OffsetZ = 0;
+                    mainSphere->SetTranslate(
+                        SceneCenterX + OffsetX,
+                        SceneBottom + 20 + OffsetY,
+                        SceneCenterZ + OffsetZ);
 
-                const Float roughness = Float(0.1 + 0.05 * i);
-                const Float IoR = Float(1.8 - i * 0.05);
+                    const Float roughness = Float(0.1 + 0.05 * i);
+                    const Float IoR = Float(1.8 - i * 0.05);
 
-                mainSphere->Material = Material::CreatePlastic(Spectrum(Float(0.5)), roughness, Spectrum(1));
-                mainSphere->Material = Material::CreateMicrofacetGGX_Debug(roughness, SpecularColor::Gold());
-                mainSphere->Material = Material::CreateAshikhminAndShirley(roughness, Spectrum(0.1), SpecularColor::Gold());
+                    mainSphere->Material = Material::CreatePlastic(Spectrum(Float(0.5)), roughness, Spectrum(1));
+                    mainSphere->Material = Material::CreateMicrofacetGGX_Debug(roughness, SpecularColor::Gold());
+                    //mainSphere->Material = Material::CreateAshikhminAndShirley(roughness, Spectrum(0.1), SpecularColor::Gold());
+                }
             }
 
 
@@ -275,13 +285,13 @@ void LitRenderer::GenerateCameraRays()
                             const Float pixelCenterX = ColIndex * PixelSize + HalfPixelSize - HalfWidth;
                             const Float pixelCenterY = RowIndex * PixelSize + HalfPixelSize - HalfHeight;
 
-                            Sample& Samples = mCameraRaySamples[ColIndex + RowOffset];
-                            Samples.PixelRow = RowIndex;
-                            Samples.PixelCol = ColIndex;
-                            Samples.Ray.set_origin(mCamera.Position);
-                            Samples.Ray.set_direction(CanvasPositionToRay(pixelCenterX, pixelCenterY));
+                            Sample& Sample = mCameraRaySamples[ColIndex + RowOffset];
+                            Sample.PixelRow = RowIndex;
+                            Sample.PixelCol = ColIndex;
+                            Sample.Ray.set_origin(mCamera.Position);
+                            Sample.Ray.set_direction(CanvasPositionToRay(pixelCenterX, pixelCenterY));
 
-                            Samples.RecordP1 = mScene->DetectIntersecting(Samples.Ray, nullptr, math::SMALL_NUM<Float>);
+                            Sample.RecordP1 = mScene->DetectIntersecting(Sample.Ray, nullptr, math::SMALL_NUM<Float>);
                         }
                     }
 

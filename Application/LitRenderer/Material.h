@@ -108,10 +108,10 @@ struct BSDF
 
     BSDF(const std::string& debugName, uint32_t mask) : DebugName(debugName), BSDFMask(mask) { }
     virtual ~BSDF() { }
-    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const = 0;
-    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const = 0;
-    virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi) const { return Spectrum::zero(); }
-    virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const { return Float(1); }
+    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const = 0;
+    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const = 0;
+    virtual Spectrum f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const { return Spectrum::zero(); }
+    virtual Float pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const { return Float(1); }
 };
 
 struct Material
@@ -128,8 +128,8 @@ struct Material
     const std::unique_ptr<BSDF>& GetBSDFComponentByIndex(uint32_t index) const { return mBSDFComponents[index]; }
     const std::unique_ptr<BSDF>& GetBSDFComponentByMask(uint32_t mask) const;
     const std::unique_ptr<BSDF>& GetRandomBSDFComponent(Float u) const;
-    Spectrum SampleF(const Direction& N, const Direction& Wo, const Direction& Wi) const;
-    Float SamplePdf(const Direction& N, const Direction& Wo, const Direction& Wi) const;
+    Spectrum SampleF(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const;
+    Float SamplePdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const;
 
 private:
     std::vector<std::unique_ptr<BSDF>> mBSDFComponents;
@@ -142,10 +142,10 @@ struct Lambertian : public BSDF
 
     Lambertian() : BSDF("Lambertian", BSDFMask::DiffuseMask) { }
     Lambertian(const Spectrum& albedo) : BSDF("Lambertian", BSDFMask::DiffuseMask), Albedo(albedo) { }
-    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const override;
-    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const override;
-    virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
-    virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
+    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const override;
+    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const override;
+    virtual Spectrum f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
+    virtual Float pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
 };
 
 struct OrenNayar : public BSDF
@@ -158,10 +158,10 @@ struct OrenNayar : public BSDF
 
     OrenNayar() : BSDF("Oren-Nayer", BSDFMask::DiffuseMask) { };
     OrenNayar(const Spectrum& albedo, Radian sigma = 0_degd);
-    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const override;
-    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const override;
-    virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
-    virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
+    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const override;
+    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const override;
+    virtual Spectrum f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
+    virtual Float pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
 };
 
 struct TorranceSparrow : public BSDF
@@ -170,10 +170,10 @@ struct TorranceSparrow : public BSDF
     Spectrum Rs;
 
     TorranceSparrow(std::unique_ptr<DistributionFunction>&& distrib, const Spectrum& Rs);
-    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const override;
-    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const override;
-    virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
-    virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
+    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const override;
+    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const override;
+    virtual Spectrum f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
+    virtual Float pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
 };
 
 struct AshikhminAndShirley : public BSDF
@@ -185,10 +185,10 @@ struct AshikhminAndShirley : public BSDF
     Spectrum DiffuseWeight = (Float(28) / Float(23) * math::InvPI<Float>) * Spectrum::one();
 
     AshikhminAndShirley(std::unique_ptr<DistributionFunction>&& distrib, const Spectrum& Rd, const Spectrum& Rs);
-    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const override;
-    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const override;
-    virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
-    virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
+    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const override;
+    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const override;
+    virtual Spectrum f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
+    virtual Float pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
 };
 
 struct AshikhminAndShirleyDiffuse : public BSDF
@@ -197,10 +197,10 @@ struct AshikhminAndShirleyDiffuse : public BSDF
     Spectrum DiffuseWeight = (Float(28) / Float(23) * math::InvPI<Float>) * Spectrum::one();
 
     AshikhminAndShirleyDiffuse(const Spectrum& Rd, const Spectrum& Rs);
-    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const override;
-    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const override;
-    virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
-    virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
+    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const override;
+    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const override;
+    virtual Spectrum f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
+    virtual Float pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
 };
 
 struct AshikhminAndShirleySpecular : public BSDF
@@ -209,10 +209,10 @@ struct AshikhminAndShirleySpecular : public BSDF
     Spectrum Rs = Spectrum::one();
 
     AshikhminAndShirleySpecular(std::unique_ptr<DistributionFunction>&& distrib, const Spectrum& Rs);
-    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Ray& Ray, BSDFSample& oBSDFSample) const override;
-    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Ray& Ray) const override;
-    virtual Spectrum f(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
-    virtual Float pdf(const Direction& N, const Direction& Wo, const Direction& Wi) const override;
+    virtual bool SampleFCosOverPdf(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray, BSDFSample& oBSDFSample) const override;
+    virtual Direction SampleWi(Float u[3], const Point& P, const Direction& N, const Direction& T, const Ray& Ray) const override;
+    virtual Spectrum f(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
+    virtual Float pdf(const Direction& N, const Direction& T, const Direction& Wo, const Direction& Wi) const override;
 };
 
 using Mircofacet = TorranceSparrow;

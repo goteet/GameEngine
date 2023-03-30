@@ -71,6 +71,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
             mUniformSamplers[2].value()
         };
 
+        const Direction& T = hitRecord.SurfaceTangent;
         const Direction& N = hitRecord.SurfaceNormal;
         const Direction Wo = -ray.direction();
         const std::unique_ptr<Material>& material = surface.Material;
@@ -101,9 +102,9 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
                     {
                         const Float pdf_light = scene.SampleLightPdf(lightRay);
                         assert(pdf_light > Float(0));
-                        const Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
+                        const Float pdf_bsdf = material->SamplePdf(N, T, Wo, Wi);
                         const Float weight_mis = PowerHeuristic(pdf_light, pdf_bsdf);
-                        const Spectrum f = material->SampleF(N, Wo, Wi);
+                        const Spectrum f = material->SampleF(N, T, Wo, Wi);
                         const Spectrum& Le = lightSource->LightSource->Le();
                         //                      f * cos(Wi)
                         // beta * mis_weight * -------------
@@ -117,7 +118,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
 
         //Sampling BSDF
         {
-            const Direction Wi = bsdf.SampleWi(u, P_i, N, ray);
+            const Direction Wi = bsdf.SampleWi(u, P_i, N, T, ray);
             const Float NdotL = math::dot(N, Wi);
             if (NdotL <= Float(0))
             {
@@ -128,10 +129,10 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
             ray.set_direction(Wi);
 
             const Float pdf_light = scene.SampleLightPdf(ray);
-            const Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
+            const Float pdf_bsdf = material->SamplePdf(N, T, Wo, Wi);
             lastMISSample.Weight_bsdf = (!lastMISSample.IsMirrorReflection)
                 ? PowerHeuristic(pdf_bsdf, pdf_light) : Float(1);
-            const Spectrum f = material->SampleF(N, Wo, Wi);
+            const Spectrum f = material->SampleF(N, T, Wo, Wi);
             beta *= (NdotL / pdf_bsdf) * f;
         }
 
@@ -166,6 +167,7 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
     const SceneObject& surface = *hitRecord.Object;
     const std::unique_ptr<Material>& material = surface.Material;
     const Direction& N = hitRecord.SurfaceNormal;
+    const Direction& T = hitRecord.SurfaceTangent;
     const Direction Wo = -ray.direction();
 
     const bool bIsLightSource = surface.LightSource != nullptr;
@@ -189,11 +191,19 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
         if (material)
         {
             const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
-            const Direction Wi = bsdf.SampleWi(u, P_i, N, ray);
+            const Direction Wi = bsdf.SampleWi(u, P_i, N, T, ray);
             const Float NdotL = math::dot(N, Wi);
+
+            return Spectrum(-NdotL);
+            return Wi * 0.5 + 0.5;
+
             if (NdotL > 0)
             {
-                return Wi;
+                //auto f = material->SampleF(N, Wo, Wi);
+                //auto pdf = material->SamplePdf(N, Wo, Wi);
+                //auto r = f * NdotL / pdf;
+                //return r;
+                return cameraRay.direction() * 0.5 + 0.5;
 
                 const Direction Half = (Wi + Wo);
                 return Half * 0.5 + 0.5;
@@ -215,6 +225,7 @@ Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, cons
         const SceneObject& surface = *hitRecord.Object;
         const std::unique_ptr<Material>& material = surface.Material;
         const Direction& N = hitRecord.SurfaceNormal;
+        const Direction& T = hitRecord.SurfaceTangent;
         const Direction Wo = -ray.direction();
 
         const bool bIsLightSource = surface.LightSource != nullptr;
@@ -262,7 +273,7 @@ Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, cons
                         {
                             Float pdf_light = scene.SampleLightPdf(lightRay);
                             assert(pdf_light > Float(0));
-                            Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
+                            Float pdf_bsdf = material->SamplePdf(N, T, Wo, Wi);
                             Float weight = PowerHeuristic(pdf_light, pdf_bsdf);
                             Weights.y = math::saturate(weight);
                         }
@@ -271,7 +282,7 @@ Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, cons
             }
 
             {
-                const Direction Wi = bsdf.SampleWi(u, P_i, N, ray);
+                const Direction Wi = bsdf.SampleWi(u, P_i, N, T, ray);
                 const Float NdotL = math::dot(N, Wi);
                 if (NdotL > Float(0))
                 {
@@ -281,7 +292,7 @@ Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, cons
                         Float pdf_light = scene.SampleLightPdf(Ray{ P_i, Wi });
                         if (pdf_light > Float(0))
                         {
-                            Float pdf_bsdf = material->SamplePdf(N, Wo, Wi);
+                            Float pdf_bsdf = material->SamplePdf(N, T, Wo, Wi);
                             weight = PowerHeuristic(pdf_bsdf, pdf_light);
                         }
                     }
