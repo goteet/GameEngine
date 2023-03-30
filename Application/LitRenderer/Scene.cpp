@@ -4,17 +4,50 @@
 void Transform::UpdateWorldTransform()
 {
     TransformMatrix = math::matrix4x4<Float>::tr(Translate, Rotation);
+    TransformMatrix3x3 = math::convert_to_matrix3x3(TransformMatrix);
+    TransformMatrix3x3T = math::transposed(TransformMatrix3x3);
+    TransformMatrix3x3InverseT = math::inversed(TransformMatrix3x3T);
+}
+
+Direction Transform::InverseTransformNormal(const Direction& direction) const
+{
+    return math::transform(TransformMatrix3x3T, direction);
+}
+
+Direction Transform::TransformNormal(const Direction& direction) const
+{
+    return math::transform(TransformMatrix3x3InverseT, direction);
+}
+
+Direction Transform::TransformDirection(const Direction& direction) const
+{
+    return math::transform(TransformMatrix3x3, direction);
+}
+
+Point Transform::TransformPoint(const Point& Point) const
+{
+    return math::transform(TransformMatrix, Point);
 }
 
 void SceneObject::UpdateWorldTransform()
 {
-    Transform.UpdateWorldTransform();
+    WorldTransform.UpdateWorldTransform();
+}
+
+Direction SceneObject::WorldToLocalNormal(const Direction& direction) const
+{
+    return WorldTransform.InverseTransformNormal(direction);
+}
+
+Direction SceneObject::LocalToWorldNormal(const Direction& direction) const
+{
+    return WorldTransform.TransformNormal(direction);
 }
 
 void SceneSphere::UpdateWorldTransform()
 {
     SceneObject::UpdateWorldTransform();
-    mWorldCenter = transform(Transform.TransformMatrix, mSphere.center());
+    mWorldCenter = WorldTransform.TransformPoint(mSphere.center());
 }
 
 Point SceneRect::SampleRandomPoint(Float epsilon[3]) const
@@ -22,8 +55,8 @@ Point SceneRect::SampleRandomPoint(Float epsilon[3]) const
     Float e1 = (Float(2) * epsilon[1] - Float(1)) * Rect.width();
     Float e2 = (Float(2) * epsilon[2] - Float(1)) * Rect.height();
 
-    Direction Bitangent = math::cross(mWorldNormal, mWorldTagent);
-    return Point(mWorldPosition + e1 * mWorldTagent + e2 * Bitangent);
+    Direction Bitangent = math::cross(mWorldNormal, mWorldTangent);
+    return Point(mWorldPosition + e1 * mWorldTangent + e2 * Bitangent);
 }
 
 Float SceneRect::SamplePdf(const SurfaceIntersection& hr, const Ray& ray) const
@@ -71,23 +104,37 @@ SurfaceIntersection SceneSphere::IntersectWithRay(const Ray& ray, Float error) c
 
     Point intersectPosition = ray.calc_offset(t0);
     Direction surfaceNormal = intersectPosition - mWorldCenter;
-    return SurfaceIntersection(const_cast<SceneSphere*>(this), isOnSurface, (isOnSurface ? surfaceNormal : -surfaceNormal), t0);
+
+    Direction localNormal = WorldToLocalNormal(surfaceNormal);
+    //{dPx/dPhi, dPy/dPhi, dPz/dPhi}; 
+    //it should be: { -sinTheta*sinPhi, sinTheta*cosPhi, 0 }
+    // sinPhi = -y / (x*x + y*y)  --> -y
+    // cosPhi =  x / (x*x + y*y)  -->  x
+    //and after normalized, it can be:
+    bool bIsPolaPoint = math::near_one_length(localNormal.y);
+    Direction localTangent = bIsPolaPoint
+        ? Direction(Float(1), Float(0), Float(0))
+        : Direction(-localNormal.z, 0, localNormal.x);
+    Direction surfaceTangent = LocalToWorldNormal(localTangent);
+    return SurfaceIntersection(const_cast<SceneSphere*>(this), isOnSurface,
+        (isOnSurface ? surfaceNormal : -surfaceNormal),
+        (isOnSurface ? surfaceTangent : -surfaceTangent), t0);
 }
 
 void SceneRect::UpdateWorldTransform()
 {
     SceneObject::UpdateWorldTransform();
 
-    mWorldPosition = transform(Transform.TransformMatrix, Rect.position());
-    mWorldNormal = transform(Transform.TransformMatrix, Rect.normal()); // no scale so there...
-    mWorldTagent = transform(Transform.TransformMatrix, Rect.tangent());
+    mWorldPosition = WorldTransform.TransformPoint(Rect.position());
+    mWorldNormal = WorldTransform.TransformNormal(Rect.normal()); // no scale so there...
+    mWorldTangent = WorldTransform.TransformDirection(Rect.tangent());
 }
 
 SurfaceIntersection SceneRect::IntersectWithRay(const Ray& ray, Float error) const
 {
     Float t;
     bool isOnSurface = true;
-    math::intersection result = math::intersect_rect(ray, mWorldPosition, mWorldNormal, mWorldTagent, Rect.extends(), mDualFace, error, t);
+    math::intersection result = math::intersect_rect(ray, mWorldPosition, mWorldNormal, mWorldTangent, Rect.extends(), mDualFace, error, t);
     if (result == math::intersection::none)
     {
         return SurfaceIntersection();
@@ -95,7 +142,9 @@ SurfaceIntersection SceneRect::IntersectWithRay(const Ray& ray, Float error) con
     else
     {
         isOnSurface = math::dot(mWorldNormal, ray.direction()) < 0;
-        return SurfaceIntersection(const_cast<SceneRect*>(this), isOnSurface, isOnSurface ? mWorldNormal : -mWorldNormal, t);
+        return SurfaceIntersection(const_cast<SceneRect*>(this), isOnSurface,
+            (isOnSurface ? mWorldNormal : -mWorldNormal),
+            (isOnSurface ? mWorldTangent : -mWorldTangent), t);
     }
 }
 
@@ -103,8 +152,8 @@ void SceneDisk::UpdateWorldTransform()
 {
     SceneObject::UpdateWorldTransform();
 
-    mWorldPosition = transform(Transform.TransformMatrix, Disk.position());
-    mWorldNormal = transform(Transform.TransformMatrix, Disk.normal()); // no scale so there...
+    mWorldPosition = WorldTransform.TransformPoint(Disk.position());
+    mWorldNormal = WorldTransform.TransformNormal(Disk.normal()); // no scale so there...
 }
 
 SurfaceIntersection SceneDisk::IntersectWithRay(const Ray& ray, Float error) const
@@ -119,17 +168,20 @@ SurfaceIntersection SceneDisk::IntersectWithRay(const Ray& ray, Float error) con
     else
     {
         isOnSurface = math::dot(mWorldNormal, ray.direction()) < 0;
-        return SurfaceIntersection(const_cast<SceneDisk*>(this), isOnSurface, isOnSurface ? mWorldNormal : -mWorldNormal, t);
+        Direction worldTangent = ray.calc_offset(t) - mWorldPosition;
+        return SurfaceIntersection(const_cast<SceneDisk*>(this), isOnSurface,
+            (isOnSurface ? mWorldNormal : -mWorldNormal),
+            (isOnSurface ? worldTangent : -worldTangent), t);
     }
 }
 
 void SceneCube::UpdateWorldTransform()
 {
     SceneObject::UpdateWorldTransform();
-    mWorldPosition = transform(Transform.TransformMatrix, Cube.center());
-    mWorldAxisX = transform(Transform.TransformMatrix, Cube.axis_x());
-    mWorldAxisY = transform(Transform.TransformMatrix, Cube.axis_y());
-    mWorldAxisZ = transform(Transform.TransformMatrix, Cube.axis_z());
+    mWorldPosition = WorldTransform.TransformPoint(Cube.center());
+    mWorldAxisX = WorldTransform.TransformDirection(Cube.axis_x());
+    mWorldAxisY = WorldTransform.TransformDirection(Cube.axis_y());
+    mWorldAxisZ = WorldTransform.TransformDirection(Cube.axis_z());
 }
 
 SurfaceIntersection SceneCube::IntersectWithRay(const Ray& ray, Float error) const
@@ -137,7 +189,9 @@ SurfaceIntersection SceneCube::IntersectWithRay(const Ray& ray, Float error) con
     Float t0, t1;
     bool front = true;
 
-    math::vector3<Float> n0, n1;
+    Direction n0, n1;
+    Direction tangent0 = Direction::unit_x();
+    Direction tangent1 = Direction::unit_x();
     math::intersection result = math::intersect_cube(ray, mWorldPosition,
         mWorldAxisX, mWorldAxisY, mWorldAxisZ,
         Cube.width(), Cube.height(), Cube.depth(),
@@ -150,10 +204,11 @@ SurfaceIntersection SceneCube::IntersectWithRay(const Ray& ray, Float error) con
     {
         n0 = -n1;
         t0 = t1;
+        tangent0 = tangent1;
         front = false;
     }
 
-    return SurfaceIntersection(const_cast<SceneCube*>(this), front, n0, t0);
+    return SurfaceIntersection(const_cast<SceneCube*>(this), front, n0, tangent0, t0);
 }
 
 Scene::~Scene()

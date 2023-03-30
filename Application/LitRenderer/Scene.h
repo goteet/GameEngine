@@ -10,8 +10,8 @@ struct SceneObject;
 struct SurfaceIntersection
 {
     SurfaceIntersection() = default;
-    SurfaceIntersection(SceneObject* o, bool f, Direction n, Float d)
-        : Object(o), SurfaceNormal(n), Distance(d), IsOnSurface(f)
+    SurfaceIntersection(SceneObject* o, bool f, Direction n, Direction t, Float d)
+        : Object(o), SurfaceNormal(n), SurfaceTangent(t), Distance(d), IsOnSurface(f)
     {
 
     }
@@ -21,21 +21,28 @@ struct SurfaceIntersection
     SceneObject* Object = nullptr;
     bool IsOnSurface = true;
     Direction SurfaceNormal;
+    Direction SurfaceTangent;
     Float Distance = Float(0);
 };
 
 struct Transform
 {
     void UpdateWorldTransform();
+    Direction InverseTransformNormal(const Direction& direction) const;
+    Direction TransformNormal(const Direction& direction) const;
+    Direction TransformDirection(const Direction& direction) const;
+    Point TransformPoint(const Point& Point) const;
     math::vector3<Float> Translate = math::vector3<Float>::zero();
     math::quaternion<Float> Rotation = math::quaternion<Float>::identity();
+private:
     math::matrix4x4<Float> TransformMatrix = math::matrix4x4<Float>::identity();
+    math::matrix3x3<Float> TransformMatrix3x3, TransformMatrix3x3T, TransformMatrix3x3InverseT;
 };
 
 
 struct LightSource
 {
-    LightSource(Float r, Float g, Float b) : Emission(r,g,b) { }
+    LightSource(Float r, Float g, Float b) : Emission(r, g, b) { }
 
     const Spectrum& Le() const { return Emission; }
 
@@ -48,12 +55,14 @@ struct SceneObject
     virtual ~SceneObject() { }
     virtual void UpdateWorldTransform();
     virtual SurfaceIntersection IntersectWithRay(const Ray& ray, Float error) const = 0;
-    void SetTranslate(Float x, Float y, Float z) { Transform.Translate.set(x, y, z); }
-    void SetRotation(const math::quaternion<Float>& q) { Transform.Rotation = q; }
+    void SetTranslate(Float x, Float y, Float z) { WorldTransform.Translate.set(x, y, z); }
+    void SetRotation(const math::quaternion<Float>& q) { WorldTransform.Rotation = q; }
+    Direction WorldToLocalNormal(const Direction& direction) const;
+    Direction LocalToWorldNormal(const Direction& direction) const;
     virtual Point SampleRandomPoint(Float epsilon[3]) const { return Point::zero(); }
     virtual Float SamplePdf(const SurfaceIntersection& hr, const Ray& ray) const { return Float(0); }
     virtual bool IsDualface() const { return false; }
-    Transform Transform;
+    Transform WorldTransform;
     std::unique_ptr<Material> Material;
     std::unique_ptr<LightSource> LightSource = nullptr;
 };
@@ -88,7 +97,7 @@ private:
     math::rect<Float> Rect;
     Point mWorldPosition;
     Direction mWorldNormal;
-    Direction mWorldTagent;
+    Direction mWorldTangent;
 };
 
 struct SceneDisk : SceneObject
