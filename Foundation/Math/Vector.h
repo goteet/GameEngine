@@ -856,6 +856,18 @@ namespace math
     }
 
     template<typename value_type>
+    bool near_one_length(const vector_t<value_type, EDim::_2>& v)
+    {
+        return near_one<value_type>(magnitude_sqr(v));
+    }
+
+    template<typename value_type>
+    bool near_one_length(const vector_t<value_type, EDim::_3>& v)
+    {
+        return near_one<value_type>(magnitude_sqr(v));
+    }
+
+    template<typename value_type>
     bool almost_same(const vector_t<value_type, EDim::_3>& a, const vector_t<value_type, EDim::_3>& b, value_type epsilon = SMALL_NUM<value_type>)
     {
         vector_t<value_type, EDim::_3> d = a - b;

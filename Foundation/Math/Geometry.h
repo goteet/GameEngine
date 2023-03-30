@@ -485,6 +485,36 @@ namespace math
         }
     }
 
+    template<typename value_type>
+    struct normal_space
+    {
+        normalized_vector_t<value_type, EDim::_3> basis_x, basis_y, basis_z;
+
+        normal_space(const normalized_vector_t<value_type, EDim::_3>& n, const normalized_vector_t<value_type, EDim::_3>& t)
+            : basis_x(t), basis_y(cross(n, t)), basis_z(n)
+        {
+        }
+
+        normalized_vector_t<value_type, EDim::_3> world_2_local(const normalized_vector_t<value_type, EDim::_3>& d)
+        {
+            return normalized_vector_t<value_type, EDim::_3>
+            {
+                math::dot(d, basis_x),
+                math::dot(d, basis_y),
+                math::dot(d, basis_z)
+            };
+        }
+        normalized_vector_t<value_type, EDim::_3> local_2_world(value_type x, value_type y, value_type z)
+        {
+            return x * basis_x + y * basis_y + z * basis_z;
+        }
+
+        normalized_vector_t<value_type, EDim::_3> local_2_world(const normalized_vector_t<value_type, EDim::_3>& d)
+        {
+            return local_2_world(d.x, d.y, d.z);
+        }
+    };
+
     template<typename value_type> using point2d = point<value_type, EDim::_2>;
     template<typename value_type> using point3d = point<value_type, EDim::_3>;
     template<typename value_type> using ray2d = ray<value_type, EDim::_2>;

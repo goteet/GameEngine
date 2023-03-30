@@ -24,6 +24,17 @@ namespace math
         return std::fabs(v) <= small_number;
     }
 
+    template<typename value_type, typename = std::enable_if_t<std::is_floating_point_v<value_type>>>
+    constexpr bool near_one(value_type v, value_type small_number = SMALL_NUM<value_type>)
+    {
+        return near_zero(v - value_type(1));
+    }
+
+    template<typename value_type, typename = std::enable_if_t<std::is_floating_point_v<value_type>>>
+    constexpr bool near_one_length(value_type v, value_type small_number = SMALL_NUM<value_type>)
+    {
+        return (v + small_number >= value_type(1)) || (v - small_number <= value_type(-1));
+    }
 
     template<typename n_value_type, typename value_type, typename = std::enable_if_t<std::is_integral_v<n_value_type>>>
     constexpr int floor2(value_type f)
