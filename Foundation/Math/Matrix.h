@@ -355,7 +355,7 @@ namespace math
             {
                 for (size_t ci = 0; ci < col_dim; ci++)
                 {
-                    c[ri][ci] = r.cells[ri][ci];
+                    cells[ri][ci] = r.cells[ri][ci];
                 }
             }
             return *this;
