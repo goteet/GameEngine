@@ -12,3 +12,4 @@ using Degree = math::degree<Float>;
 using Ray = math::ray3d<Float>;
 using Point = math::point3d<Float>;
 using Direction = math::nvector3<Float>;
+using UVW = math::normal_space<Float>;

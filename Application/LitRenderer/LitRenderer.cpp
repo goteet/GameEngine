@@ -9,6 +9,7 @@ static const int BlockSize = 64;
 namespace
 {
     const bool DEBUG = false;
+    const bool DEBUGScene = DEBUG || false;
     class SimpleScene : public Scene
     {
         virtual void CreateScene(Float aspect, std::vector<SceneObject*>& OutSceneObjects) override
@@ -32,8 +33,7 @@ namespace
             const Float SmallObjectSize = 8;
             const Float BigObjectSize = SmallObjectSize * Float(1.75);
 
-            //if(false)
-            if (DEBUG)
+            if (DEBUGScene)
             {
                 SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
                 mainSphere->SetRadius(30);
@@ -65,7 +65,7 @@ namespace
             }
 
 
-            if (!DEBUG)
+            if (!DEBUGScene)
             {
                 Spectrum Red(Float(0.75), Float(0.2), Float(0.2));
                 Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
