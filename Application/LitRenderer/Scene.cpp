@@ -306,8 +306,3 @@ Float Scene::SampleLightPdf(const Ray& ray)
         ? result.Object->SamplePdf(result, ray) / Float(mSceneLights.size())
         : Float(0);
 }
-
-void Scene::CreateScene(Float aspect, std::vector<SceneObject*>& OutSceneObjects)
-{
-
-}

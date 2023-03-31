@@ -142,7 +142,7 @@ public:
 
     SceneObject* UniformSampleLightSource(Float u);
 private:
-    virtual void CreateScene(Float aspect, std::vector<SceneObject*>& OutSceneObjects);
+    virtual void CreateScene(Float aspect, std::vector<SceneObject*>& OutSceneObjects) = 0;
     void FindAllLights();
     std::vector<SceneObject*> mSceneObjects;
     std::vector<SceneObject*> mSceneLights;
