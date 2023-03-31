@@ -156,6 +156,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             WORD vkCode = LOWORD(wParam);
             switch (vkCode)
             {
+            case 'E':
+                Renderer->MoveCamera(math::vector3<Float>(0, 1, 0));
+                break;
+            case 'Q':
+                Renderer->MoveCamera(math::vector3<Float>(0, -1, 0));
+                break;
             case 'S':
                 Renderer->MoveCamera(math::vector3<Float>(0, 0, -1));
                 break;

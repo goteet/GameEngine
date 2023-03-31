@@ -346,7 +346,7 @@ void LitRenderer::ResetCamera()
 
 void LitRenderer::MoveCamera(const math::vector3<Float>& Offset)
 {
-    mCamera.Position += Offset.x * mCamera.Left + Offset.z * mCamera.Forward;
+    mCamera.Position += Offset.x * mCamera.Left + Offset.y * Direction::unit_y() + Offset.z * mCamera.Forward;
     mCameraDirty = true;
 }
 
