@@ -281,7 +281,7 @@ bool Initialize(HWND hWindow)
 {
     srand(static_cast<unsigned>(time(0)));
 
-    Task::StartSystem(7);
+    Task::StartSystem(20);
 
     HDC hdcWindowDC = ::GetDC(hWindow);
     unsigned char* canvasDIBDataPtr = nullptr;

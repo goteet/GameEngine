@@ -495,7 +495,7 @@ namespace math
         {
         }
 
-        normalized_vector_t<value_type, EDim::_3> world_2_local(const normalized_vector_t<value_type, EDim::_3>& d)
+        normalized_vector_t<value_type, EDim::_3> world_2_local(const normalized_vector_t<value_type, EDim::_3>& d) const
         {
             return normalized_vector_t<value_type, EDim::_3>
             {
@@ -504,12 +504,12 @@ namespace math
                 math::dot(d, basis_z)
             };
         }
-        normalized_vector_t<value_type, EDim::_3> local_2_world(value_type x, value_type y, value_type z)
+        normalized_vector_t<value_type, EDim::_3> local_2_world(value_type x, value_type y, value_type z) const
         {
             return x * basis_x + y * basis_y + z * basis_z;
         }
 
-        normalized_vector_t<value_type, EDim::_3> local_2_world(const normalized_vector_t<value_type, EDim::_3>& d)
+        normalized_vector_t<value_type, EDim::_3> local_2_world(const normalized_vector_t<value_type, EDim::_3>& d)  const
         {
             return local_2_world(d.x, d.y, d.z);
         }

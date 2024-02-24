@@ -383,7 +383,7 @@ std::tuple<Float, Float> CalculateFactorAndCosineWi(const Direction& Wi, const D
         TangentBeta = SineWi / CosineWi;
     }
 
-    Float maxWi_Wo = math::clamp0(CosineWi * CosineWo + SineWi * SineWo);
+    Float maxWi_Wo = math::saturate(CosineWi * CosineWo + SineWi * SineWo);
     Float factor = A + B * maxWi_Wo * SineAlpha * TangentBeta;
     return { factor, CosineWi };
 }

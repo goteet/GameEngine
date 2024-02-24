@@ -220,7 +220,7 @@ using Mircofacet = TorranceSparrow;
 
 inline Float CosTheta(const Direction& w) { return w.z; }
 inline Float Cos2Theta(const Direction& w) { return w.z * w.z; }
-inline Float Sin2Theta(const Direction& w) { return math::clamp0(Float(1) - Cos2Theta(w)); }
+inline Float Sin2Theta(const Direction& w) { return math::saturate(Float(1) - Cos2Theta(w)); }
 inline Float AbsCosTheta(const Direction& w) { return std::abs(w.z); }
 inline Float SinTheta(const Direction& w) { return std::sqrt(Sin2Theta(w)); }
 inline Float TanTheta(const Direction& w) { return SinTheta(w) / CosTheta(w); }

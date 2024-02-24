@@ -238,7 +238,7 @@ Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, cons
         {
             Spectrum Weights = Spectrum::zero();
 
-            const Float biasedDistance = math::clamp0(hitRecord.Distance);
+            const Float biasedDistance = math::saturate(hitRecord.Distance);
             const Point P_i = viewRay.calc_offset(biasedDistance);
             Float u[3] =
             {
