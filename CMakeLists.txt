@@ -4,7 +4,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 project(GameEngine)
 
-set(GameEngineOutputDirectory ${CMAKE_CURRENT_SOURCE_DIR}/binary)
+set(GameEngineOutputDirectory ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 add_subdirectory(Foundation)
 add_subdirectory(Engine)
 add_subdirectory(Application/LitRenderer)
