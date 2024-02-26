@@ -40,6 +40,8 @@ set(GameEngine_HeaderFiles_Render
     ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.h
     ${GameEngine_SourceDir_Render}/TransientBufferRegistry.h
+
+    ${GameEngine_SourceDir_Render}/RHI/GfxD3D12.h
 )
 set(GameEngine_SourceFiles_Render
     ${GameEngine_SourceDir_Render}/FrameGraph.cpp
@@ -47,6 +49,8 @@ set(GameEngine_SourceFiles_Render
     ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.cpp
     ${GameEngine_SourceDir_Render}/TransientBufferRegistry.cpp
+
+    ${GameEngine_SourceDir_Render}/RHI/GfxD3D12.cpp
 )
 
 set(GameEngine_HeaderFiles_Scene
@@ -94,10 +98,10 @@ target_include_directories(GameEngine PUBLIC "${GameEngine_IncludeDir}" "${CMAKE
 target_include_directories(GameEngine PRIVATE "${GameEngine_SourceDir}")
 
 if(MSVC)
-    target_link_libraries(GameEngine d3d11.lib dxgi.lib d3dcompiler.lib)
+    target_link_libraries(GameEngine d3d11.lib d3d12.lib dxguid.lib dxgi.lib d3dcompiler.lib)
 endif(MSVC)
 
 set_target_properties(GameEngine PROPERTIES
-    COMPILE_DEFINITIONS "GAME_ENGINE_EXPORT"
+    COMPILE_DEFINITIONS "GAME_ENGINE_EXPORT;UNICODE;_UNICODE"
     RUNTIME_OUTPUT_DIRECTORY ${GameEngineOutputDirectory}
 )
