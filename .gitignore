@@ -1,6 +1,7 @@
 # Folders
 .vs/
 .vscode/
+.idea/
 [Bb]uild
 [Pp]roject[Dd]irectory/
 [Dd]ebug/
