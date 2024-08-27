@@ -1,6 +1,5 @@
 #include "Scene.h"
 #include "SceneNode.h"
-#include "Render/GfxInterface.h"
 
 namespace GE
 {
@@ -386,7 +385,7 @@ namespace engine
         }
     }
 
-    void SceneNode::RecursiveRender(GfxDeferredContext* context)
+    void SceneNode::RecursiveRender(GFXI::DeferredContext& context)
     {
         for (const ComponentWrap& compWrap : mComponents)
         {

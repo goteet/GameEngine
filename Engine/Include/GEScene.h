@@ -4,6 +4,10 @@
 #include <Foundation/Math/Geometry.h>
 #include "GEPredefinedMacros.h"
 
+namespace GFXI
+{
+    struct DeferredContext;
+}
 namespace GE
 {
     using CameraVisibleMask = uint32_t;
@@ -12,7 +16,6 @@ namespace GE
     struct SceneNode;
     struct Component;
     struct Scene;
-    struct GfxDeferredContext;
 
     constexpr CameraVisibleMask DefaultCameraVisibkeMask = 0xFFFFFFFF;
     constexpr ComponentExecutionOrder DefaultComponentExecutionOrder = 0x5000;
@@ -96,7 +99,7 @@ namespace GE
         *********************************************************************/
         virtual void OnInitial() { }
         virtual void OnUpdate(unsigned int deltaTime) { }
-        virtual void OnRender(GfxDeferredContext*) { }
+        virtual void OnRender(GFXI::DeferredContext& context) { }
         virtual void OnRemove() { }
         //virtual void OnPositionChanging(const math::point3d<float>& newPos) { }
         //virtual void OnPositionChanged(const math::point3d<float>& newPos) { }
@@ -173,7 +176,9 @@ namespace GE
 
     struct GameEngineAPI MeshRenderer : public Component
     {
-        enum EMeshType { Box, Plane, Sphere, Disk };
+        enum class EMeshType : unsigned char
+        { Box, Plane, Sphere, Disk };
+
         static MeshRenderer* CreateMeshRenderer(EMeshType type);
     };
 

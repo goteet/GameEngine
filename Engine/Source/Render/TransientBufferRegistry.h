@@ -1,29 +1,29 @@
 #pragma once
-#include "PreIncludeFiles.h"
-#include "GfxInterface.h"
 #include <vector>
+#include <GfxInterface.h>
+#include "PreIncludeFiles.h"
 
 namespace engine
 {
     class TransientBufferRegistry
     {
     public:
-        TransientBufferRegistry(GfxDevice* creator, GfxRenderTarget* defaultBackbufferRT, GfxDepthStencil* tempDS);
+        TransientBufferRegistry(GFXI::GraphicDevice* creatorPtr, GFXI::RenderTargetView* defaultBackbufferRT, GFXI::DepthStencilView* tempDS);
         ~TransientBufferRegistry();
-        GfxRenderTarget* GetDefaultBackbufferRT() { return mDefaultBackbufferRT; }
-        GfxDepthStencil* GetDefaultBackbufferDS() { return mDefaultBackbufferDSTemp; }
-        GfxRenderTarget* AllocateRenderTarget(ERenderTargetFormat format, unsigned int width, unsigned int height, bool usedForShader);
-        GfxDepthStencil* AllocateDepthStencil(EDepthStencilFormat format, unsigned int width, unsigned int height, bool usedForShader);
-        void RecycleRenderTarget(GfxRenderTarget* texture);
-        void RecycleDepthStencil(GfxDepthStencil* texture);
+        GFXI::RenderTargetView* GetDefaultBackbufferRT() { return mDefaultBackbufferRT; }
+        GFXI::DepthStencilView* GetDefaultBackbufferDS() { return mDefaultBackbufferDSTemp; }
+        GFXI::RenderTargetView* AllocateRenderTarget(GFXI::RenderTargetView::EFormat format, unsigned int width, unsigned int height, bool usedByShader);
+        GFXI::DepthStencilView* AllocateDepthStencil(GFXI::DepthStencilView::EFormat format, unsigned int width, unsigned int height, bool usedByShader);
+        void RecycleRenderTarget(GFXI::RenderTargetView* texture);
+        void RecycleDepthStencil(GFXI::DepthStencilView* texture);
         void ReleaseAllBuffers();
 
     private:
-        GfxDevice* mGfxResourceCreator;
-        GfxRenderTarget* mDefaultBackbufferRT;
-        GfxDepthStencil* mDefaultBackbufferDSTemp;
+        GFXI::GraphicDevice* mGfxResourceDevice;
+        GFXI::RenderTargetView* mDefaultBackbufferRT;
+        GFXI::DepthStencilView* mDefaultBackbufferDSTemp;
 
-        std::vector<GfxRenderTarget*> mRenderTargets;
-        std::vector<GfxDepthStencil*> mDepthStencils;
+        std::vector<GFXI::RenderTargetView*> mRenderTargets;
+        std::vector<GFXI::DepthStencilView*> mDepthStencils;
     };
 }

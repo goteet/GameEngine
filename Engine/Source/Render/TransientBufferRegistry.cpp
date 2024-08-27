@@ -2,8 +2,8 @@
 
 namespace engine
 {
-    TransientBufferRegistry::TransientBufferRegistry(GfxDevice* creator, GfxRenderTarget* defaultBackbufferRT, GfxDepthStencil* defaultBackbufferDS)
-        : mGfxResourceCreator(creator)
+    TransientBufferRegistry::TransientBufferRegistry(GFXI::GraphicDevice* creatorPtr, GFXI::RenderTargetView* defaultBackbufferRT, GFXI::DepthStencilView* defaultBackbufferDS)
+        : mGfxResourceDevice(creatorPtr)
         , mDefaultBackbufferRT(defaultBackbufferRT)
         , mDefaultBackbufferDSTemp(defaultBackbufferDS)
     {
@@ -30,19 +30,60 @@ namespace engine
         return nullptr;
     }
 
-    GfxRenderTarget* TransientBufferRegistry::AllocateRenderTarget(ERenderTargetFormat format, unsigned int width, unsigned int height, bool usedForShader)
+    template<typename T, class TFormat>
+    T* FindCache(std::vector<T*>& container, TFormat format, unsigned int width, unsigned int height, bool forshader)
     {
-        GfxRenderTarget* result = FindSame(mRenderTargets, format, width, height, usedForShader);
-        return result != nullptr ? result
-            : mGfxResourceCreator->CreateRenderTarget(format, width, height, usedForShader);
+        auto it = std::find_if(container.begin(), container.end(),
+            [&](T* v)
+            {
+                return (v != nullptr)
+                    && v->GetFormat() == format
+                    && v->GetWidth() == width
+                    && v->GetHeight() == height
+                    && v->IsUsedByShader() == forshader;
+            }
+        );
+        if (it != container.end())
+        {
+            T* rst = *it;
+            *it = nullptr;
+            return rst;
+        }
+        return nullptr;
     }
 
-    GfxDepthStencil* TransientBufferRegistry::AllocateDepthStencil(EDepthStencilFormat format, unsigned int width, unsigned int height, bool usedForShader)
+    GFXI::RenderTargetView* TransientBufferRegistry::AllocateRenderTarget(GFXI::RenderTargetView::EFormat format, unsigned int width, unsigned int height, bool usedByShader)
     {
-        GfxDepthStencil* result = FindSame(mDepthStencils, format, width, height, usedForShader);
-        return result != nullptr ? result
-            : mGfxResourceCreator->CreateDepthStencil(format, width, height, usedForShader);
-        return nullptr;
+        GFXI::RenderTargetView* result = FindCache(mRenderTargets, format, width, height, usedByShader);
+        if (result != nullptr)
+        {
+            return result;
+        }
+
+        GFXI::RenderTargetView::CreateInfo rtCreateInfo;
+        rtCreateInfo.Format = format;
+        rtCreateInfo.Width = width;
+        rtCreateInfo.Height = height;
+        rtCreateInfo.UsedByShader = usedByShader;
+
+        return mGfxResourceDevice->CreateRenderTargetView(rtCreateInfo);
+    }
+
+    GFXI::DepthStencilView* TransientBufferRegistry::AllocateDepthStencil(GFXI::DepthStencilView::EFormat format, unsigned int width, unsigned int height, bool usedByShader)
+    {
+        GFXI::DepthStencilView* result = FindCache(mDepthStencils, format, width, height, usedByShader);
+        if (result != nullptr)
+        {
+            return result;
+        }
+
+        GFXI::DepthStencilView::CreateInfo dsCreateInfo;
+        dsCreateInfo.Format = format;
+        dsCreateInfo.Width  = width;
+        dsCreateInfo.Height = height;
+        dsCreateInfo.UsedByShader = usedByShader;
+
+        return mGfxResourceDevice->CreateDepthStencilView(dsCreateInfo);
     }
 
     template<typename T>
@@ -65,25 +106,25 @@ namespace engine
         }
     }
 
-    void TransientBufferRegistry::RecycleRenderTarget(GfxRenderTarget* texture)
+    void TransientBufferRegistry::RecycleRenderTarget(GFXI::RenderTargetView* texture)
     {
         Recycle(mRenderTargets, texture);
     }
-    void TransientBufferRegistry::RecycleDepthStencil(GfxDepthStencil* texture)
+    void TransientBufferRegistry::RecycleDepthStencil(GFXI::DepthStencilView* texture)
     {
         Recycle(mDepthStencils, texture);
     }
     void TransientBufferRegistry::ReleaseAllBuffers()
     {
-        for (GfxRenderTarget* rt : mRenderTargets)
+        for (GFXI::RenderTargetView* rt : mRenderTargets)
         {
-            safe_delete(rt);
+            SafeRelease(rt);
         }
         mRenderTargets.clear();
 
-        for (GfxDepthStencil* ds : mDepthStencils)
+        for (GFXI::DepthStencilView* ds : mDepthStencils)
         {
-            safe_delete(ds);
+            SafeRelease(ds);
         }
         mDepthStencils.clear();
     }

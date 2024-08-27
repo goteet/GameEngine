@@ -7,9 +7,7 @@
 #include "TransientBufferRegistry.h"
 namespace engine
 {
-    class GfxDeferredContext;
     class RenderFrameGraph;
-
 
     struct ClearState
     {
@@ -38,7 +36,7 @@ namespace engine
 
         bool BindReading(RFGResourceHandle);
         bool BindWriting(RFGResourceHandle&, const ClearState& state);
-        bool AttachJob(std::function<void(GfxDeferredContext&)>);
+        bool AttachJob(std::function<void(GFXI::DeferredContext&)>);
     };
 
     class RenderFrameGraph
@@ -46,20 +44,20 @@ namespace engine
     public:
         RenderFrameGraph(TransientBufferRegistry* registry);
         RFGRenderPass AddRenderPass(const std::string& name);
-        RFGResourceHandle RequestResource(const std::string& name, int width, int height, ERenderTargetFormat format);
-        RFGResourceHandle RequestResource(const std::string& name, int width, int height, EDepthStencilFormat format);
+        RFGResourceHandle RequestResource(const std::string& name, int width, int height, GFXI::RenderTargetView::EFormat format);
+        RFGResourceHandle RequestResource(const std::string& name, int width, int height, GFXI::DepthStencilView::EFormat format);
         void Compile();
-        void Execute(GfxDeferredContext&);
+        void Execute(GFXI::DeferredContext&);
         bool BindReading(RFGRenderPass, RFGResourceHandle&);
         bool BindWriting(RFGRenderPass, RFGResourceHandle&, const ClearState& state);
         void BindOutput(RFGResourceHandle resource);
-        bool AttachJob(RFGRenderPass pass, std::function<void(GfxDeferredContext&)> job);
+        bool AttachJob(RFGRenderPass pass, std::function<void(GFXI::DeferredContext&)> job);
         void CreateTestFrameGraph();
 
         int GetBackbufferWidth() const;
         int GetBackbufferHeight() const;
-        ERenderTargetFormat GetBackbufferRTFormat() const;
-        EDepthStencilFormat GetBackbufferDSFormat() const;
+        GFXI::RenderTargetView::EFormat GetBackbufferRTFormat() const;
+        GFXI::DepthStencilView::EFormat GetBackbufferDSFormat() const;
         int GetWidth(const RFGResourceHandle&) const;
         int GetHeigt(const RFGResourceHandle&) const;
         int GetFormat(const RFGResourceHandle&) const;
@@ -85,7 +83,7 @@ namespace engine
             std::vector<ClearState> RenderTargetBindStates;
             ClearState DepthStencilBindState;
 
-            std::function<void(GfxDeferredContext&)> mExecuteJob = nullptr;
+            std::function<void(GFXI::DeferredContext&)> mExecuteJob = nullptr;
         };
 
         struct RFGResource
@@ -99,23 +97,23 @@ namespace engine
             int ReadingCount = 0;
             union
             {
-                ERenderTargetFormat RenderTargetFormat;
-                EDepthStencilFormat DepthStencilFormat;
+                GFXI::RenderTargetView::EFormat RenderTargetFormat;
+                GFXI::DepthStencilView::EFormat DepthStencilFormat;
             };
             std::vector<int> ReadingNodes;
             std::vector<int> WritingNodes;
             std::vector<int> AliasingResources;
 
-            GfxRenderTarget* GfxRenderTargetPtr = nullptr;
-            GfxDepthStencil* GfxDepthStencilPtr = nullptr;
+            GFXI::RenderTargetView* GfxRenderTargetPtr = nullptr;
+            GFXI::DepthStencilView* GfxDepthStencilPtr = nullptr;
         };
 
         bool MoveResource(RFGResource& from, RFGResource& to);
-        RFGResource& CreateNewResource(const std::string& name, int width, int height, ERenderTargetFormat format);
-        RFGResource& CreateNewResource(const std::string& name, int width, int height, EDepthStencilFormat format);
-        void BindReadingResources(GfxDeferredContext& context, RFGNode& node);
-        void BindWritingResources(GfxDeferredContext& context, RFGNode& node);
-        void ExecuteNode(GfxDeferredContext& context, RFGNode& node);
+        RFGResource& CreateNewResource(const std::string& name, int width, int height, GFXI::RenderTargetView::EFormat format);
+        RFGResource& CreateNewResource(const std::string& name, int width, int height, GFXI::DepthStencilView::EFormat format);
+        void BindReadingResources(GFXI::DeferredContext&, RFGNode&);
+        void BindWritingResources(GFXI::DeferredContext&, RFGNode&);
+        void ExecuteNode(GFXI::DeferredContext&, RFGNode&);
         void ReleaseTransientResources(RFGNode& node);
         int GetAliasingResourceIndex(int);
 

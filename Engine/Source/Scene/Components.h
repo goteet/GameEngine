@@ -2,6 +2,13 @@
 #include "PreIncludeFiles.h"
 #include "SceneNode.h"
 
+namespace GFXI
+{
+    struct DeferredContext;
+    struct VertexBuffer;
+    struct IndexBuffer;
+}
+
 namespace engine
 {
     class Camera : public GE::Camera
@@ -55,12 +62,12 @@ namespace engine
         DefineRTTI;
 
         ~MeshRenderer();
-        virtual void OnRender(GE::GfxDeferredContext* context) override;
+        virtual void OnRender(GFXI::DeferredContext& context) override;
 
         bool IntializeGeometryHWResource(GE::MeshRenderer::EMeshType type);
 
     private:
-        GE::GfxDefaultVertexBuffer* CubeVertexBufferPtr = nullptr;
-        GE::GfxDefaultIndexBuffer* CubeIndexBufferPtr = nullptr;
+        GFXI::VertexBuffer* mCubeVertexBuffer = nullptr;
+        GFXI::IndexBuffer*  mCubeIndexBuffer = nullptr;
     };
 }

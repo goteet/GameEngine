@@ -28,14 +28,14 @@ namespace engine
         RFGResource& BackbufferRT = CreateNewResource("backbuffer.rendertarget",
             registry->GetDefaultBackbufferRT()->GetWidth(),
             registry->GetDefaultBackbufferRT()->GetHeight(),
-            registry->GetDefaultBackbufferRT()->mRenderTargetFormat);
+            registry->GetDefaultBackbufferRT()->GetFormat());
 
         mBackbufferRTIndex = BackbufferRT.Index;
 
         RFGResource& BackbufferDS = CreateNewResource("backbuffer.depthstencil",
             registry->GetDefaultBackbufferDS()->GetWidth(),
             registry->GetDefaultBackbufferDS()->GetHeight(),
-            registry->GetDefaultBackbufferDS()->mDepthStencilFormat);
+            registry->GetDefaultBackbufferDS()->GetFormat());
         mBackbufferDSIndex = BackbufferDS.Index;
     }
 
@@ -48,7 +48,7 @@ namespace engine
         return RFGRenderPass{ this, node.Index };
     }
 
-    RFGResourceHandle RenderFrameGraph::RequestResource(const std::string& name, int width, int height, ERenderTargetFormat format)
+    RFGResourceHandle RenderFrameGraph::RequestResource(const std::string& name, int width, int height, GFXI::RenderTargetView::EFormat format)
     {
         auto it = std::find_if(mResources.begin(), mResources.end(),
             [&](const RenderFrameGraph::RFGResource& resource) {
@@ -64,7 +64,7 @@ namespace engine
         : RFGResourceHandle{ this, it->Index };
     }
 
-    RFGResourceHandle RenderFrameGraph::RequestResource(const std::string& name, int width, int height, EDepthStencilFormat format)
+    RFGResourceHandle RenderFrameGraph::RequestResource(const std::string& name, int width, int height, GFXI::DepthStencilView::EFormat format)
     {
         auto it = std::find_if(mResources.begin(), mResources.end(),
             [&](const RenderFrameGraph::RFGResource& resource) {
@@ -72,7 +72,7 @@ namespace engine
                     && !resource.RenderTarget
                     && resource.Width == width
                     && resource.Height == height
-                    && resource.RenderTargetFormat == format;
+                    && resource.DepthStencilFormat == format;
             });
 
         return (mResources.end() == it)
@@ -172,12 +172,12 @@ namespace engine
         }
     }
 
-    void RenderFrameGraph::Execute(GfxDeferredContext& context)
+    void RenderFrameGraph::Execute(GFXI::DeferredContext& newContext)
     {
         for (int nodeIndex : mCompiledNodeExecuteOrder)
         {
             RFGNode& node = mNodes[nodeIndex];
-            ExecuteNode(context, node);
+            ExecuteNode(newContext, node);
         }
     }
 
@@ -229,7 +229,7 @@ namespace engine
         }
     }
 
-    bool RenderFrameGraph::AttachJob(RFGRenderPass pass, std::function<void(GfxDeferredContext&)> job)
+    bool RenderFrameGraph::AttachJob(RFGRenderPass pass, std::function<void(GFXI::DeferredContext&)> job)
     {
         if (pass.Graph != this)
             return false;
@@ -276,14 +276,14 @@ namespace engine
         return mTransientBufferRegistry->GetDefaultBackbufferRT()->GetHeight();
     }
 
-    ERenderTargetFormat RenderFrameGraph::GetBackbufferRTFormat() const
+    GFXI::RenderTargetView::EFormat RenderFrameGraph::GetBackbufferRTFormat() const
     {
-        return mTransientBufferRegistry->GetDefaultBackbufferRT()->mRenderTargetFormat;
+        return mTransientBufferRegistry->GetDefaultBackbufferRT()->GetFormat();
     }
 
-    EDepthStencilFormat RenderFrameGraph::GetBackbufferDSFormat() const
+    GFXI::DepthStencilView::EFormat RenderFrameGraph::GetBackbufferDSFormat() const
     {
-        return mTransientBufferRegistry->GetDefaultBackbufferDS()->mDepthStencilFormat;
+        return mTransientBufferRegistry->GetDefaultBackbufferDS()->GetFormat();
     }
 
     int RenderFrameGraph::GetWidth(const RFGResourceHandle& handle) const
@@ -322,11 +322,11 @@ namespace engine
     {
         if (handle.Index == mBackbufferRTIndex)
         {
-            return GetBackbufferRTFormat();
+            return static_cast<int>(GetBackbufferRTFormat());
         }
         else if (handle.Index == mBackbufferDSIndex)
         {
-            return mTransientBufferRegistry->GetDefaultBackbufferDS()->mDepthStencilFormat;
+            return static_cast<int>(mTransientBufferRegistry->GetDefaultBackbufferDS()->GetFormat());
         }
         else
         {
@@ -367,7 +367,7 @@ namespace engine
         }
     }
 
-    RenderFrameGraph::RFGResource& RenderFrameGraph::CreateNewResource(const std::string& name, int width, int height, ERenderTargetFormat format)
+    RenderFrameGraph::RFGResource& RenderFrameGraph::CreateNewResource(const std::string& name, int width, int height, GFXI::RenderTargetView::EFormat format)
     {
         RFGResource resource;
         resource.DebugName = name;
@@ -380,7 +380,7 @@ namespace engine
         return mResources.back();
     }
 
-    RenderFrameGraph::RFGResource& RenderFrameGraph::CreateNewResource(const std::string& name, int width, int height, EDepthStencilFormat format)
+    RenderFrameGraph::RFGResource& RenderFrameGraph::CreateNewResource(const std::string& name, int width, int height, GFXI::DepthStencilView::EFormat format)
     {
         RFGResource resource;
         resource.DebugName = name;
@@ -393,9 +393,9 @@ namespace engine
         return mResources.back();
     }
 
-    void RenderFrameGraph::BindReadingResources(GfxDeferredContext& context, RFGNode& node)
+    void RenderFrameGraph::BindReadingResources(GFXI::DeferredContext& gfxContext, RFGNode& node)
     {
-        ID3D11ShaderResourceView* views[16];
+        GFXI::ShaderResourceView* views[16];
         int viewCount = 0;
         for (int renderTargetIndex : node.ReadingResourcesAliasing)
         {
@@ -404,23 +404,23 @@ namespace engine
             if (resource.RenderTarget)
             {
                 views[viewCount] = resource.GfxRenderTargetPtr == nullptr ? nullptr
-                    : resource.GfxRenderTargetPtr->mShaderResourceView.Get();
+                    : resource.GfxRenderTargetPtr->GetShaderResourceView();
             }
             else
             {
                 views[viewCount] = resource.GfxDepthStencilPtr == nullptr ? nullptr
-                    : resource.GfxDepthStencilPtr->mShaderResourceView.Get();
+                    : resource.GfxDepthStencilPtr->GetShaderResourceView();
             }
             viewCount++;
         }
 
-        context.mGfxDeviceContext->PSSetShaderResources(0, viewCount, views);
+        gfxContext.SetGraphicShaderResources(GFXI::GraphicPipelineState::EShaderStage::Pixel, 0, viewCount, views);
     }
 
-    void RenderFrameGraph::BindWritingResources(GfxDeferredContext& context, RenderFrameGraph::RFGNode& node)
+    void RenderFrameGraph::BindWritingResources(GFXI::DeferredContext& gfxContext, RenderFrameGraph::RFGNode& node)
     {
         TransientBufferRegistry* registry = mTransientBufferRegistry;
-        GfxRenderTarget* renderTargets[32] = { 0 };
+        GFXI::RenderTargetView* renderTargets[32] = { 0 };
         int rtCount = 0;
         for (int renderTargetIndex : node.WritingRenderTargetAliasing)
         {
@@ -438,7 +438,7 @@ namespace engine
             rtCount++;
         }
 
-        GfxDepthStencil* depthStencil = nullptr;
+        GFXI::DepthStencilView* depthStencil = nullptr;
         if (node.WritingDepthStencil != -1)
         {
             node.WritingDepthStencilAliasing = GetAliasingResourceIndex(node.WritingDepthStencil);
@@ -454,20 +454,20 @@ namespace engine
                 resDepthStencil.GfxDepthStencilPtr = depthStencil;
             }
         }
-        context.SetRenderTargets(renderTargets, rtCount, depthStencil);
+        gfxContext.SetRenderTargets(rtCount, renderTargets, depthStencil);
 
         for (int index = 0; index < node.WritingRenderTargetAliasing.size(); index++)
         {
             const auto& state =node.RenderTargetBindStates[index];
             if (state.ClearColor)
             {
-                context.ClearRenderTarget(renderTargets[index], state.ClearColorValue);
+                gfxContext.ClearRenderTarget(renderTargets[index], state.ClearColorValue.v);
             }
         }
 
         if (depthStencil != nullptr)
         {
-            context.ClearDepthStencil(depthStencil,
+            gfxContext.ClearDepthStencil(depthStencil,
                 node.DepthStencilBindState.ClearStencil,
                 node.DepthStencilBindState.ClearDepth,
                 node.DepthStencilBindState.ClearDepthValue,
@@ -475,13 +475,13 @@ namespace engine
         }
     }
 
-    void RenderFrameGraph::ExecuteNode(GfxDeferredContext& context, RenderFrameGraph::RFGNode& node)
+    void RenderFrameGraph::ExecuteNode(GFXI::DeferredContext& deviceContext, RenderFrameGraph::RFGNode& node)
     {
-        BindReadingResources(context, node);
-        BindWritingResources(context, node);
+        BindReadingResources(deviceContext, node);
+        BindWritingResources(deviceContext, node);
         if (node.mExecuteJob)
         {
-            node.mExecuteJob(context);
+            node.mExecuteJob(deviceContext);
         }
         ReleaseTransientResources(node);
     }
@@ -557,7 +557,7 @@ namespace engine
 
         return Graph->BindWriting(*this, resource, state);
     }
-    bool RFGRenderPass::AttachJob(std::function<void(GfxDeferredContext&)> job)
+    bool RFGRenderPass::AttachJob(std::function<void(GFXI::DeferredContext&)> job)
     {
         return Graph->AttachJob(*this, std::move(job));
     }

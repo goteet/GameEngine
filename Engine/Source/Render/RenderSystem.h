@@ -1,7 +1,7 @@
 #pragma once
 #include <memory>
+#include <GfxInterface.h>
 #include "PreIncludeFiles.h"
-#include "GfxInterface.h"
 #include "TransientBufferRegistry.h"
 
 namespace engine
@@ -10,7 +10,15 @@ namespace engine
 
     class Scene;
 
-    enum EGfxIntializationError
+    struct VertexLayout
+    {
+        math::float4 Position;
+        math::float3 Normal;
+        math::float2 Texcoord;
+    };
+
+
+    enum class EGfxIntializationError
     {
         NoError = 0,
         DeviceCreationFail,
@@ -28,12 +36,14 @@ namespace engine
     public:
         DefineRTTI;
 
-        virtual GE::GfxDevice* GetGfxDevice() override { return mGfxDevice.get(); }
-        virtual GE::GfxDeviceImmediateContext* GetGfxDeviceImmediateContext() override { return mGfxDeviceImmediateContext.get(); }
+        virtual GFXI::GraphicDevice* GetGfxDevice() override { return mGfxDevice; }
+        //virtual GE::GfxDeviceImmediateContext* GetGfxDeviceImmediateContext() override { return mGfxDeviceImmediateContext.get(); }
         virtual unsigned int GetWindowWidth() const override { return mWindowWidth; }
         virtual unsigned int GetWindowHeight() const override { return mWindowHeight; }
         virtual math::point3d<float> ScreenToView(const math::point3d<int>& screen) const override { return math::point3d<float>::zero(); }
         virtual math::point3d<int> ViewToScreen(const math::point3d<float>& view) const override { return math::point3d<int>::zero(); }
+        virtual void SetRenderingWorldMatrixForTest(const math::float4x4& matrix) override { SetObjectToWorldMatrixForTest(matrix); }
+        virtual void FillEntireEntireBufferFromMemory(GFXI::Buffer*, const void* data) override;
 
     public:
         RenderSystem(void* hWindow, bool fullscreen, int width, int height);
@@ -55,7 +65,7 @@ namespace engine
         };
 
     private:
-        void RenderScene(Scene& scene, GfxDeferredContext& context, const ViewConstantBufferData& data, bool shadow);
+        void RenderScene(Scene& scene, GFXI::DeferredContext& context, const ViewConstantBufferData& data, bool shadow);
 
         HWND mMainWindowHandle;
         bool mIsFullScreen = false;
@@ -63,12 +73,35 @@ namespace engine
         int mWindowHeight = 0;
         int mClientWidth = 0;
         int mClientHeight = 0;
-        std::unique_ptr<GfxDevice> mGfxDevice = nullptr;
-        std::unique_ptr<GfxImmediateContext> mGfxDeviceImmediateContext = nullptr;
-        std::unique_ptr<GfxDeferredContext> mGfxDeviceDeferredContext = nullptr;
-        std::unique_ptr<GfxRenderTarget> mBackbufferRenderTarget = nullptr;
-        std::unique_ptr<GfxDepthStencil> mBackbufferDepthStencil = nullptr;
         std::unique_ptr<TransientBufferRegistry> mTransientBufferRegistry = nullptr;
-        ComPtr<IDXGISwapChain1> mGfxSwapChain = nullptr;
+
+        GFXI::GraphicModule* mGfxModule = nullptr;
+        GFXI::GraphicDevice* mGfxDevice = nullptr;
+        GFXI::SwapChain* mMainWindowSwapChain = nullptr;
+        GFXI::DepthStencilView* mMainWindowDepthStencil = nullptr;
+
+        GFXI::SamplerState* mDefaultSamplerState = nullptr;
+
+        GFXI::CommandQueue* mCubeRenderingQueueShadow = nullptr;
+        GFXI::CommandQueue* mCubeRenderingQueueFinal = nullptr;
+        GFXI::CommandQueue* mBlitRenderingQueue = nullptr;
+        
+        GFXI::Shader* mShadowPassVS       = nullptr;
+        GFXI::Shader* mShadowPassPS       = nullptr;
+        GFXI::Shader* mSimpleDrawPassVS   = nullptr;
+        GFXI::Shader* mSimpleDrawPassPS   = nullptr;
+        GFXI::Shader* mBlitPassVS         = nullptr;
+        GFXI::Shader* mBlitPassPS         = nullptr;
+        GFXI::GraphicPipelineState* mShadowPassState     = nullptr;
+        GFXI::GraphicPipelineState* mSimpleDrawPassState = nullptr;
+        GFXI::GraphicPipelineState* mBlitPassState       = nullptr;
+
+        GFXI::VertexBuffer* mFullsceenQuadVerticePositions = nullptr;
+        GFXI::VertexBuffer* mFullsceenQuadVertices = nullptr;
+
+        GFXI::UniformBuffer* mSceneUniformBuffer = nullptr;
+        GFXI::UniformBuffer* mObjectUniformBuffer = nullptr;
+        GFXI::UniformBuffer* mLightViewUniformBuffer = nullptr;
+
     };
 }

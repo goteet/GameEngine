@@ -1,6 +1,8 @@
 #pragma once
 #include <Foundation/Math/Matrix.h>
+#include <GfxInterface.h>
 #include "GEPredefinedMacros.h"
+
 
 namespace GE
 {
@@ -117,15 +119,6 @@ namespace GE
         virtual GfxDefaultIndexBuffer* CreateDefaultIndexBuffer(unsigned int indexCount) = 0;
     };
 
-    struct GameEngineAPI GfxDeferredContext : public GEObject
-    {
-        virtual void SetVertexBuffer(GfxVertexBuffer*, unsigned int offset) = 0;
-        virtual void SetIndexBuffer(GfxIndexBuffer*, unsigned int offset) = 0;
-        virtual void DrawIndexed(unsigned int indexCount, unsigned int startLocation, int indexOffset) = 0;
-
-        virtual void SetRenderingWorldMatrixForTest(const math::float4x4&) = 0;
-    };
-
     struct GameEngineAPI GfxDeviceImmediateContext : public GEObject
     {
         virtual void UploadEntireBufferFromStagingMemory(GfxBuffer*, const void* data) = 0;
@@ -134,11 +127,12 @@ namespace GE
 
     struct GameEngineAPI RenderSystem : public GEObject
     {
-        virtual GfxDevice* GetGfxDevice() = 0;
-        virtual GfxDeviceImmediateContext* GetGfxDeviceImmediateContext() = 0;
+        virtual GFXI::GraphicDevice* GetGfxDevice() = 0;
         virtual unsigned int GetWindowWidth() const = 0;
         virtual unsigned int GetWindowHeight() const = 0;
         virtual math::point3d<float> ScreenToView(const math::point3d<int>& screen) const = 0;
         virtual math::point3d<int> ViewToScreen(const math::point3d<float>& view) const = 0;
+        virtual void SetRenderingWorldMatrixForTest(const math::float4x4&) = 0;
+        virtual void FillEntireEntireBufferFromMemory(GFXI::Buffer*, const void* data) = 0;
     };
 }

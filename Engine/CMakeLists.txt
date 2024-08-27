@@ -2,11 +2,11 @@ cmake_minimum_required(VERSION 3.12)
 
 project(GameEngine)
 
-set(GameEngine_IncludeDir ${CMAKE_CURRENT_SOURCE_DIR}/Include)
-set(GameEngine_SourceDir ${CMAKE_CURRENT_SOURCE_DIR}/Source)
-set(GameEngine_SourceDir_Core ${GameEngine_SourceDir}/Core)
+set(GameEngine_IncludeDir       ${CMAKE_CURRENT_SOURCE_DIR}/Include)
+set(GameEngine_SourceDir        ${CMAKE_CURRENT_SOURCE_DIR}/Source)
+set(GameEngine_SourceDir_Core   ${GameEngine_SourceDir}/Core)
 set(GameEngine_SourceDir_Render ${GameEngine_SourceDir}/Render)
-set(GameEngine_SourceDir_Scene ${GameEngine_SourceDir}/Scene)
+set(GameEngine_SourceDir_Scene  ${GameEngine_SourceDir}/Scene)
 
 set(GameEngine_HeaderFiles_Interface
     ${GameEngine_IncludeDir}/GEPredefinedMacros.h
@@ -36,21 +36,15 @@ set(GameEngine_SourceFiles_Core
 
 set(GameEngine_HeaderFiles_Render
     ${GameEngine_SourceDir_Render}/FrameGraph.h
-    ${GameEngine_SourceDir_Render}/GfxInterface.h
     ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.h
     ${GameEngine_SourceDir_Render}/TransientBufferRegistry.h
-
-    ${GameEngine_SourceDir_Render}/RHI/GfxD3D12.h
 )
 set(GameEngine_SourceFiles_Render
     ${GameEngine_SourceDir_Render}/FrameGraph.cpp
-    ${GameEngine_SourceDir_Render}/GfxInterface.cpp
     ${GameEngine_SourceDir_Render}/Mesh.h
     ${GameEngine_SourceDir_Render}/RenderSystem.cpp
     ${GameEngine_SourceDir_Render}/TransientBufferRegistry.cpp
-
-    ${GameEngine_SourceDir_Render}/RHI/GfxD3D12.cpp
 )
 
 set(GameEngine_HeaderFiles_Scene
@@ -98,10 +92,12 @@ target_include_directories(GameEngine PUBLIC "${GameEngine_IncludeDir}" "${CMAKE
 target_include_directories(GameEngine PRIVATE "${GameEngine_SourceDir}")
 
 if(MSVC)
-    target_link_libraries(GameEngine d3d11.lib d3d12.lib dxguid.lib dxgi.lib d3dcompiler.lib)
+    target_link_libraries(GameEngine)
+    target_link_libraries(GameEngine GfxInterfaceVulkan GfxInterfaceD3D11)
 endif(MSVC)
 
 set_target_properties(GameEngine PROPERTIES
     COMPILE_DEFINITIONS "GAME_ENGINE_EXPORT;UNICODE;_UNICODE"
+    FOLDER "Engine"
     RUNTIME_OUTPUT_DIRECTORY ${GameEngineOutputDirectory}
 )

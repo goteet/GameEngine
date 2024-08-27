@@ -1,3 +1,4 @@
+#include <GfxInterface.h>
 #include "Scene.h"
 #include "Components.h"
 
@@ -83,7 +84,7 @@ namespace engine
         mRoot.RecursiveUpdate(elapsedMilliseconds);
     }
 
-    void Scene::RecursiveRender(GfxDeferredContext* context)
+    void Scene::RecursiveRender(GFXI::DeferredContext& context)
     {
         mRoot.RecursiveRender(context);
     }

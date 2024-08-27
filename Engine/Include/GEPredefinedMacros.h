@@ -39,13 +39,13 @@ namespace GE
         return obj->GetClassUID() == InterfaceType::GetStaticClassUID();
     }
 
-#define DefineRTTI                                                    \
-    public:                                                           \
-    static GE::ClassUID GetStaticClassUID()                           \
-    {                                                                 \
-        static GE::ClassUID sStaticClassUID = GE::GenerateClassUID(); \
-        return sStaticClassUID;                                       \
-    }                                                                 \
-    virtual GE::ClassUID GetClassUID() const override { return GetStaticClassUID(); }
+#define DefineRTTI                                                          \
+    public:                                                                 \
+        static GE::ClassUID GetStaticClassUID()                             \
+        {                                                                   \
+            static GE::ClassUID sStaticClassUID = GE::GenerateClassUID();   \
+            return sStaticClassUID;                                         \
+        }                                                                   \
+        virtual GE::ClassUID GetClassUID() const override { return GetStaticClassUID(); }
 
 }    // namespace GE

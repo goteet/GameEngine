@@ -1,5 +1,5 @@
+#include <GfxInterface.h>
 #include "Components.h"
-#include "Render/GfxInterface.h"
 #include "Core/GameEngine.h"
 
 namespace engine
@@ -75,7 +75,7 @@ namespace engine
     namespace cube_geometry_desc
     {
         const unsigned int CubeVertexCount = 24;
-        VertexLayout CubeVertices[CubeVertexCount] =
+        engine::VertexLayout CubeVertices[CubeVertexCount] =
         {
             { math::float4(-0.5f, +0.5f, -0.5f, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
             { math::float4(-0.5f, +0.5f, +0.5f, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
@@ -123,7 +123,7 @@ namespace engine
     namespace plane_geomoetry_desc
     {
         const unsigned int PlaneVertexCount = 4;
-        VertexLayout PlaneVertices[PlaneVertexCount] =
+        engine::VertexLayout PlaneVertices[PlaneVertexCount] =
         {
             { math::float4(-0.5f, 0.0f, -0.5f, 1), math::normalized_float3::unit_y(),  math::float2(0, 0) },
             { math::float4(-0.5f, 0.0f, +0.5f, 1), math::normalized_float3::unit_y(),  math::float2(0, 1) },
@@ -137,24 +137,30 @@ namespace engine
 
     MeshRenderer::~MeshRenderer()
     {
-        SafeRelease(CubeVertexBufferPtr);
-        SafeRelease(CubeIndexBufferPtr);
+        SafeRelease(mCubeVertexBuffer);
+        SafeRelease(mCubeIndexBuffer);
     }
 
-    void MeshRenderer::OnRender(GE::GfxDeferredContext* context)
+    void MeshRenderer::OnRender(GFXI::DeferredContext& context)
     {
         const math::float4x4& matrix = GetSceneNode()->GetWorldMatrix();
-        context->SetRenderingWorldMatrixForTest(matrix);
-        context->SetVertexBuffer(CubeVertexBufferPtr, 0);
-        context->SetIndexBuffer(CubeIndexBufferPtr, 0);
-        context->DrawIndexed(cube_geometry_desc::CubeIndexCount, 0, 0);
+        GetEngineInstance()->GetRenderSystem()->SetRenderingWorldMatrixForTest(matrix);
+
+        GFXI::DeviceContext::VertexBufferBinding binding;
+        binding.VertexBuffer = mCubeVertexBuffer;
+        binding.BufferOffset = 0;
+        binding.ElementStride = sizeof(engine::VertexLayout);
+        
+        context.SetVertexBuffers(0, 1, &binding);
+        context.SetIndexBuffer(mCubeIndexBuffer, 0);
+        context.DrawIndexed(cube_geometry_desc::CubeIndexCount, 0, 0);
     }
 
     bool MeshRenderer::IntializeGeometryHWResource(GE::MeshRenderer::EMeshType type)
     {
         int vertexCount = 0;
         int indexCount = 0;
-        VertexLayout* vertices = nullptr;
+        engine::VertexLayout* vertices = nullptr;
         unsigned int* indices = nullptr;
         switch (type)
         {
@@ -176,19 +182,28 @@ namespace engine
 
 
         GE::RenderSystem* renderSystem = GetEngineInstance()->GetRenderSystem();
-        GE::GfxDevice* devicePtr = renderSystem->GetGfxDevice();
-        GE::GfxDeviceImmediateContext* contextPtr = renderSystem->GetGfxDeviceImmediateContext();
-        CubeVertexBufferPtr = devicePtr->CreateDefaultVertexBuffer(vertexCount);
-        CubeIndexBufferPtr = devicePtr->CreateDefaultIndexBuffer(indexCount);
-        if (CubeVertexBufferPtr == nullptr || CubeIndexBufferPtr == nullptr)
+        GFXI::GraphicDevice* devicePtr = renderSystem->GetGfxDevice();
+        //GE::GfxDeviceImmediateContext* contextPtr = renderSystem->GetGfxDeviceImmediateContext();
+
+        GFXI::VertexBuffer::CreateInfo vbCreateInfo;
+        vbCreateInfo.BufferSize = vertexCount * sizeof(engine::VertexLayout);
+        vbCreateInfo.DataUsage = GFXI::EDataUsage::Default;
+        mCubeVertexBuffer   = devicePtr->CreateVertexBuffer(vbCreateInfo);
+
+        GFXI::IndexBuffer::CreateInfo ibCreateInfo;
+        ibCreateInfo.BufferSize = indexCount * sizeof(unsigned int);
+        ibCreateInfo.DataUsage = GFXI::EDataUsage::Default;
+        ibCreateInfo.DataFormat = GFXI::IndexBuffer::EFormat::UInt32;
+        mCubeIndexBuffer    = devicePtr->CreateIndexBuffer(ibCreateInfo);
+        if (mCubeVertexBuffer == nullptr || mCubeIndexBuffer == nullptr)
         {
-            SafeRelease(CubeVertexBufferPtr);
-            SafeRelease(CubeIndexBufferPtr);
+            SafeRelease(mCubeVertexBuffer);
+            SafeRelease(mCubeIndexBuffer);
             return false;
         }
         //upload cube vertex data to gfx vertex buffer.
-        contextPtr->UploadEntireBufferFromStagingMemory(CubeVertexBufferPtr, vertices);
-        contextPtr->UploadEntireBufferFromMemory(CubeIndexBufferPtr, indices);
+        renderSystem->FillEntireEntireBufferFromMemory(mCubeVertexBuffer, vertices);
+        renderSystem->FillEntireEntireBufferFromMemory(mCubeIndexBuffer, indices);
         return true;
     }
 }

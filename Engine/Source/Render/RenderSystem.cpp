@@ -1,9 +1,11 @@
-#include "RenderSystem.h"
-#include <Foundation/Base/ScopeHelper.h>
-#include <Foundation/Base/MemoryHelper.h>
 #include <vector>
 #include <string>
+#include <Foundation/Base/ScopeHelper.h>
+#include <Foundation/Base/MemoryHelper.h>
+#include <GfxInterface.h>
 #include <d3dcompiler.h>
+
+#include "RenderSystem.h"
 #include "Core/GameEngine.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
@@ -11,37 +13,14 @@
 
 using Microsoft::WRL::ComPtr;
 
-Microsoft::WRL::ComPtr<IDXGIFactory2> GetDXGIAdapterFromDevice(Microsoft::WRL::ComPtr<ID3D11Device> pDevice)
-{
-    using Microsoft::WRL::ComPtr;
-
-    ComPtr<IDXGIDevice2> DXGIDevice2;
-    HRESULT resultGetDXGIDevice2 = pDevice.As(&DXGIDevice2);
-    if (SUCCEEDED(resultGetDXGIDevice2))
-    {
-        ComPtr<IDXGIAdapter1> DXGIDevice1;
-        HRESULT resultGetDXGIDevice1 = DXGIDevice2->GetParent(IID_PPV_ARGS(&DXGIDevice1));
-        if (SUCCEEDED(resultGetDXGIDevice1))
-        {
-            ComPtr<IDXGIFactory2> mDXGIFactory;
-            if (SUCCEEDED(DXGIDevice1->GetParent(IID_PPV_ARGS(&mDXGIFactory))))
-            {
-                return mDXGIFactory;
-            }
-        }
-    }
-    return nullptr;
-}
-
-
+using VertexInputLayout = GFXI::GraphicPipelineState::VertexInputLayout;
 const unsigned int InputLayoutCount = 3;
-D3D11_INPUT_ELEMENT_DESC InputLayout[InputLayoutCount]
+GFXI::GraphicPipelineState::VertexInputLayout::InputElement InputLayoutArray[InputLayoutCount] =
 {
-    D3D11_INPUT_ELEMENT_DESC{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-    D3D11_INPUT_ELEMENT_DESC{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0},
-    D3D11_INPUT_ELEMENT_DESC{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0}
+    { VertexInputLayout::EInputRate::Vertex, VertexInputLayout::EVertexFormat::RGBA32_SFloat,   "POSITION", 0, 0, 0, 0 },
+    { VertexInputLayout::EInputRate::Vertex, VertexInputLayout::EVertexFormat::RGB32_SFloat,    "NORMAL",   0, 0, 16, 0 },
+    { VertexInputLayout::EInputRate::Vertex, VertexInputLayout::EVertexFormat::RG32_SFloat,     "TEXCOORD", 0, 0, 28, 0 }
 };
-
 namespace context_private_impl
 {
     ComPtr<ID3DBlob> CompileShaderSource(
@@ -76,120 +55,54 @@ namespace context_private_impl
     }
 }
 
-struct VertexShader
+GFXI::Shader* CreateVertexShader(GFXI::GraphicDevice* GfxDevice,const std::string& source, const std::string& entry)
 {
-    ComPtr<ID3D11VertexShader> mVertexShader = nullptr;
-    ComPtr<ID3D11InputLayout> mInputLayout = nullptr;
-    std::vector<D3D11_INPUT_ELEMENT_DESC> mInputLayoutDesc;
-};
+    GFXI::ShaderBinary::CreateInfo binaryCreateInfo;
+    binaryCreateInfo.ShaderType = GFXI::EShaderType::VertexShader;
+    binaryCreateInfo.ShaderName = "VertexShader";
+    binaryCreateInfo.EntryNameString = entry.c_str();
+    binaryCreateInfo.ShaderSourceCodeData = source.c_str();
+    binaryCreateInfo.ShaderSourceCodeLength = static_cast<unsigned int>(source.size());
 
-struct PixelShader
-{
-    ComPtr<ID3D11PixelShader> mPixelShader = nullptr;
-};
 
-struct ShaderProgram
-{
-    ~ShaderProgram()
+    GFXI::ShaderBinary* vsBinary = GfxDevice->CompileShader(binaryCreateInfo);
+    if (vsBinary)
     {
-        safe_delete(VertexShader);
-        safe_delete(PixelShader);
+        GFXI::Shader::CreateInfo shaderCreateInfo;
+        shaderCreateInfo.ShaderBinary = vsBinary;
+        GFXI::Shader* vertexShader = GfxDevice->CreateShader(shaderCreateInfo);
+        vsBinary->Release();
+        return vertexShader;
     }
-    VertexShader* VertexShader = nullptr;
-    PixelShader* PixelShader = nullptr;
-};
-
-
-VertexShader* CreateVertexShader(ID3D11Device* GfxDevice,
-    const std::string& source, const std::string& entry,
-    const std::vector<D3D11_INPUT_ELEMENT_DESC>& layout)
-{
-    using context_private_impl::CompileShaderSource;
-    const std::string profile = "vs_5_0";
-    ComPtr<ID3DBlob> vsBlob = CompileShaderSource(source, entry, profile);
-
-    if (vsBlob == nullptr)
+    else
     {
-        ASSERT(vsBlob != nullptr);
         return nullptr;
     }
-
-    ComPtr<ID3D11VertexShader> vertexShader = nullptr;
-    ComPtr<ID3D11InputLayout> inputLayout = nullptr;
-
-    HRESULT rstCreateVertexShader = GfxDevice->CreateVertexShader(
-        vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(),
-        NULL,
-        &vertexShader);
-
-    if (FAILED(rstCreateVertexShader))
-    {
-        ASSERT_SUCCEEDED(rstCreateVertexShader);
-        return nullptr;
-    }
-
-    HRESULT rstCreateInputLayout = GfxDevice->CreateInputLayout(
-        &(layout[0]), (UINT)layout.size(),
-        vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(),
-        &inputLayout);
-
-    if (FAILED(rstCreateInputLayout))
-    {
-        ASSERT_SUCCEEDED(rstCreateInputLayout);
-        return nullptr;
-    }
-
-    VertexShader* shader = new VertexShader();
-    shader->mVertexShader = vertexShader;
-    shader->mInputLayout = inputLayout;
-    shader->mInputLayoutDesc = layout;
-    return shader;
 }
 
-PixelShader* CreatePixelShader(ID3D11Device* GfxDevice,
-    const std::string& source, const std::string& entry)
+GFXI::Shader* CreatePixelShader(GFXI::GraphicDevice* GfxDevice, const std::string& source, const std::string& entry)
 {
-    using context_private_impl::CompileShaderSource;
-    const std::string profile = "ps_5_0";
-    ComPtr<ID3DBlob> psBlob = CompileShaderSource(source, entry, profile);
+    GFXI::ShaderBinary::CreateInfo binaryCreateInfo;
+    binaryCreateInfo.ShaderType = GFXI::EShaderType::PixelShader;
+    binaryCreateInfo.ShaderName = "PixelShader";
+    binaryCreateInfo.EntryNameString = entry.c_str();
+    binaryCreateInfo.ShaderSourceCodeData = source.c_str();
+    binaryCreateInfo.ShaderSourceCodeLength = static_cast<unsigned int>(source.size());
 
-    if (psBlob == nullptr)
+
+    GFXI::ShaderBinary* psBinary = GfxDevice->CompileShader(binaryCreateInfo);
+    if (psBinary)
     {
-        ASSERT(psBlob != nullptr);
+        GFXI::Shader::CreateInfo shaderCreateInfo;
+        shaderCreateInfo.ShaderBinary = psBinary;
+        GFXI::Shader* pixelShader = GfxDevice->CreateShader(shaderCreateInfo);
+        psBinary->Release();
+        return pixelShader;
+    }
+    else
+    {
         return nullptr;
     }
-
-    ComPtr<ID3D11PixelShader> pixelShader = nullptr;
-    HRESULT rstCreatePixelShader = GfxDevice->CreatePixelShader(
-        psBlob->GetBufferPointer(), psBlob->GetBufferSize(),
-        NULL,
-        &pixelShader);
-
-    if (FAILED(rstCreatePixelShader))
-    {
-        ASSERT_SUCCEEDED(rstCreatePixelShader);
-        return nullptr;
-    }
-
-    PixelShader* shader = new PixelShader();
-    shader->mPixelShader = pixelShader;
-    return shader;
-}
-
-ShaderProgram* LinkShader(VertexShader* vertexShader, PixelShader* pixelShader)
-{
-    auto vertexShaderImpl = reinterpret_cast<::VertexShader*>(vertexShader);
-    auto pixelShaderImpl = reinterpret_cast<::PixelShader*>(pixelShader);
-    if (vertexShaderImpl == nullptr || pixelShaderImpl == nullptr)
-    {
-        ASSERT(vertexShaderImpl != nullptr && pixelShaderImpl != nullptr);
-        return nullptr;
-    }
-
-    ShaderProgram* program = new ShaderProgram();
-    program->VertexShader = vertexShaderImpl;
-    program->PixelShader = pixelShaderImpl;
-    return program;
 }
 
 struct ObjectConstantDesc
@@ -203,6 +116,9 @@ struct LightViewConstantDesc
     math::float4x4 MatrixView;
     math::float4x4 MatrixProj;
 };
+
+const std::string kVsEntryName = "VSMain";
+const std::string kPsEntryName = "PSMain";
 
 const std::string DefaultVertexShaderSourceCode = R"(
     cbuffer object
@@ -280,6 +196,7 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
         float2 shadowDepthTexcoord = 0.5 * projection.xy + 0.5;
         float depth = projection.z;
         float shadowDepth = Texture.Sample(Sampler, shadowDepthTexcoord).r;
+        //return float4(shadowDepthTexcoord,0,1);
         float shadow = shadowDepth + 0.0000025 >= depth ;
         //return float4(float3(1,1,1) * shadow, 1); 
         float3 N = normalize(input.Normal);
@@ -393,18 +310,10 @@ namespace fullscreen_quad
 
 namespace engine
 {
-    GfxDefaultVertexBuffer* FullscreenQuadVertexBuffer = nullptr;
-    GfxDynamicConstantBuffer* ObjectConstantBufferPtr = nullptr;
-    GfxDynamicConstantBuffer* SceneConstantBufferPtr = nullptr;
-    GfxDynamicConstantBuffer* LightViewConstantBufferPtr = nullptr;
-    ShaderProgram* ShadowShaderProgramPtr = nullptr;
-    ShaderProgram* SimpleShaderProgramPtr = nullptr;
-    ShaderProgram* BlitShaderProgramPtr = nullptr;
-    ID3D11CommandList* CubeRenderingCommandList = nullptr;
-    ID3D11CommandList* BlitRenderingCommandList = nullptr;
-    ID3D11RasterizerState* DefaultRasterState = nullptr;
-    ID3D11SamplerState* DefaultSamplerState = nullptr;
-
+    void RenderSystem::FillEntireEntireBufferFromMemory(GFXI::Buffer* buffer, const void* data)
+    {
+        mGfxDevice->GetImmediateContext()->UpdateBuffer(buffer, data);
+    }
     RenderSystem::RenderSystem(void* hWindow, bool fullscreen, int width, int height)
         : mMainWindowHandle((HWND)hWindow)
         , mIsFullScreen(fullscreen)
@@ -417,153 +326,71 @@ namespace engine
         mClientHeight = clientRect.bottom - clientRect.top;
     }
 
-
-    template<typename T>
-    void safe_release(std::unique_ptr<T>& ptr) { ptr.release(); }
     RenderSystem::~RenderSystem()
     {
-        safe_delete(FullscreenQuadVertexBuffer);
-        safe_delete(ObjectConstantBufferPtr);
-        safe_delete(SceneConstantBufferPtr);
-        safe_delete(LightViewConstantBufferPtr);
-        safe_delete(ShadowShaderProgramPtr);
-        safe_delete(SimpleShaderProgramPtr);
-        safe_delete(BlitShaderProgramPtr);
-        SafeRelease(DefaultRasterState);
-        SafeRelease(DefaultSamplerState);
-        SafeRelease(CubeRenderingCommandList);
-        SafeRelease(BlitRenderingCommandList);
+        SafeRelease(mFullsceenQuadVertices);
+        SafeRelease(mSceneUniformBuffer);
+        SafeRelease(mObjectUniformBuffer);
+        SafeRelease(mLightViewUniformBuffer);
 
-        safe_release(mBackbufferDepthStencil);
-        safe_release(mGfxDeviceDeferredContext);
-        safe_release(mGfxDeviceImmediateContext);
-        safe_release(mGfxDevice);
+        SafeRelease(mShadowPassVS);
+        SafeRelease(mShadowPassPS);
+        SafeRelease(mSimpleDrawPassVS);
+        SafeRelease(mSimpleDrawPassPS);
+        SafeRelease(mBlitPassVS);
+        SafeRelease(mBlitPassPS);
+
+        
+
+        SafeRelease(mCubeRenderingQueueShadow);
+        SafeRelease(mCubeRenderingQueueFinal);
+        SafeRelease(mBlitRenderingQueue);
+        SafeRelease(mDefaultSamplerState);
+        SafeRelease(mShadowPassState);
+        SafeRelease(mSimpleDrawPassState);
+        SafeRelease(mBlitPassState);
+
+        
+        SafeRelease(mMainWindowDepthStencil);
+
+        SafeRelease(mMainWindowSwapChain);
+        SafeRelease(mGfxDevice);
+        SafeRelease(mGfxModule);
     }
+
+
+    GFXI::GraphicModule* LoadGfxLibrary(const TCHAR* LibraryName)
+    {
+        HMODULE Module = ::LoadLibraryW(LibraryName);
+        if (Module != NULL)
+        {
+            typedef GFXI::GraphicModule* (*CreateGfxModule)();
+            CreateGfxModule CreateGfxModulePtr = (CreateGfxModule)GetProcAddress(Module, "CreateGfxModule");
+            if (CreateGfxModulePtr != nullptr)
+            {
+                GFXI::GraphicModule* GfxModule = CreateGfxModulePtr();
+                return GfxModule;
+            }
+            FreeLibrary(Module);
+        }
+        return nullptr;
+    }
+
 
     EGfxIntializationError RenderSystem::InitializeGfxDevice()
     {
-        //CreateVertexBuffer Device and DeviceContext
-        ComPtr<ID3D11Device> outD3DDevice = nullptr;
-        ComPtr<ID3D11DeviceContext> outD3DDeviceImmediateContext = nullptr;
-        ComPtr<ID3D11DeviceContext> outD3DDeferredContext = nullptr;
-        ComPtr<IDXGISwapChain1> outSwapChain = nullptr;
-        ComPtr<ID3D11Texture2D> outBackbufferTexture = nullptr;
-        ComPtr<ID3D11RenderTargetView> outBackbufferRTV = nullptr;
-        ComPtr<ID3D11ShaderResourceView> outBackbufferSRV = nullptr;
-        D3D_FEATURE_LEVEL outFeatureLevel;
+        mGfxModule = LoadGfxLibrary(L"GfxInterfaceD3D11.dll");
+        mGfxDevice = mGfxModule->CreateDevice();
+        mMainWindowSwapChain = mGfxDevice->CreateSwapChain(mMainWindowHandle, mClientWidth, mClientHeight, mIsFullScreen);
 
-        IDXGIAdapter* defualtAdpater = nullptr;
-        HMODULE noneSoftwareModule = nullptr;
-        UINT deviceCreationFlag = 0;
-        const int numFeatureLevel = 2;
-        D3D_FEATURE_LEVEL featureLevels[numFeatureLevel] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
+        GFXI::DepthStencilView::CreateInfo depthStencilCreateInfo;
+        depthStencilCreateInfo.Format = GFXI::DepthStencilView::EFormat::D24_UNormInt_S8_UInt;
+        depthStencilCreateInfo.Width = mClientWidth;
+        depthStencilCreateInfo.Height = mClientHeight;
+        depthStencilCreateInfo.UsedByShader = false;
 
-        HRESULT resultCreateDevice = D3D11CreateDevice(
-            defualtAdpater,
-            D3D_DRIVER_TYPE_HARDWARE,
-            noneSoftwareModule,
-            deviceCreationFlag,
-            featureLevels, numFeatureLevel,
-            D3D11_SDK_VERSION,
-            &outD3DDevice,
-            &outFeatureLevel,
-            &outD3DDeviceImmediateContext
-        );
-
-        if (FAILED(resultCreateDevice))
-        {
-            ASSERT_SUCCEEDED(resultCreateDevice, "D3D11CreateDevice failed.");
-            return EGfxIntializationError::DeviceCreationFail;
-        }
-
-        ///* CreateVertexBuffer SwapChain */
-        bool usedForshader = true;
-        mBackbufferRenderTarget = std::make_unique<GfxRenderTarget>(ERenderTargetFormat::UNormRGB10A2, usedForshader);
-        mBackbufferRenderTarget->mTexture2DDesc.Width = mClientWidth;
-        mBackbufferRenderTarget->mTexture2DDesc.Height = mClientHeight;
-
-        DXGI_SWAP_CHAIN_DESC1 swapchainDesc;
-        swapchainDesc.Width = mBackbufferRenderTarget->mTexture2DDesc.Width;
-        swapchainDesc.Height = mBackbufferRenderTarget->mTexture2DDesc.Height;
-        swapchainDesc.BufferCount = 2;
-        swapchainDesc.BufferUsage = usedForshader ? (DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT) : DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapchainDesc.Stereo = false;
-        swapchainDesc.SampleDesc.Count = mBackbufferRenderTarget->mTexture2DDesc.SampleDesc.Count;
-        swapchainDesc.SampleDesc.Quality = mBackbufferRenderTarget->mTexture2DDesc.SampleDesc.Quality;
-        swapchainDesc.Flags = 0;
-        swapchainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-        swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-        swapchainDesc.Format = mBackbufferRenderTarget->mTexture2DDesc.Format;
-        swapchainDesc.Scaling = DXGI_SCALING_STRETCH;
-
-        DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullScreenDesc;
-        fullScreenDesc.RefreshRate.Numerator = 60;
-        fullScreenDesc.RefreshRate.Denominator = 1;
-        fullScreenDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-        fullScreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_PROGRESSIVE;
-        fullScreenDesc.Windowed = !mIsFullScreen;
-
-        ComPtr<IDXGIFactory2> DXGIFactory = GetDXGIAdapterFromDevice(outD3DDevice);
-        if (DXGIFactory == nullptr)
-        {
-            ASSERT(DXGIFactory != nullptr);
-            return EGfxIntializationError::RetrieveDXGIFactoryFail;
-        }
-
-        IDXGIOutput* noneDXGIOutput = nullptr;
-        HRESULT resultCreateSwapchain = DXGIFactory->CreateSwapChainForHwnd(outD3DDevice.Get(), mMainWindowHandle, &swapchainDesc, &fullScreenDesc, noneDXGIOutput, &outSwapChain);
-
-        if (FAILED(resultCreateSwapchain))
-        {
-            ASSERT_SUCCEEDED(resultCreateSwapchain, "CreateSwapChainForHwnd failed.");
-            return EGfxIntializationError::CreateSwapchainFail;
-        }
-
-        //CreateVertexBuffer RenderTargetView
-        HRESULT resultGetBackbuffer = outSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &outBackbufferTexture);
-        if (FAILED(resultGetBackbuffer))
-        {
-            ASSERT_SUCCEEDED(resultGetBackbuffer);
-            return EGfxIntializationError::RetrieveBackbufferFail;
-        }
-
-        HRESULT resultCreateBackbufferRT = outD3DDevice->CreateRenderTargetView(outBackbufferTexture.Get(), &mBackbufferRenderTarget->mRenderTargetDesc, &outBackbufferRTV);
-        if (FAILED(resultCreateBackbufferRT))
-        {
-            ASSERT_SUCCEEDED(resultCreateBackbufferRT);
-            return EGfxIntializationError::CreateBackbufferRTVFail;
-        }
-
-        HRESULT resultCreateBackbufferSRV = outD3DDevice->CreateShaderResourceView(outBackbufferTexture.Get(), &mBackbufferRenderTarget->mShaderResourceDesc, &outBackbufferSRV);
-        if (FAILED(resultCreateBackbufferSRV))
-        {
-            ASSERT_SUCCEEDED(resultCreateBackbufferSRV);
-            return EGfxIntializationError::CreateBackbufferSRVFail;
-        }
-
-        HRESULT resultCreateDeferredContext = outD3DDevice->CreateDeferredContext(0, &outD3DDeferredContext);
-        if (FAILED(resultCreateDeferredContext))
-        {
-            ASSERT_SUCCEEDED(resultCreateDeferredContext);
-            return EGfxIntializationError::CreateDeferredContextFail;
-        }
-
-        mGfxDevice = std::make_unique<GfxDevice>(outD3DDevice.Detach());
-        GfxDepthStencil* outDepthStencil = mGfxDevice->CreateDepthStencil(EDepthStencilFormat::UNormDepth24_UIntStencil8, mClientWidth, mClientHeight, false);
-        if (outDepthStencil == nullptr)
-        {
-            ASSERT(outDepthStencil != nullptr);
-            return EGfxIntializationError::CreateBackbufferDSFail;
-        }
-
-        mGfxDeviceImmediateContext = std::make_unique<GfxImmediateContext>(mGfxDevice.get(), outD3DDeviceImmediateContext.Detach());
-        mGfxDeviceDeferredContext = std::make_unique<GfxDeferredContext>(mGfxDevice.get(), outD3DDeferredContext.Detach());
-        mGfxSwapChain = outSwapChain;
-        mBackbufferDepthStencil = std::unique_ptr<GfxDepthStencil>(outDepthStencil);
-        mBackbufferRenderTarget->mTexturePtr = outBackbufferTexture;
-        mBackbufferRenderTarget->mRenderTargetView = outBackbufferRTV;
-        mBackbufferRenderTarget->mShaderResourceView = outBackbufferSRV;
-        mTransientBufferRegistry = std::make_unique<TransientBufferRegistry>(mGfxDevice.get(), mBackbufferRenderTarget.get(), mBackbufferDepthStencil.get());
+        mMainWindowDepthStencil = mGfxDevice->CreateDepthStencilView(depthStencilCreateInfo);
+        mTransientBufferRegistry = std::make_unique<TransientBufferRegistry>(mGfxDevice, mMainWindowSwapChain->GetRenderTargetView(), mMainWindowDepthStencil);
         return EGfxIntializationError::NoError;
     }
 
@@ -600,13 +427,28 @@ namespace engine
         }
 
         //Do Rendering.
+        const bool bRestoreToDefaultState = true;
         {
+            auto CreateDefaultSamplerState = [&]()
+            {
+                if (mDefaultSamplerState == nullptr)
+                {
+                    GFXI::SamplerState::CreateInfo createInfo;
+                    createInfo.SamplingFilter = GFXI::SamplerState::ESamplingFilter::MinLinear_MagLinear_MipLinear;
+                    createInfo.BorderColor[0] = 0;
+                    createInfo.BorderColor[1] = 0;
+                    createInfo.BorderColor[2] = 0;
+                    createInfo.BorderColor[3] = 0;
+                    mDefaultSamplerState = mGfxDevice->CreateSamplerState(createInfo);
+                }
+            };
+
             RenderFrameGraph MainGraph(mTransientBufferRegistry.get());
             RFGRenderPass forwardPass = MainGraph.AddRenderPass("test.forward");
             RFGRenderPass shadowPass = MainGraph.AddRenderPass("test.shadowdepth");
             RFGRenderPass blitPass = MainGraph.AddRenderPass("test.blit");
             RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
-            RFGResourceHandle shadowDepth = MainGraph.RequestResource("test.shadowdepth", 1024, 1024, EDepthStencilFormat::UNormDepth24_UIntStencil8);
+            RFGResourceHandle shadowDepth = MainGraph.RequestResource("test.shadowdepth", 1024, 1024, GFXI::DepthStencilView::EFormat::D24_UNormInt_S8_UInt);
             RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferDSFormat());
             RFGResourceHandle blitRenderTarget = MainGraph.RequestResource("test.blitrendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
 
@@ -617,40 +459,37 @@ namespace engine
             state.ClearStencilValue = 0;
             shadowPass.BindWriting(shadowDepth, state);
             shadowPass.AttachJob(
-                [&](GfxDeferredContext& context)
+                [&](GFXI::DeferredContext& deviceContext)
                 {
-                    if (DefaultRasterState == nullptr)
+                    if (mShadowPassState == nullptr)
                     {
-                        D3D11_RASTERIZER_DESC RasterizerDesc;
-                        RasterizerDesc.FillMode = D3D11_FILL_MODE::D3D11_FILL_SOLID;
-                        RasterizerDesc.CullMode = D3D11_CULL_MODE::D3D11_CULL_BACK;
-                        RasterizerDesc.FrontCounterClockwise = TRUE;
-                        RasterizerDesc.DepthBias = 0;
-                        RasterizerDesc.DepthBiasClamp = 0.0f;
-                        RasterizerDesc.SlopeScaledDepthBias = 0.0;
-                        RasterizerDesc.DepthClipEnable = TRUE;
-                        RasterizerDesc.ScissorEnable = FALSE;
-                        RasterizerDesc.MultisampleEnable = FALSE;
-                        RasterizerDesc.AntialiasedLineEnable = FALSE;
-                        mGfxDevice->mGfxDevice->CreateRasterizerState(&RasterizerDesc, &DefaultRasterState);
+                        mShadowPassVS = CreateVertexShader(mGfxDevice, ShadowVertexShaderSource, kVsEntryName);
+                        mShadowPassPS = CreatePixelShader(mGfxDevice, ShadowPixelShaderSource, kPsEntryName);
+                        GFXI::GraphicPipelineState::CreateInfo PipelineCreateInfo;
+                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mShadowPassVS;
+                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)]  = mShadowPassPS;
+                        PipelineCreateInfo.VertexInputLayout.ElementCount = InputLayoutCount;
+                        PipelineCreateInfo.VertexInputLayout.ElementArray = InputLayoutArray;
+                        mShadowPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
                     }
-                    context.mGfxDeviceContext->RSSetState(DefaultRasterState);
 
-                    D3D11_VIEWPORT Viewport;
-                    Viewport.TopLeftX = 0.0f;
-                    Viewport.TopLeftY = 0.0f;
-                    Viewport.Width = (float)1024;
-                    Viewport.Height = (float)1024;
-                    Viewport.MinDepth = 0.0f;
-                    Viewport.MaxDepth = 1.0f;
+                    if (mCubeRenderingQueueShadow == nullptr)
+                    {
+                        GFXI::ViewportInfo viewport;
+                        viewport.X = 0.0f;
+                        viewport.Y = 0.0f;
+                        viewport.Width =  (float)1024;
+                        viewport.Height = (float)1024;
+                        viewport.MinDepth = 0.0f;
+                        viewport.MaxDepth = 1.0f;
 
-                    context.mGfxDeviceContext->RSSetViewports(1, &Viewport);
-
-                    RenderScene(scene, context, data, true);
-
-                    const bool DontRestoreContextState = false;
-                    context.mGfxDeviceContext->FinishCommandList(DontRestoreContextState, &CubeRenderingCommandList);
-                    mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(CubeRenderingCommandList, DontRestoreContextState);
+                        mGfxDevice->GetDeferredContext()->StartRecordCommandQueue();
+                        mGfxDevice->GetDeferredContext()->SetViewport(viewport);
+                        mGfxDevice->GetDeferredContext()->SetGraphicPipelineState(mShadowPassState);
+                        RenderScene(scene, deviceContext, data, true);
+                        mCubeRenderingQueueShadow = mGfxDevice->GetDeferredContext()->FinishRecordCommandQueue(bRestoreToDefaultState);
+                    }
+                    mGfxDevice->GetImmediateContext()->ExecuteCommandQueue(mCubeRenderingQueueShadow, bRestoreToDefaultState);
                 }
             );
 
@@ -662,46 +501,41 @@ namespace engine
             forwardPass.BindWriting(renderTarget, state);
             forwardPass.BindWriting(depthStencil, state);
             forwardPass.AttachJob(
-                [&](GfxDeferredContext& context)
+                [&](GFXI::DeferredContext& deviceContext)
                 {
-                    if (DefaultSamplerState == nullptr)
+                    CreateDefaultSamplerState();
+                    if (mSimpleDrawPassState == nullptr)
                     {
-                        // Create a texture sampler state description.
-                        D3D11_SAMPLER_DESC samplerDesc;
-                        samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-                        samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-                        samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-                        samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-                        samplerDesc.MipLODBias = 0.0f;
-                        samplerDesc.MaxAnisotropy = 1;
-                        samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
-                        samplerDesc.BorderColor[0] = 0;
-                        samplerDesc.BorderColor[1] = 0;
-                        samplerDesc.BorderColor[2] = 0;
-                        samplerDesc.BorderColor[3] = 0;
-                        samplerDesc.MinLOD = 0;
-                        samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
-                        mGfxDevice->mGfxDevice->CreateSamplerState(&samplerDesc, &DefaultSamplerState);
+                        mSimpleDrawPassVS = CreateVertexShader(mGfxDevice, DefaultVertexShaderSourceCode, kVsEntryName);
+                        mSimpleDrawPassPS = CreatePixelShader(mGfxDevice, SimpleColorPixelShaderSourceCode, kPsEntryName);
+                        GFXI::GraphicPipelineState::CreateInfo PipelineCreateInfo;
+                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mSimpleDrawPassVS;
+                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mSimpleDrawPassPS;
+                        PipelineCreateInfo.VertexInputLayout.ElementCount = InputLayoutCount;
+                        PipelineCreateInfo.VertexInputLayout.ElementArray = InputLayoutArray;
+                        mSimpleDrawPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
                     }
 
-                    context.mGfxDeviceContext->PSSetSamplers(0, 1, &DefaultSamplerState);
-                    context.mGfxDeviceContext->RSSetState(DefaultRasterState);
+                    if (mCubeRenderingQueueFinal == nullptr)
+                    {
+                        GFXI::ViewportInfo viewport;
+                        viewport.X = 0.0f;
+                        viewport.Y = 0.0f;
+                        viewport.Width =  (float)mClientWidth;
+                        viewport.Height = (float)mClientHeight;
+                        viewport.MinDepth = 0.0f;
+                        viewport.MaxDepth = 1.0f;
 
-                    D3D11_VIEWPORT Viewport;
-                    Viewport.TopLeftX = 0.0f;
-                    Viewport.TopLeftY = 0.0f;
-                    Viewport.Width = (float)mClientWidth;
-                    Viewport.Height = (float)mClientHeight;
-                    Viewport.MinDepth = 0.0f;
-                    Viewport.MaxDepth = 1.0f;
+                        mGfxDevice->GetDeferredContext()->StartRecordCommandQueue();
+                        mGfxDevice->GetDeferredContext()->SetGraphicSamplerStates(GFXI::GraphicPipelineState::EShaderStage::Pixel, 0, 1, &mDefaultSamplerState);
+                        mGfxDevice->GetDeferredContext()->SetViewport(viewport);
+                        mGfxDevice->GetDeferredContext()->SetGraphicPipelineState(mSimpleDrawPassState);
 
-                    context.mGfxDeviceContext->RSSetViewports(1, &Viewport);
+                        RenderScene(scene, deviceContext, data, false);
 
-                    RenderScene(scene, context, data, false);
-
-                    const bool DontRestoreContextState = false;
-                    context.mGfxDeviceContext->FinishCommandList(DontRestoreContextState, &CubeRenderingCommandList);
-                    mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(CubeRenderingCommandList, DontRestoreContextState);
+                        mCubeRenderingQueueFinal = mGfxDevice->GetDeferredContext()->FinishRecordCommandQueue(bRestoreToDefaultState);
+                    }                
+                    mGfxDevice->GetImmediateContext()->ExecuteCommandQueue(mCubeRenderingQueueFinal, bRestoreToDefaultState);
                 }
             );
 
@@ -710,74 +544,61 @@ namespace engine
             blitPass.BindWriting(blitRenderTarget, state);
             blitPass.BindWriting(depthStencil, state);
             blitPass.AttachJob(
-                [&](GfxDeferredContext& context)
+                [&](GFXI::DeferredContext& deviceContext)
                 {
-                    if (DefaultSamplerState == nullptr)
+                    CreateDefaultSamplerState();
+                    if (mBlitPassState == nullptr)
                     {
-                        // Create a texture sampler state description.
-                        D3D11_SAMPLER_DESC samplerDesc;
-                        samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-                        samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-                        samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-                        samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-                        samplerDesc.MipLODBias = 0.0f;
-                        samplerDesc.MaxAnisotropy = 1;
-                        samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
-                        samplerDesc.BorderColor[0] = 0;
-                        samplerDesc.BorderColor[1] = 0;
-                        samplerDesc.BorderColor[2] = 0;
-                        samplerDesc.BorderColor[3] = 0;
-                        samplerDesc.MinLOD = 0;
-                        samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
-                        mGfxDevice->mGfxDevice->CreateSamplerState(&samplerDesc, &DefaultSamplerState);
-                    }
-                    context.mGfxDeviceContext->PSSetSamplers(0, 1, &DefaultSamplerState);
-                    context.mGfxDeviceContext->RSSetState(DefaultRasterState);
+                        mBlitPassVS = CreateVertexShader(mGfxDevice, BlitVertexShaderSource, kVsEntryName);
+                        mBlitPassPS = CreatePixelShader(mGfxDevice, BlitPixelShaderSource, kPsEntryName);
+                        GFXI::GraphicPipelineState::CreateInfo PipelineCreateInfo;
+                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mBlitPassVS;
+                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mBlitPassPS;
+                        PipelineCreateInfo.VertexInputLayout.ElementCount = InputLayoutCount;
+                        PipelineCreateInfo.VertexInputLayout.ElementArray = InputLayoutArray;
+                        mBlitPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
 
-
-                    if (BlitShaderProgramPtr == nullptr)
-                    {
-                        const std::string vsEntryName = "VSMain";
-                        const std::string psEntryName = "PSMain";
-                        const std::vector<D3D11_INPUT_ELEMENT_DESC> InputLayoutArray(InputLayout, InputLayout + InputLayoutCount);
-                        auto VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, BlitVertexShaderSource, vsEntryName, InputLayoutArray);
-                        auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, BlitPixelShaderSource, psEntryName);
-                        BlitShaderProgramPtr = LinkShader(VertexShader, PixelShader);
-                        ASSERT(BlitShaderProgramPtr != nullptr);
-
-                        FullscreenQuadVertexBuffer = mGfxDevice->CreateDefaultVertexBufferImpl(fullscreen_quad::FSQuadVertexCount);
-                        mGfxDeviceImmediateContext->UploadEntireBufferFromMemory(FullscreenQuadVertexBuffer, fullscreen_quad::FSQuadVertices);
+                        GFXI::VertexBuffer::CreateInfo vertexBufferCreateInfo;
+                        vertexBufferCreateInfo.DataUsage = GFXI::EDataUsage::Immutable;
+                        vertexBufferCreateInfo.BufferSize = fullscreen_quad::FSQuadVertexCount * sizeof(engine::VertexLayout);
+                        vertexBufferCreateInfo.InitializedBufferDataPtr = fullscreen_quad::FSQuadVertices;
+                        mFullsceenQuadVertices = mGfxDevice->CreateVertexBuffer(vertexBufferCreateInfo);
                     }
 
-                    D3D11_VIEWPORT Viewport;
-                    Viewport.TopLeftX = 0.0f;
-                    Viewport.TopLeftY = 0.0f;
-                    Viewport.Width = (float)mClientWidth;
-                    Viewport.Height = (float)mClientHeight;
-                    Viewport.MinDepth = 0.0f;
-                    Viewport.MaxDepth = 1.0f;
+                    
+                    GFXI::ViewportInfo viewport;
+                    viewport.X = 0.0f;
+                    viewport.Y = 0.0f;
+                    viewport.Width =  (float)mClientWidth;
+                    viewport.Height = (float)mClientHeight;
+                    viewport.MinDepth = 0.0f;
+                    viewport.MaxDepth = 1.0f;
 
-                    context.mGfxDeviceContext->RSSetViewports(1, &Viewport);
-                    context.mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-                    context.mGfxDeviceContext->IASetInputLayout(BlitShaderProgramPtr->VertexShader->mInputLayout.Get());
-                    context.mGfxDeviceContext->VSSetShader(BlitShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
-                    context.mGfxDeviceContext->PSSetShader(BlitShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
+                    if(mBlitRenderingQueue == nullptr)
+                    {
+                        mGfxDevice->GetDeferredContext()->StartRecordCommandQueue();
+                        mGfxDevice->GetDeferredContext()->SetViewport(viewport);
+                        mGfxDevice->GetDeferredContext()->SetGraphicPipelineState(mBlitPassState);
+                        mGfxDevice->GetDeferredContext()->SetGraphicSamplerStates(GFXI::GraphicPipelineState::EShaderStage::Pixel, 0, 1, &mDefaultSamplerState);
 
-                    context.SetVertexBuffer(FullscreenQuadVertexBuffer, 0);
-                    context.mGfxDeviceContext->Draw(3, 0);
-
-                    const bool DontRestoreContextState = false;
-                    context.mGfxDeviceContext->FinishCommandList(DontRestoreContextState, &BlitRenderingCommandList);
-                    mGfxDeviceImmediateContext->mGfxDeviceContext->ExecuteCommandList(BlitRenderingCommandList, DontRestoreContextState);
+                        GFXI::DeviceContext::VertexBufferBinding binding;
+                        binding.VertexBuffer = mFullsceenQuadVertices;
+                        binding.ElementStride = sizeof(engine::VertexLayout);
+                        binding.BufferOffset = 0;
+                        mGfxDevice->GetDeferredContext()->SetVertexBuffers(0, 1, &binding);
+                        mGfxDevice->GetDeferredContext()->Draw(3, 0);
+                        mBlitRenderingQueue = mGfxDevice->GetDeferredContext()->FinishRecordCommandQueue(bRestoreToDefaultState);
+                    }
+                    mGfxDevice->GetImmediateContext()->ExecuteCommandQueue(mBlitRenderingQueue, bRestoreToDefaultState);
                 }
             );
             MainGraph.BindOutput(blitRenderTarget);
             MainGraph.BindOutput(depthStencil);
             MainGraph.Compile();
-            MainGraph.Execute(*mGfxDeviceDeferredContext);
+            MainGraph.Execute(*mGfxDevice->GetDeferredContext());
         }
 
-        mGfxSwapChain->Present(0, 0);
+        mMainWindowSwapChain->Present();
     }
 
     bool RenderSystem::OnResizeWindow(void* hWindow, int width, int height)
@@ -796,50 +617,40 @@ namespace engine
         return false;
     }
 
-    void RenderSystem::RenderScene(Scene& scene, GfxDeferredContext& context, const ViewConstantBufferData& data, bool shadow)
+    template<typename DataLayout>
+    DataLayout* Map(GFXI::DeferredContext& context, GFXI::UniformBuffer* buffer)
+    {
+        GFXI::DeviceContext::MappedBuffer mb = context.MapBuffer(buffer, GFXI::DeviceContext::EMapMethod::DiscardWrite);
+        return reinterpret_cast<DataLayout*>(mb.DataPtr);
+    }
+    void RenderSystem::RenderScene(Scene& scene, GFXI::DeferredContext& context, const ViewConstantBufferData& data, bool shadow)
     {
         static bool initialize = false;
         static bool initialize_error = false;
         if (!initialize)
         {
-            const unsigned int SceneConstBufferLength = sizeof(math::float4x4) * 3 + sizeof(math::float4) * 2;
-            SceneConstantBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(SceneConstBufferLength);
-
-            const unsigned int ObjectConstBufferLength = sizeof(ObjectConstantDesc);
-            ObjectConstantBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(ObjectConstBufferLength);
-
-            const unsigned int LightViewConstBufferLength = sizeof(LightViewConstantDesc);
-            LightViewConstantBufferPtr = mGfxDevice->CreateDynamicConstantBuffer(LightViewConstBufferLength);
-
-            // 创建顶点着色器
-            const std::string vsEntryName = "VSMain";
-            const std::string psEntryName = "PSMain";
-            const std::vector<D3D11_INPUT_ELEMENT_DESC> InputLayoutArray(InputLayout, InputLayout + InputLayoutCount);
-            auto VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, DefaultVertexShaderSourceCode, vsEntryName, InputLayoutArray);
-            auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, SimpleColorPixelShaderSourceCode, psEntryName);
-            SimpleShaderProgramPtr = LinkShader(VertexShader, PixelShader);
+            GFXI::UniformBuffer::CreateInfo sceneUBCreateInfo;
+            sceneUBCreateInfo.DataUsage = GFXI::EDataUsage::Dynamic;
+            sceneUBCreateInfo.BufferSize = sizeof(math::float4x4) * 3 + sizeof(math::float4) * 2;
+            mSceneUniformBuffer = mGfxDevice->CreateUniformbuffer(sceneUBCreateInfo);
 
 
-            if (ShadowShaderProgramPtr == nullptr)
-            {
-                const std::string vsEntryName = "VSMain";
-                const std::string psEntryName = "PSMain";
-                const std::vector<D3D11_INPUT_ELEMENT_DESC> InputLayoutArray(InputLayout, InputLayout + InputLayoutCount);
-                auto VertexShader = CreateVertexShader(mGfxDevice->mGfxDevice, ShadowVertexShaderSource, vsEntryName, InputLayoutArray);
-                auto PixelShader = CreatePixelShader(mGfxDevice->mGfxDevice, ShadowPixelShaderSource, psEntryName);
-                ShadowShaderProgramPtr = LinkShader(VertexShader, PixelShader);
-                ASSERT(ShadowShaderProgramPtr != nullptr);
-            }
+            GFXI::UniformBuffer::CreateInfo objUBCreateInfo;
+            objUBCreateInfo.DataUsage = GFXI::EDataUsage::Dynamic;
+            objUBCreateInfo.BufferSize = sizeof(ObjectConstantDesc);
+            mObjectUniformBuffer = mGfxDevice->CreateUniformbuffer(objUBCreateInfo);
 
+            GFXI::UniformBuffer::CreateInfo lightViewUBCreateInfo;
+            lightViewUBCreateInfo.DataUsage = GFXI::EDataUsage::Dynamic;
+            lightViewUBCreateInfo.BufferSize = sizeof(LightViewConstantDesc);
+            mLightViewUniformBuffer = mGfxDevice->CreateUniformbuffer(lightViewUBCreateInfo);
 
-            if (SceneConstantBufferPtr == nullptr || ObjectConstantBufferPtr == nullptr
-                || SimpleShaderProgramPtr == nullptr)
+            if (mSceneUniformBuffer == nullptr || mObjectUniformBuffer == nullptr || mLightViewUniformBuffer == nullptr)
             {
                 initialize_error = true;
-                safe_delete(SceneConstantBufferPtr);
-                safe_delete(ObjectConstantBufferPtr);
-                safe_delete(SimpleShaderProgramPtr);
-                safe_delete(BlitShaderProgramPtr);
+                SafeRelease(mSceneUniformBuffer);
+                SafeRelease(mObjectUniformBuffer);
+                SafeRelease(mLightViewUniformBuffer);
             }
             initialize = true;
         }
@@ -850,7 +661,7 @@ namespace engine
             math::float2 zNearFar(1.0f, 50.0f);
 
             // TODO: Vertex and pixel use same constant buffer here.
-            math::float4* pConstBuffer = context.MapBuffer<math::float4>(*SceneConstantBufferPtr);
+            math::float4* pConstBuffer = Map<math::float4>(context , mSceneUniformBuffer);
             {
                 pConstBuffer[0] = data.ViewMatrix.rows[0];
                 pConstBuffer[1] = data.ViewMatrix.rows[1];
@@ -871,49 +682,42 @@ namespace engine
                 pConstBuffer[12] = math::float4(data.LightColor, 1.0f);
                 pConstBuffer[13] = math::float4(data.LightDirection, 0.0f);
             }
-            context.UnmapBuffer(*SceneConstantBufferPtr);
-
-            LightViewConstantDesc* pLightViewConstBuffer = context.MapBuffer<LightViewConstantDesc>(*LightViewConstantBufferPtr);
+            context.UnmapBuffer(mSceneUniformBuffer);
+            LightViewConstantDesc* pLightViewConstBuffer = Map<LightViewConstantDesc>(context, mLightViewUniformBuffer);
             {
                 //TODO:
                 engine::DirectionalLight* pLight = dynamic_cast<engine::DirectionalLight*>(scene.GetDirectionalLight(0));
                 pLightViewConstBuffer->MatrixView = pLight->GetViewMatrix();
                 pLightViewConstBuffer->MatrixProj = math::ortho_lh_matrix4x4f(20, 20, -50, 50);
             }
-            context.UnmapBuffer(*LightViewConstantBufferPtr);
+            context.UnmapBuffer(mLightViewUniformBuffer);
 
-            context.mGfxDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            context.mGfxDeviceContext->IASetInputLayout(SimpleShaderProgramPtr->VertexShader->mInputLayout.Get());
+            GFXI::UniformBuffer* Buffers[2];
             if (shadow)
             {
-                context.mGfxDeviceContext->VSSetShader(ShadowShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
-                context.SetVSConstantBufferImpl(1, LightViewConstantBufferPtr);
+                Buffers[0] = mLightViewUniformBuffer;
+                context.SetGraphicUniformBuffers(GFXI::GraphicPipelineState::EShaderStage::Vertex, 1, 1, Buffers);
             }
             else
             {
-                context.mGfxDeviceContext->VSSetShader(SimpleShaderProgramPtr->VertexShader->mVertexShader.Get(), nullptr, 0);
-                context.SetVSConstantBufferImpl(1, SceneConstantBufferPtr);
-                context.SetVSConstantBufferImpl(2, LightViewConstantBufferPtr);
+                Buffers[0] = mSceneUniformBuffer;
+                Buffers[1] = mLightViewUniformBuffer;
+                context.SetGraphicUniformBuffers(GFXI::GraphicPipelineState::EShaderStage::Vertex, 1, 2, Buffers);
             }
-            if (shadow)
-                context.mGfxDeviceContext->PSSetShader(ShadowShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
-            else
-                context.mGfxDeviceContext->PSSetShader(SimpleShaderProgramPtr->PixelShader->mPixelShader.Get(), nullptr, 0);
-            context.SetPSConstantBufferImpl(0, SceneConstantBufferPtr);
-            scene.RecursiveRender(mGfxDeviceDeferredContext.get());
+            context.SetGraphicUniformBuffers(GFXI::GraphicPipelineState::EShaderStage::Pixel, 0, 1, &mSceneUniformBuffer);
+            scene.RecursiveRender(context);
         }
-
     }
 
 
     void RenderSystem::SetObjectToWorldMatrixForTest(const math::float4x4& matrix)
     {
-        ObjectConstantDesc* pConstBuffer = mGfxDeviceDeferredContext->MapBuffer<ObjectConstantDesc>(*ObjectConstantBufferPtr);
+        ObjectConstantDesc* pConstBuffer = Map<ObjectConstantDesc>(*mGfxDevice->GetDeferredContext(), mObjectUniformBuffer);
         {
             pConstBuffer->MatrixObjectToWorld = matrix;
             pConstBuffer->MatrixWorldToObject = inversed(matrix);
         }
-        mGfxDeviceDeferredContext->UnmapBuffer(*ObjectConstantBufferPtr);
-        mGfxDeviceDeferredContext->SetVSConstantBufferImpl(0, ObjectConstantBufferPtr);
+        mGfxDevice->GetDeferredContext()->UnmapBuffer(mObjectUniformBuffer);
+        mGfxDevice->GetDeferredContext()->SetGraphicUniformBuffers(GFXI::GraphicPipelineState::EShaderStage::Vertex, 0, 1, &mObjectUniformBuffer);
     }
 }

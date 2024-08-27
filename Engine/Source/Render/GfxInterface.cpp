@@ -355,29 +355,4 @@ namespace engine
         mGfxDeviceContext->UpdateSubresource(defaultBuffer->mBufferPtr.Get(), subresource, nullptr,
             data, sourceRowPitch, sourceDepthPitch);
     }
-
-    GfxDeferredContext::GfxDeferredContext(GfxDevice* device, ID3D11DeviceContext* context)
-        : GfxDeviceContext(device, context)
-    { }
-
-    void GfxDeferredContext::SetVertexBuffer(GE::GfxVertexBuffer* vb, unsigned int offset)
-    {
-        SetVertexBufferImpl(dynamic_cast<GfxBaseVertexBuffer*>(vb), offset);
-    }
-
-    void GfxDeferredContext::SetIndexBuffer(GE::GfxIndexBuffer* ib, unsigned int offset)
-    {
-        SetIndexBufferImpl(dynamic_cast<GfxBaseIndexBuffer*>(ib), offset);
-    }
-
-    void GfxDeferredContext::DrawIndexed(unsigned int indexCount, unsigned int startLocation, int indexOffset)
-    {
-        mGfxDeviceContext->DrawIndexed(indexCount, startLocation, indexOffset);
-    }
-
-    void GfxDeferredContext::SetRenderingWorldMatrixForTest(const math::float4x4& matrix)
-    {
-        GetEngineInstance()->GetRenderSystemImpl()->SetObjectToWorldMatrixForTest(matrix);
-    }
-
 }

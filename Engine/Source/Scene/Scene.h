@@ -2,11 +2,15 @@
 #include "PreIncludeFiles.h"
 #include "SceneNode.h"
 
+namespace GFXI
+{
+    struct DeferredContext;
+}
+
 namespace engine
 {
     class Camera;
     class DirectionalLight;
-    class GfxDeferredContext;
 
     class Scene : public GE::Scene
     {
@@ -28,7 +32,7 @@ namespace engine
         Scene();
 
         void RecursiveUpdate(unsigned int elapsedMilliseconds);
-        void RecursiveRender(GfxDeferredContext* context);
+        void RecursiveRender(GFXI::DeferredContext& context);
 
         Camera* GetDefaultCameraInternal();
 

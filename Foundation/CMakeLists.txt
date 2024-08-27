@@ -29,3 +29,7 @@ source_group(Base FILES ${Base_InterSourceFiles})
 add_library(FoundationLibrary ${FoundationLibrary_SourceFiles} )
 target_include_directories(FoundationLibrary PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Base")
 target_include_directories(FoundationLibrary PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Math")
+
+set_target_properties(FoundationLibrary PROPERTIES
+    FOLDER "Engine"
+)

@@ -6,6 +6,8 @@ project(GameEngine)
 
 set(GameEngineOutputDirectory ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 add_subdirectory(Foundation)
+add_subdirectory(GfxInterface/Source/D3D11)
+add_subdirectory(GfxInterface/Source/Vulkan)
 add_subdirectory(Engine)
 add_subdirectory(Application/LitRenderer)
 add_subdirectory(Application/SimpleGame)

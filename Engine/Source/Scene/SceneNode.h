@@ -1,12 +1,11 @@
 #pragma once
-#include "PreIncludeFiles.h"
 #include <vector>
+#include "PreIncludeFiles.h"
 #include "..\..\Include\GEScene.h"
 
 namespace engine
 {
     class Scene;
-    class GfxDeferredContext;
 
     class SceneNode : public GE::SceneNode
     {
@@ -58,7 +57,7 @@ namespace engine
         bool DestoryChildSceneNode(SceneNode* node);
 
         void RecursiveUpdate(uint32_t elapsedMilliseconds);
-        void RecursiveRender(GfxDeferredContext*);
+        void RecursiveRender(GFXI::DeferredContext&);
         
 
     protected:
