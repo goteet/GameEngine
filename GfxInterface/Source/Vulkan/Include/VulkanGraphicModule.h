@@ -9,10 +9,10 @@ namespace GFXI
 {
     const int32_t kQueueFamilyNotFound = -1;
 
-    struct GfxModuleVulkan : public GraphicModule
+    struct GraphicModuleVulkan : public GraphicModule
     {
-        GfxModuleVulkan();
-        virtual ~GfxModuleVulkan();
+        GraphicModuleVulkan();
+        virtual ~GraphicModuleVulkan();
         virtual void Release() override;
 
         virtual bool IsHardwareSupported() override;

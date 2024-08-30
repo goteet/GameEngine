@@ -6,12 +6,12 @@
 
 namespace GFXI
 {
-    struct GfxModuleVulkan;
+    struct GraphicModuleVulkan;
 
-    struct GfxDeviceVulkan : public GraphicDevice
+    struct GraphicDeviceVulkan : public GraphicDevice
     {
-        GfxDeviceVulkan(GfxModuleVulkan* belongsTo, VkDevice);
-        virtual ~GfxDeviceVulkan();
+        GraphicDeviceVulkan(GraphicModuleVulkan* belongsTo, VkDevice);
+        virtual ~GraphicDeviceVulkan();
         virtual void Release() override;
 
         virtual SwapChain*              CreateSwapChain(void* windowHandle, int windowWidth, int windowHeight, bool isFullscreen) override;
@@ -28,7 +28,7 @@ namespace GFXI
         virtual ImmediateContext*       GetImmediateContext() override { return nullptr; }
         virtual DeferredContext*        GetDeferredContext()  override { return nullptr; }
     private:
-        GfxModuleVulkan* mBelongsTo;
+        GraphicModuleVulkan* mBelongsTo;
         VkDevice mVulkanDevice;
         VkQueue  mVulkanQueue;
     };

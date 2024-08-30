@@ -1,11 +1,11 @@
-#include "VulkanGfxModule.h"
-#include "VulkanGfxDevice.h"
+#include "VulkanGraphicDevice.h"
+#include "VulkanGraphicModule.h"
 
 #define kVulkanValidationLayer "VK_LAYER_KHRONOS_validation"
 namespace GFXI
 {
     const int kEnableDebugValidationLayer = true;
-    GfxModuleVulkan::GfxModuleVulkan()
+    GraphicModuleVulkan::GraphicModuleVulkan()
     {
         VkInstance VulkanInstance = CreateVkInstance(kEnableDebugValidationLayer);
         if (VulkanInstance != nullptr)
@@ -28,7 +28,7 @@ namespace GFXI
         }
     }
 
-    GfxModuleVulkan::~GfxModuleVulkan()
+    GraphicModuleVulkan::~GraphicModuleVulkan()
     {
         if (mVulkanInstance != nullptr)
         {
@@ -36,12 +36,12 @@ namespace GFXI
         }
     }
 
-    bool GfxModuleVulkan::IsHardwareSupported()
+    bool GraphicModuleVulkan::IsHardwareSupported()
     {
         return mVulkanInstance != nullptr && mPhyiscalDevice != nullptr && mQueueFamilyIndex != kQueueFamilyNotFound;
     }
 
-    GraphicDevice* GfxModuleVulkan::CreateDevice()
+    GraphicDevice* GraphicModuleVulkan::CreateDevice()
     {
         const float kDeviceQueuePriority = 1.0;
         VkDeviceQueueCreateInfo DeviceQueueCreateInfo;
@@ -66,18 +66,18 @@ namespace GFXI
 
         if (RetCreateDevice == VkResult::VK_SUCCESS)
         {
-            return new GfxDeviceVulkan(this,VulkanDevice);
+            return new GraphicDeviceVulkan(this,VulkanDevice);
         }
 
         return nullptr;
     }
 
-    void GfxModuleVulkan::Release()
+    void GraphicModuleVulkan::Release()
     {
         delete this;
     }
 
-    VkInstance GfxModuleVulkan::CreateVkInstance(bool bEnableDebugLayer)
+    VkInstance GraphicModuleVulkan::CreateVkInstance(bool bEnableDebugLayer)
     {
         if (bEnableDebugLayer)
         {
@@ -127,7 +127,7 @@ namespace GFXI
         }
     }
 
-    bool GfxModuleVulkan::SelectBestPhysicalDevice(const VkInstance& VulkanInstance, VkPhysicalDevice& OutPhysicalDevice, int32_t& OutQueueFamilyIndex, VkPhysicalDeviceFeatures& OutDeviceFeatures)
+    bool GraphicModuleVulkan::SelectBestPhysicalDevice(const VkInstance& VulkanInstance, VkPhysicalDevice& OutPhysicalDevice, int32_t& OutQueueFamilyIndex, VkPhysicalDeviceFeatures& OutDeviceFeatures)
     {
         uint32_t PhysicalDeviceCount = 0;
         vkEnumeratePhysicalDevices(VulkanInstance, &PhysicalDeviceCount, nullptr);
@@ -227,5 +227,5 @@ namespace GFXI
 
 extern "C" GfxInterfaceAPI GFXI::GraphicModule* CreateGfxModule()
 {
-    return new GFXI::GfxModuleVulkan();
+    return new GFXI::GraphicModuleVulkan();
 }

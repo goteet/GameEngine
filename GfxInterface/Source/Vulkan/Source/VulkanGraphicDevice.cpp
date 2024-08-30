@@ -1,10 +1,10 @@
-#include "VulkanGfxDevice.h"
-#include "VulkanGfxModule.h"
+#include "VulkanGraphicDevice.h"
+#include "VulkanGraphicModule.h"
 
 
 namespace GFXI
 {
-    GfxDeviceVulkan::GfxDeviceVulkan(GfxModuleVulkan* belongsTo, VkDevice vulkanDevice)
+    GraphicDeviceVulkan::GraphicDeviceVulkan(GraphicModuleVulkan* belongsTo, VkDevice vulkanDevice)
         : mBelongsTo(belongsTo)
         , mVulkanDevice(vulkanDevice)
     {
@@ -13,16 +13,16 @@ namespace GFXI
         vkGetDeviceQueue(vulkanDevice, QueueFamilyIndex, QueueIndex, &mVulkanQueue);
     }
 
-    GfxDeviceVulkan::~GfxDeviceVulkan()
+    GraphicDeviceVulkan::~GraphicDeviceVulkan()
     {
         vkDestroyDevice(mVulkanDevice, GFX_VK_ALLOCATION_CALLBACK);
     }
-    void GfxDeviceVulkan::Release()
+    void GraphicDeviceVulkan::Release()
     {
         delete this;
     }
 
-    SwapChain* GfxDeviceVulkan::CreateSwapChain(void* windowHandle, int windowWidth, int windowHeight, bool isFullscreen)
+    SwapChain* GraphicDeviceVulkan::CreateSwapChain(void* windowHandle, int windowWidth, int windowHeight, bool isFullscreen)
     {
         return nullptr;
     }

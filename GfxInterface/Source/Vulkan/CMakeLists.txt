@@ -4,13 +4,13 @@ set(GfxInterface_Include ${CMAKE_CURRENT_SOURCE_DIR}/../../Include/GfxInterface.
 
 set(GfxInterfaceVulkan_Inlcude
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanInclude.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanGfxModule.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanGfxDevice.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanGraphicDevice.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanGraphicModule.h
 )
 
 set(GfxInterfaceVulkan_Source
-    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanGfxModule.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanGfxDevice.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanGraphicDevice.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanGraphicModule.cpp
 )
 
 set(GfxInterfaceVulkan_SourceFiles 
