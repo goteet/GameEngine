@@ -37,6 +37,7 @@ namespace GFXI
         VkQueue  mVulkanGraphicQueue;
         VkQueue  mVulkanComputeQueue;
         VkQueue  mVulkanTransferQueue;
+        VkQueue  mVulkanPresentQueue;
 
         uint32_t mGraphicQueueFamilyIndex,  mGraphicQueueIndex;
         uint32_t mComputeQueueFamilyIndex,  mComputeQueueIndex;

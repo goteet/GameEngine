@@ -379,7 +379,7 @@ namespace engine
 
     EGfxIntializationError RenderSystem::InitializeGfxDevice()
     {
-        mGfxModule = LoadGfxLibrary(L"GfxInterfaceD3D11.dll");
+        mGfxModule = LoadGfxLibrary(L"GfxInterfaceVulkan.dll");
         mGfxDevice = mGfxModule->CreateDevice();
         mMainWindowSwapChain = mGfxDevice->CreateSwapChain(mMainWindowHandle, mClientWidth, mClientHeight, mIsFullScreen);
 

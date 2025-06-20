@@ -16,7 +16,7 @@ namespace GFXI
         virtual ~SwapChainD3D11();
         virtual void Release() override;
 
-        virtual void* GetRawHandleForTest() { return mSwapChain.Get(); }
+        void* GetRawHandleForTest() { return mSwapChain.Get(); }
         virtual RenderTargetView* GetRenderTargetView() override;
         virtual void Present() override;
 
