@@ -30,6 +30,8 @@ namespace GFXI
         virtual DepthStencilView*       CreateDepthStencilView(const DepthStencilView::CreateInfo&) override { return nullptr; }
         virtual ImmediateContext*       GetImmediateContext() override { return nullptr; }
         virtual DeferredContext*        GetDeferredContext()  override { return nullptr; }
+
+        VkDevice GetVulkanDevice() { return mVulkanDevice; }
     private:
         GraphicModuleVulkan* mBelongsTo;
         VkPhysicalDevice mVulkanPhysicalDevice;
@@ -37,6 +39,7 @@ namespace GFXI
         VkQueue  mVulkanGraphicQueue;
         VkQueue  mVulkanComputeQueue;
         VkQueue  mVulkanTransferQueue;
+        VkQueue  mVulkanPresentQueue;
 
         uint32_t mGraphicQueueFamilyIndex,  mGraphicQueueIndex;
         uint32_t mComputeQueueFamilyIndex,  mComputeQueueIndex;

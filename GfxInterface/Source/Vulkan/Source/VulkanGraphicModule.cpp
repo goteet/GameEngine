@@ -299,7 +299,7 @@ namespace GFXI
             if (!FoundInQueue)
             {
                 VkDeviceQueueCreateInfo DeviceQueueCreateInfo;
-                VulkanZeroMemory(DeviceQueueCreateInfo, VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
+                VulkanZeroMemory(DeviceQueueCreateInfo);
                 DeviceQueueCreateInfo.queueCount = 1;
                 DeviceQueueCreateInfo.queueFamilyIndex = FamilyIndex;
                 DeviceQueueCreateInfo.pQueuePriorities = QueuePrioritiesOffset;
@@ -400,12 +400,12 @@ namespace GFXI
         }
 
         VkApplicationInfo ApplicationInfo;
-        VulkanZeroMemory(ApplicationInfo, VK_STRUCTURE_TYPE_APPLICATION_INFO);
+        VulkanZeroMemory(ApplicationInfo);
         ApplicationInfo.pEngineName = "GameEngine";
         ApplicationInfo.apiVersion = VK_API_VERSION_1_3;
 
         VkInstanceCreateInfo CreateInfo;
-        VulkanZeroMemory(CreateInfo, VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO);
+        VulkanZeroMemory(CreateInfo);
         CreateInfo.pApplicationInfo = &ApplicationInfo;
 
         if (FoundDebugLayerNames.size() > 0)
