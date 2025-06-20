@@ -10,7 +10,10 @@ namespace GFXI
 
     struct GraphicDeviceVulkan : public GraphicDevice
     {
-        GraphicDeviceVulkan(GraphicModuleVulkan* belongsTo, VkDevice);
+        GraphicDeviceVulkan(GraphicModuleVulkan* BelongsTo, VkPhysicalDevice VulkanPhysicalDevice, VkDevice VulkanDevice,
+            uint32_t GraphicQueueFamilyIndex, uint32_t GraphicQueueIndex,
+            uint32_t ComputeQueueFamilyIndex, uint32_t ComputeQueueIndex,
+            uint32_t TransferQueueFamilyIndex, uint32_t TransferQueueIndex);
         virtual ~GraphicDeviceVulkan();
         virtual void Release() override;
 
@@ -29,7 +32,14 @@ namespace GFXI
         virtual DeferredContext*        GetDeferredContext()  override { return nullptr; }
     private:
         GraphicModuleVulkan* mBelongsTo;
+        VkPhysicalDevice mVulkanPhysicalDevice;
         VkDevice mVulkanDevice;
-        VkQueue  mVulkanQueue;
+        VkQueue  mVulkanGraphicQueue;
+        VkQueue  mVulkanComputeQueue;
+        VkQueue  mVulkanTransferQueue;
+
+        uint32_t mGraphicQueueFamilyIndex,  mGraphicQueueIndex;
+        uint32_t mComputeQueueFamilyIndex,  mComputeQueueIndex;
+        uint32_t mTransferQueueFamilyIndex, mTransferQueueIndex;
     };
 }
