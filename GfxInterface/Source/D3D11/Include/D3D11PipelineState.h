@@ -31,12 +31,12 @@ namespace GFXI
         D3D11_PRIMITIVE_TOPOLOGY        mPrimitiveTopology;
         D3D11_DEPTH_STENCIL_DESC        mDepthStencilStateDesc;
         D3D11_BLEND_DESC                mColorBlendStateDesc;
-        D3D11_RASTERIZER_DESC           mRasterizerStateDesc;
+        D3D11_RASTERIZER_DESC           mRasterizationStateDesc;
 
         ComPtr<ID3D11InputLayout>       mInputLayout;
         ComPtr<ID3D11DepthStencilState> mDepthStencilState;
         ComPtr<ID3D11BlendState>        mColorBlendState;
-        ComPtr<ID3D11RasterizerState>   mRasterizerState;
+        ComPtr<ID3D11RasterizerState>   mRasterizationState;
         float           mBlendConstants[4];
 
         ComPtr<ID3D11VertexShader>      mVertexShader;

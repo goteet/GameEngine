@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 // clang-format off
 #ifdef _MSC_VER
@@ -18,7 +19,7 @@
 
 namespace GFXI
 {
-    enum class GfxInterfaceAPI ECompareFunction : unsigned char
+    enum class GfxInterfaceAPI ECompareFunction : uint8_t
     {
         Never           = 0,
         Always          = 1,
@@ -36,45 +37,45 @@ namespace GFXI
         virtual void Release() = 0;
     };
 
-    enum class EDataUsage : unsigned char
+    enum class EDataUsage : uint8_t
     {
         Default = 0, Immutable = 1, Dynamic = 2, Staging = 3
     };
 
     struct GfxInterfaceAPI Buffer : public Object
     {
-        enum class EBinding : unsigned char
+        enum class EBinding : uint8_t
         {
             Vertex = 0, Index = 1, Uniform = 2
         };
 
-        virtual EBinding        GetBinding() = 0;
-        virtual EDataUsage      GetUsage() = 0;
-        virtual unsigned int    GetBufferSize() = 0;
+        virtual EBinding    GetBinding() = 0;
+        virtual EDataUsage  GetUsage() = 0;
+        virtual uint32_t    GetBufferSize() = 0;
     };
 
     struct GfxInterfaceAPI VertexBuffer : Buffer
     {
         struct CreateInfo
         {
-            EDataUsage      DataUsage = EDataUsage::Default;
-            unsigned int    BufferSize = 0;
-            void*           InitializedBufferDataPtr = nullptr;
+            EDataUsage  DataUsage = EDataUsage::Default;
+            uint32_t    BufferSize = 0;
+            void*       InitializedBufferDataPtr = nullptr;
         };
     };
 
     struct GfxInterfaceAPI IndexBuffer : Buffer
     {
-        enum class EFormat : unsigned char
+        enum class EFormat : uint8_t
         {
             UInt32 = 0, UInt16 = 1,
         };
         struct CreateInfo
         {
-            EFormat         DataFormat  = EFormat::UInt32;
-            EDataUsage      DataUsage   = EDataUsage::Default;
-            unsigned int    BufferSize  = 0;
-            void*           InitializedBufferDataPtr = nullptr;
+            EFormat     DataFormat  = EFormat::UInt32;
+            EDataUsage  DataUsage   = EDataUsage::Default;
+            uint32_t    BufferSize  = 0;
+            void*       InitializedBufferDataPtr = nullptr;
         };
 
         virtual EFormat     GetIndexFormat() = 0;
@@ -84,17 +85,17 @@ namespace GFXI
     {
         struct CreateInfo
         {
-            EDataUsage      DataUsage = EDataUsage::Default;
-            unsigned int    BufferSize = 0;
-            void*           InitializedBufferDataPtr = nullptr;
+            EDataUsage  DataUsage = EDataUsage::Default;
+            uint32_t    BufferSize = 0;
+            void*       InitializedBufferDataPtr = nullptr;
         };
     };
 
     struct GfxInterfaceAPI Texture2D : public Object
     {
-        virtual unsigned int    GetWidth() = 0;
-        virtual unsigned int    GetHeight() = 0;
-        virtual bool            IsUsedByShader() = 0;
+        virtual uint32_t    GetWidth() = 0;
+        virtual uint32_t    GetHeight() = 0;
+        virtual bool        IsUsedByShader() = 0;
     };
 
     struct GfxInterfaceAPI ShaderResourceView : public Object
@@ -104,18 +105,18 @@ namespace GFXI
 
     struct GfxInterfaceAPI RenderTargetView : public Texture2D
     {
-        enum class EFormat: unsigned char
+        enum class EFormat: uint8_t
         {
             R10G10B10A2_UNormInt,
             R8G8B8A8_UNormInt,
         };
         struct CreateInfo
         {
-            EFormat         Format          = EFormat::R8G8B8A8_UNormInt;
-            EDataUsage      DataUsage       = EDataUsage::Default;
-            unsigned int    Width;
-            unsigned int    Height;
-            bool            UsedByShader    = false;
+            EFormat     Format          = EFormat::R8G8B8A8_UNormInt;
+            EDataUsage  DataUsage       = EDataUsage::Default;
+            uint32_t    Width;
+            uint32_t    Height;
+            bool        UsedByShader    = false;
         };
 
         virtual EFormat             GetFormat() = 0;
@@ -125,17 +126,17 @@ namespace GFXI
 
     struct GfxInterfaceAPI DepthStencilView : public Texture2D
     {
-        enum class EFormat : unsigned char
+        enum class EFormat : uint8_t
         {
             D24_UNormInt_S8_UInt,
             D32_SFloat,
         };
         struct CreateInfo
         {
-            EFormat         Format          = EFormat::D24_UNormInt_S8_UInt;
-            unsigned int    Width;
-            unsigned int    Height;
-            bool            UsedByShader    = false;
+            EFormat     Format          = EFormat::D24_UNormInt_S8_UInt;
+            uint32_t    Width;
+            uint32_t    Height;
+            bool        UsedByShader    = false;
         };
 
         virtual EFormat             GetFormat() = 0;
@@ -143,7 +144,7 @@ namespace GFXI
         virtual ShaderResourceView* GetShaderResourceView() = 0;
     };
 
-    enum class GfxInterfaceAPI EShaderType : unsigned char
+    enum class GfxInterfaceAPI EShaderType : uint8_t
     {
         VertexShader    = 0,
         PixelShader     = 1,
@@ -158,17 +159,19 @@ namespace GFXI
         struct CreateInfo
         {
             EShaderType ShaderType              = EShaderType::VertexShader;
-            const char* ShaderName              = nullptr;
+            const char* ShaderNameString        = nullptr;
             const char* EntryNameString         = nullptr;
             const void* ShaderSourceCodeData    = nullptr;
-            unsigned int ShaderSourceCodeLength = 0;
+            uint32_t    ShaderSourceCodeLength  = 0;
             //Includes
             //Definitions
         };
 
-        virtual EShaderType     GetShaderType() = 0;
-        virtual unsigned int    GetBytecodeLength() = 0;
-        virtual void*           GetBytecode() = 0;
+        virtual EShaderType GetShaderType() = 0;
+        virtual const char* GetShaderName() = 0;
+        virtual const char* GetEntryPointName() = 0;
+        virtual void*       GetBytecode() = 0;
+        virtual uint32_t    GetBytecodeLength() = 0;
     };
 
     struct GfxInterfaceAPI Shader : public Object
@@ -176,15 +179,13 @@ namespace GFXI
         struct CreateInfo
         {
             ShaderBinary* ShaderBinary;
-            //unsigned int CodeSize;
-            //unsigned char* CodeDataPtr;
         };
 
-        virtual EShaderType     GetShaderType() = 0;
-        virtual unsigned int    GetBytecodeLength() = 0;
-        virtual void*           GetBytecode() = 0;
-
-        virtual void* GetRawHandle() = 0;
+        virtual EShaderType GetShaderType() = 0;
+        virtual const char* GetShaderName() = 0;
+        virtual const char* GetEntryPointName() = 0;
+        virtual void*       GetBytecode() = 0;
+        virtual uint32_t    GetBytecodeLength() = 0;
     };
 
     struct GfxInterfaceAPI CommandQueue : public Object
@@ -192,18 +193,29 @@ namespace GFXI
 
     };
 
+    struct GfxInterfaceAPI ViewportInfo
+    {
+        float X        = 0.0f;
+        float Y        = 0.0f;
+        float Width    = 1.0f;
+        float Height   = 1.0f;
+        float MinDepth = 0.0f;
+        float MaxDepth = 1.0;
+    };
+
     struct GfxInterfaceAPI GraphicPipelineState : public Object
     {
-        static const int kNumShaderStage = 5;
-        enum class EShaderStage : unsigned char
+        static const uint32_t kNumShaderStage = 5;
+        enum class EShaderStage : uint8_t
         {
             Vertex      = 0,
             Pixel       = 1,
             Geometry    = 2,
             Domain      = 3,
             Hull        = 4,
+            Num         = 5
         };
-        enum class EPrimitiveTopology : unsigned char
+        enum class EPrimitiveTopology : uint8_t
         {
             PointList               = 0,
             LineList                = 1,
@@ -215,11 +227,11 @@ namespace GFXI
         };
         struct VertexInputLayout
         {
-            enum class EInputRate : unsigned char
+            enum class EInputRate : uint8_t
             {
                 Vertex = 0, Instance = 1
             };
-            enum class EVertexFormat : unsigned char
+            enum class EVertexFormat : uint8_t
             {
                 RGBA32_SFloat,
                 RGBA32_UInt,
@@ -231,23 +243,30 @@ namespace GFXI
                 RG32_UInt,
                 RG32_SInt,
             };
-            struct InputElement
+            struct Binding
             {
-                EInputRate      InputRate       = EInputRate::Vertex;
+                EInputRate      InputRate   = EInputRate::Vertex;
+                uint32_t        Index       = 0;
+                uint32_t        Stride      = 0;
+            };
+            struct Attribute
+            {
                 EVertexFormat   VertexFormat    = EVertexFormat::RGBA32_SFloat;
                 const char*     SemanticName;
-                unsigned int    SemanticIndex   = 0;
-                unsigned int    BingdingIndex   = 0;
-                unsigned int    Offset          = 0;
-                unsigned int    InstancedRate   = 0;
+                uint32_t        SemanticIndex   = 0;
+                uint32_t        BingdingIndex   = 0;
+                uint32_t        LocationIndex   = 0;
+                uint32_t        VertexOffset    = 0;
             };
-
-            int ElementCount = 0;
-            InputElement* ElementArray;
+            
+            uint32_t    NumBindingArray     = 0;
+            uint32_t    NumAttributeArray   = 0;
+            Binding*    BindingArray        = nullptr;
+            Attribute*  AttributeArray      = nullptr;
         };
         struct ColorBlendState
         {
-            enum class EBlendOp : unsigned char
+            enum class EBlendOp : uint8_t
             {
                 Add     = 0,
                 Sub     = 1,
@@ -255,7 +274,7 @@ namespace GFXI
                 Min     = 3,
                 Max     = 4
             };
-            enum class EBlendFactor : unsigned char
+            enum class EBlendFactor : uint8_t
             {
                 Zero                = 0,
                 One                 = 1,
@@ -279,19 +298,19 @@ namespace GFXI
                 bool            ColorWriteA     = true;
                 EBlendOp        ColorBlendOp    = EBlendOp::Add;
                 EBlendOp        AlphaBlendOp    = EBlendOp::Add;
-                EBlendFactor    ColorSrcFactor;
-                EBlendFactor    ColorDstFactor;
-                EBlendFactor    AlphaSrcFactor;
-                EBlendFactor    AlphaDstFactor;
+                EBlendFactor    ColorSrcFactor  = EBlendFactor::Zero;
+                EBlendFactor    ColorDstFactor  = EBlendFactor::One;
+                EBlendFactor    AlphaSrcFactor  = EBlendFactor::Zero;
+                EBlendFactor    AlphaDstFactor  = EBlendFactor::One;
             };
 
-            int AttachmentCount = 0;
-            AttachmentBlendState AttachmentBlendStates[8];
-            float BlendConstant[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+            uint32_t                NumAttachments = 0;
+            AttachmentBlendState    AttachmentBlendStates[8];
+            float                   BlendConstant[4] = {1.0f, 1.0f, 1.0f, 1.0f};
         };
         struct DepthStencilState
         {
-            enum class EStencilOp : unsigned char
+            enum class EStencilOp : uint8_t
             {
                 Zero            = 0,
                 Keep            = 1,
@@ -304,29 +323,30 @@ namespace GFXI
             };
             struct StencilDesc
             {
-                ECompareFunction StencilTestFunction    = ECompareFunction::Never;
-                EStencilOp StenciFailOp                 = EStencilOp::Zero;
-                EStencilOp DepthFailOp                  = EStencilOp::Zero;
-                EStencilOp StencilPassOp                = EStencilOp::Zero;
+                ECompareFunction    StencilTestFunction = ECompareFunction::Never;
+                EStencilOp          StenciFailOp        = EStencilOp::Zero;
+                EStencilOp          DepthFailOp         = EStencilOp::Zero;
+                EStencilOp          StencilPassOp       = EStencilOp::Zero;
             };
 
-            bool UsingDepthTest     = true;
-            bool EnableDepthWrite   = true;
-            bool UsingStencilTest   = false;
+            bool                UsingDepthTest      = true;
+            bool                EnableDepthWrite    = true;
+            bool                UsingStencilTest    = false;
             ECompareFunction    DepthTestFunction   = ECompareFunction::LessEqual;
-            unsigned char       StencilReadMask     = 0xFF;
-            unsigned char       StencilWriteMask    = 0xFF;
+            uint8_t             StencilReadMask     = 0xFF;
+            uint8_t             StencilWriteMask    = 0xFF;
+            uint8_t             StencilReference    = 0;
             StencilDesc         StencilFrontFace;
             StencilDesc         StencilBackFace;
         };
-        struct RasterizerState
+        struct RasterizationState
         {
-            enum class EFillMode : unsigned char
+            enum class EFillMode : uint8_t
             {
                 Solid = 0,
                 Wireframe = 1
             };
-            enum class ECullMode : unsigned char
+            enum class ECullMode : uint8_t
             {
                 None = 0,
                 Frontface = 1,
@@ -338,14 +358,15 @@ namespace GFXI
                 Clockwise = 1
             };
 
-            EFillMode   FillMode = EFillMode::Solid;
-            ECullMode   CullMode = ECullMode::Backface;
-            EFrontFace  Frontface = EFrontFace::CounterClockwise;
-            int         DepthBias = 0;
-            float       DepthBiasClamp = 0.0f;
-            float       SlopeScaledDepthBias = 0.0f;
-            bool        UseScissorClip = false;
-            bool        UseAntialiasedline = false;
+            EFillMode       FillMode                = EFillMode::Solid;
+            ECullMode       CullMode                = ECullMode::Backface;
+            EFrontFace      Frontface               = EFrontFace::CounterClockwise;
+            int32_t         DepthBias               = 0;
+            float           DepthBiasClamp          = 0.0f;
+            float           SlopeScaledDepthBias    = 0.0f;
+            bool            UseScissorClip          = false;
+            bool            UseAntialiasedline      = false;
+            ViewportInfo    ViewportInfo;
         };
         struct CreateInfo
         {
@@ -354,7 +375,7 @@ namespace GFXI
             VertexInputLayout   VertexInputLayout;
             ColorBlendState     ColorBlendState;
             DepthStencilState   DepthStencilState;
-            RasterizerState     RasterizerState;
+            RasterizationState  RasterizationState;
         };
     };
 
@@ -366,19 +387,9 @@ namespace GFXI
         };
     };
 
-    struct GfxInterfaceAPI ViewportInfo
-    {
-        float X         = 0.0f;
-        float Y         = 0.0f;
-        float Width     = 1.0f;
-        float Height    = 1.0f;
-        float MinDepth  = 0.0f;
-        float MaxDepth  = 1.0;
-    };
-
     struct GfxInterfaceAPI SamplerState : public Object
     {
-        enum class EFilterMethod : unsigned char
+        enum class EFilterMethod : uint8_t
         {
             Point = 0, Linear = 1, None = 2
         };
@@ -390,42 +401,42 @@ namespace GFXI
             static const EFilterMethod Mip  = _Anisotropic ? EFilterMethod::None : _Mip;
             static const bool IsAnisotropic = _Anisotropic;
             static const bool IsComparison  = _Comparison;
-            static const unsigned int Value = ((unsigned int)_Min) | (((unsigned int)_Mag) << 2) | (((unsigned int)_Mip) << 4) | ((_Comparison ? 0x1 : 0x0) << 6) | ((_Anisotropic ? 0x1 : 0x0) << 8);
+            static const uint32_t Value = ((uint32_t)_Min) | (((uint32_t)_Mag) << 2) | (((uint32_t)_Mip) << 4) | ((_Comparison ? 0x1 : 0x0) << 6) | ((_Anisotropic ? 0x1 : 0x0) << 8);
         };
-        enum class ESamplingFilter : unsigned int
+        enum class ESamplingFilter : uint32_t
         {
-            MinPoint_MagPoint_MipPoint      = SamplingFilterDesc<EFilterMethod::Point,  EFilterMethod::Point,   EFilterMethod::Point>::Value,
-            MinPoint_MagPoint_MipLinear     = SamplingFilterDesc<EFilterMethod::Point,  EFilterMethod::Point,   EFilterMethod::Linear>::Value,
-            MinPoint_MagLinear_MipPoint     = SamplingFilterDesc<EFilterMethod::Point,  EFilterMethod::Linear,  EFilterMethod::Point>::Value,
-            MinPoint_MagLinear_MipLinear    = SamplingFilterDesc<EFilterMethod::Point,  EFilterMethod::Linear,  EFilterMethod::Linear>::Value,
-            MinLinear_MagPoint_MipPoint     = SamplingFilterDesc<EFilterMethod::Linear, EFilterMethod::Point,   EFilterMethod::Point>::Value,
-            MinLinear_MagPoint_MipLinear    = SamplingFilterDesc<EFilterMethod::Linear, EFilterMethod::Point,   EFilterMethod::Linear>::Value,
-            MinLinear_MagLinear_MipPoint    = SamplingFilterDesc<EFilterMethod::Linear, EFilterMethod::Linear,  EFilterMethod::Point>::Value,
-            MinLinear_MagLinear_MipLinear   = SamplingFilterDesc<EFilterMethod::Linear, EFilterMethod::Linear,  EFilterMethod::Linear>::Value,
-            Anisotropic                     = SamplingFilterDesc<EFilterMethod::None,   EFilterMethod::None,    EFilterMethod::None, true>::Value
+            MinPoint_MagPoint_MipPoint      = SamplingFilterDesc<EFilterMethod::Point,  EFilterMethod::Point,   EFilterMethod::Point,   false>::Value,
+            MinPoint_MagPoint_MipLinear     = SamplingFilterDesc<EFilterMethod::Point,  EFilterMethod::Point,   EFilterMethod::Linear,  false>::Value,
+            MinPoint_MagLinear_MipPoint     = SamplingFilterDesc<EFilterMethod::Point,  EFilterMethod::Linear,  EFilterMethod::Point,   false>::Value,
+            MinPoint_MagLinear_MipLinear    = SamplingFilterDesc<EFilterMethod::Point,  EFilterMethod::Linear,  EFilterMethod::Linear,  false>::Value,
+            MinLinear_MagPoint_MipPoint     = SamplingFilterDesc<EFilterMethod::Linear, EFilterMethod::Point,   EFilterMethod::Point,   false>::Value,
+            MinLinear_MagPoint_MipLinear    = SamplingFilterDesc<EFilterMethod::Linear, EFilterMethod::Point,   EFilterMethod::Linear,  false>::Value,
+            MinLinear_MagLinear_MipPoint    = SamplingFilterDesc<EFilterMethod::Linear, EFilterMethod::Linear,  EFilterMethod::Point,   false>::Value,
+            MinLinear_MagLinear_MipLinear   = SamplingFilterDesc<EFilterMethod::Linear, EFilterMethod::Linear,  EFilterMethod::Linear,  false>::Value,
+            Anisotropic                     = SamplingFilterDesc<EFilterMethod::None,   EFilterMethod::None,    EFilterMethod::None,    true >::Value
         };
-        enum class ETextureAddressMode : unsigned char
+        enum class ETextureAddressMode : uint8_t
         {
             Wrap = 0, Clamp = 1, Mirror = 2, Border = 3, MirrorOnce = 5
         };
         struct CreateInfo
         {
-            ESamplingFilter SamplingFilter          = ESamplingFilter::MinLinear_MagLinear_MipLinear;
+            ESamplingFilter     SamplingFilter      = ESamplingFilter::MinLinear_MagLinear_MipLinear;
             ETextureAddressMode SamplingAddressU    = ETextureAddressMode::Clamp;
             ETextureAddressMode SamplingAddressV    = ETextureAddressMode::Clamp;
             ETextureAddressMode SamplingAddressW    = ETextureAddressMode::Clamp;
-            unsigned int MaxAnisotropy              = 1;
-            ECompareFunction ComparisonFunction     = ECompareFunction::Always;
-            float MinLOD        =  0.0f;
-            float MaxLOD        = 32.0f;
-            float MipLODBias    =  0.0f;
-            float BorderColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            uint32_t            MaxAnisotropy       = 1;
+            ECompareFunction    ComparisonFunction  = ECompareFunction::Always;
+            float               MinLOD              = 0.0f;
+            float               MaxLOD              = 32.0f;
+            float               MipLODBias          = 0.0f;
+            float               BorderColor[4]      = { 1.0f, 1.0f, 1.0f, 1.0f };
         };
     };
 
     struct GfxInterfaceAPI DeviceContext : public Object
     {
-        enum class EMapMethod : unsigned char
+        enum class EMapMethod : uint8_t
         {
             Read            = 1,
             Write           = 2,
@@ -435,33 +446,33 @@ namespace GFXI
         };
         struct VertexBufferBinding
         {
-            VertexBuffer* VertexBuffer = nullptr;
-            unsigned int ElementStride = 0;
-            unsigned int BufferOffset = 0;
+            VertexBuffer*   VertexBuffer    = nullptr;
+            uint32_t        ElementStride   = 0;
+            uint32_t        BufferOffset    = 0;  //offset from first element in buffer array.
         };
         struct MappedBuffer
         {
-            void* DataPtr = nullptr;
-            unsigned int RowPitch = 0;
+            void*       DataPtr     = nullptr;
+            uint32_t    RowPitch    = 0;
         };
 
         virtual void SetViewport(const ViewportInfo&) = 0;
-        virtual void SetViewports(unsigned int count, const ViewportInfo*) = 0;
+        virtual void SetViewports(uint32_t count, const ViewportInfo*) = 0;
         virtual void SetGraphicPipelineState(GraphicPipelineState*) = 0;
-        virtual void SetStencilReferenceValue(unsigned int) = 0;
-        virtual void SetGraphicUniformBuffers(GraphicPipelineState::EShaderStage, unsigned int startSlot, unsigned int count, UniformBuffer**) = 0;
-        virtual void SetGraphicShaderResources(GraphicPipelineState::EShaderStage, unsigned int startSlot, unsigned int count, ShaderResourceView**) = 0;
-        virtual void SetGraphicSamplerStates(GraphicPipelineState::EShaderStage, unsigned int startSlot, unsigned int count, SamplerState**) = 0;
-        virtual void SetVertexBuffers(unsigned int startSlot, unsigned int bufferBindingCount, const VertexBufferBinding* bufferBindings) = 0;
-        virtual void SetIndexBuffer(IndexBuffer*, unsigned int offset) = 0;
-        virtual void SetRenderTargets(unsigned int count, RenderTargetView** rts, DepthStencilView* ds) = 0;
-        virtual void Draw(unsigned int vertexCount, unsigned int startVertexLocation) = 0;
-        virtual void DrawIndexed(unsigned int indexCount, unsigned int startIndexLocation, unsigned int baseVertexOffset) = 0;
+        virtual void SetStencilReferenceValue(uint32_t) = 0;
+        virtual void SetGraphicUniformBuffers(GraphicPipelineState::EShaderStage, uint32_t startSlot, uint32_t count, UniformBuffer**) = 0;
+        virtual void SetGraphicShaderResources(GraphicPipelineState::EShaderStage, uint32_t startSlot, uint32_t count, ShaderResourceView**) = 0;
+        virtual void SetGraphicSamplerStates(GraphicPipelineState::EShaderStage, uint32_t startSlot, uint32_t count, SamplerState**) = 0;
+        virtual void SetVertexBuffers(uint32_t startSlot, uint32_t bufferBindingCount, const VertexBufferBinding* bufferBindings) = 0;
+        virtual void SetIndexBuffer(IndexBuffer*, uint32_t offset) = 0;
+        virtual void SetRenderTargets(uint32_t count, RenderTargetView** rts, DepthStencilView* ds) = 0;
+        virtual void Draw(uint32_t vertexCount, uint32_t startVertexLocation) = 0;
+        virtual void DrawIndexed(uint32_t indexCount, uint32_t startIndexLocation, uint32_t baseVertexOffset) = 0;
         virtual void ClearRenderTarget(RenderTargetView* renderTarget, const float clearColor[4]) = 0;
         virtual void ClearDepthBuffer(DepthStencilView* ds, float depth) = 0;
-        virtual void ClearStencilBuffer(DepthStencilView* ds, unsigned char stencil) = 0;
-        virtual void ClearDepthStencil(DepthStencilView* ds, float depth, unsigned char stencil) = 0;
-        virtual void ClearDepthStencil(DepthStencilView* ds, bool d, bool s, float dv, unsigned char sv) = 0;
+        virtual void ClearStencilBuffer(DepthStencilView* ds, uint8_t stencil) = 0;
+        virtual void ClearDepthStencil(DepthStencilView* ds, float depth, uint8_t stencil) = 0;
+        virtual void ClearDepthStencil(DepthStencilView* ds, bool d, bool s, float dv, uint8_t sv) = 0;
         virtual MappedBuffer MapBuffer(Buffer* buffer, EMapMethod mapMethod) = 0;
         virtual void UnmapBuffer(Buffer* buffer) = 0;
         virtual void UpdateBuffer(Buffer*, const void* data) = 0;
@@ -475,19 +486,19 @@ namespace GFXI
 
     struct GfxInterfaceAPI DeferredContext : public DeviceContext
     {
-        virtual void StartRecordCommandQueue() = 0;
-        virtual CommandQueue* FinishRecordCommandQueue(bool bRestoreToDefaultState) = 0;
+        virtual void            StartRecordCommandQueue() = 0;
+        virtual CommandQueue*   FinishRecordCommandQueue(bool bRestoreToDefaultState) = 0;
     };
 
     struct GfxInterfaceAPI SwapChain : public Object
     {
-        virtual RenderTargetView* GetRenderTargetView() = 0;
-        virtual void Present() = 0;
+        virtual RenderTargetView*   GetRenderTargetView() = 0;
+        virtual void                Present() = 0;
     };
 
     struct GfxInterfaceAPI GraphicDevice : public Object
     {
-        virtual SwapChain*              CreateSwapChain(void* WindowHandle, int WindowWidth, int WindowHeight, bool IsFullscreen) = 0;
+        virtual SwapChain*              CreateSwapChain(void* WindowHandle, int32_t WindowWidth, int32_t WindowHeight, bool IsFullscreen) = 0;
         virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) = 0;
         virtual ComputePipelineState*   CreateComputePipelineState(const ComputePipelineState::CreateInfo&) = 0;
         virtual SamplerState*           CreateSamplerState(const SamplerState::CreateInfo&) = 0;
@@ -504,8 +515,8 @@ namespace GFXI
 
     struct GfxInterfaceAPI GraphicModule : public Object
     {
-        virtual bool IsHardwareSupported() = 0;
-        virtual GraphicDevice* CreateDevice() = 0;
+        virtual bool            IsHardwareSupported() = 0;
+        virtual GraphicDevice*  CreateDevice() = 0;
     };
 }
 

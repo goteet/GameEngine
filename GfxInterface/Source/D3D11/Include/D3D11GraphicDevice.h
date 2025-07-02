@@ -16,7 +16,7 @@ namespace GFXI
         virtual ~GraphicDeviceD3D11();
         virtual void Release() override;
 
-        virtual SwapChain*              CreateSwapChain(void* WindowHandle, int WindowWidth, int WindowHeight, bool IsFullscreen) override;
+        virtual SwapChain*              CreateSwapChain(void* WindowHandle, int32_t WindowWidth, int32_t WindowHeight, bool IsFullscreen) override;
         virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) override;
         virtual ComputePipelineState*   CreateComputePipelineState(const ComputePipelineState::CreateInfo&) override { return nullptr; }
         virtual SamplerState*           CreateSamplerState(const SamplerState::CreateInfo&) override;

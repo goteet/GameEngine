@@ -8,20 +8,20 @@ namespace GFXI
         const D3D11_DEPTH_STENCIL_DESC& depthStencilStateDesc,  ID3D11DepthStencilState* depthStencilState,
         const D3D11_BLEND_DESC& colorBlendStateDesc,            ID3D11BlendState* colorBlendState, const float blendConstants[4],
         const D3D11_RASTERIZER_DESC& rasterizerStateDesc,       ID3D11RasterizerState* rasterizerState,
-        ComPtr<ID3D11VertexShader> vertexShader,
-        ComPtr<ID3D11PixelShader> pixelShader,
-        ComPtr<ID3D11GeometryShader> geometryShader,
-        ComPtr<ID3D11DomainShader> domainShader,
-        ComPtr<ID3D11HullShader> hulllShader
+        ComPtr<ID3D11VertexShader>      vertexShader,
+        ComPtr<ID3D11PixelShader>       pixelShader,
+        ComPtr<ID3D11GeometryShader>    geometryShader,
+        ComPtr<ID3D11DomainShader>      domainShader,
+        ComPtr<ID3D11HullShader>        hulllShader
     )
         : mPrimitiveTopology(primitiveTopology)
         , mInputLayout(inputLayout)
         , mDepthStencilStateDesc(depthStencilStateDesc)
         , mColorBlendStateDesc(colorBlendStateDesc)
-        , mRasterizerStateDesc(rasterizerStateDesc)
+        , mRasterizationStateDesc(rasterizerStateDesc)
         , mDepthStencilState(depthStencilState)
         , mColorBlendState(colorBlendState)
-        , mRasterizerState(rasterizerState)
+        , mRasterizationState(rasterizerState)
         , mVertexShader(vertexShader)
         , mPixelShader(pixelShader)
         , mGeometryShader(geometryShader)
@@ -45,7 +45,7 @@ namespace GFXI
         mInputLayout.Reset();
         mDepthStencilState.Reset();
         mColorBlendState.Reset();
-        mRasterizerState.Reset();
+        mRasterizationState.Reset();
     }
 
     void GraphicPipelineStateD3D11::Release()
@@ -64,9 +64,8 @@ namespace GFXI
         context->IASetPrimitiveTopology(mPrimitiveTopology);
         context->IASetInputLayout(mInputLayout.Get());
 
-        context->RSSetState(mRasterizerState.Get());
+        context->RSSetState(mRasterizationState.Get());
         context->OMSetDepthStencilState(mDepthStencilState.Get(), stencilValue);
         context->OMSetBlendState(mColorBlendState.Get(), mBlendConstants, kDefaultSampleCoverageMask);
-        
     }
 }

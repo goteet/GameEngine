@@ -11,55 +11,24 @@
 #include "Scene/Scene.h"
 #include "Render/FrameGraph.h"
 
-using Microsoft::WRL::ComPtr;
+#define USE_VULKAN 1
 
 using VertexInputLayout = GFXI::GraphicPipelineState::VertexInputLayout;
-const unsigned int InputLayoutCount = 3;
-GFXI::GraphicPipelineState::VertexInputLayout::InputElement InputLayoutArray[InputLayoutCount] =
+const uint32_t NumVertexBinding = 1;
+const uint32_t NumVertexAttribute = 3;
+GFXI::GraphicPipelineState::VertexInputLayout::Binding InputVertexBinding = { VertexInputLayout::EInputRate::Vertex, 0, (16 + 12 + 8) };
+GFXI::GraphicPipelineState::VertexInputLayout::Attribute InputVertexAttributes[NumVertexAttribute] =
 {
-    { VertexInputLayout::EInputRate::Vertex, VertexInputLayout::EVertexFormat::RGBA32_SFloat,   "POSITION", 0, 0, 0, 0 },
-    { VertexInputLayout::EInputRate::Vertex, VertexInputLayout::EVertexFormat::RGB32_SFloat,    "NORMAL",   0, 0, 16, 0 },
-    { VertexInputLayout::EInputRate::Vertex, VertexInputLayout::EVertexFormat::RG32_SFloat,     "TEXCOORD", 0, 0, 28, 0 }
+    { VertexInputLayout::EVertexFormat::RGBA32_SFloat,  "POSITION", 0, 0, 0, 0},
+    { VertexInputLayout::EVertexFormat::RGB32_SFloat,   "NORMAL",   0, 0, 1, 16 },
+    { VertexInputLayout::EVertexFormat::RG32_SFloat,    "TEXCOORD", 0, 0, 2, 28 }
 };
-namespace context_private_impl
-{
-    ComPtr<ID3DBlob> CompileShaderSource(
-        const std::string& sourceCodes,
-        const std::string& entryPoint,
-        const std::string profileTarget)
-    {
-        ComPtr<ID3DBlob> shaderBlobPtr = nullptr;
-        ComPtr<ID3DBlob> errorBlobPtr = nullptr;
 
-        HRESULT resultCompile = ::D3DCompile(sourceCodes.c_str(), sourceCodes.size(),
-            NULL,    //Name
-            NULL,    //Defines
-            NULL,    //Inlcudes
-            entryPoint.c_str(),
-            profileTarget.c_str(),
-            0,        //Flag1
-            0,        //Flag2
-            &shaderBlobPtr,
-            &errorBlobPtr);
-
-        if (SUCCEEDED(resultCompile))
-        {
-            return shaderBlobPtr;
-        }
-        else
-        {
-            const char* reasonPtr = (const char*)errorBlobPtr->GetBufferPointer();
-            std::string reasonString = reasonPtr;
-            return nullptr;
-        }
-    }
-}
-
-GFXI::Shader* CreateVertexShader(GFXI::GraphicDevice* GfxDevice,const std::string& source, const std::string& entry)
+GFXI::Shader* CreateVertexShader(GFXI::GraphicDevice* GfxDevice,const std::string& source, const std::string& entry, const std::string& name)
 {
     GFXI::ShaderBinary::CreateInfo binaryCreateInfo;
     binaryCreateInfo.ShaderType = GFXI::EShaderType::VertexShader;
-    binaryCreateInfo.ShaderName = "VertexShader";
+    binaryCreateInfo.ShaderNameString = name.c_str();
     binaryCreateInfo.EntryNameString = entry.c_str();
     binaryCreateInfo.ShaderSourceCodeData = source.c_str();
     binaryCreateInfo.ShaderSourceCodeLength = static_cast<unsigned int>(source.size());
@@ -80,11 +49,11 @@ GFXI::Shader* CreateVertexShader(GFXI::GraphicDevice* GfxDevice,const std::strin
     }
 }
 
-GFXI::Shader* CreatePixelShader(GFXI::GraphicDevice* GfxDevice, const std::string& source, const std::string& entry)
+GFXI::Shader* CreatePixelShader(GFXI::GraphicDevice* GfxDevice, const std::string& source, const std::string& entry, const std::string& name)
 {
     GFXI::ShaderBinary::CreateInfo binaryCreateInfo;
     binaryCreateInfo.ShaderType = GFXI::EShaderType::PixelShader;
-    binaryCreateInfo.ShaderName = "PixelShader";
+    binaryCreateInfo.ShaderNameString = name.c_str();
     binaryCreateInfo.EntryNameString = entry.c_str();
     binaryCreateInfo.ShaderSourceCodeData = source.c_str();
     binaryCreateInfo.ShaderSourceCodeLength = static_cast<unsigned int>(source.size());
@@ -117,10 +86,8 @@ struct LightViewConstantDesc
     math::float4x4 MatrixProj;
 };
 
-const std::string kVsEntryName = "VSMain";
-const std::string kPsEntryName = "PSMain";
 
-const std::string DefaultVertexShaderSourceCode = R"(
+const std::string DefaultVertexShaderSourceCodeD3D11 = R"(
     cbuffer object
     {
         float4x4 MatrixObjectToWorld;
@@ -250,7 +217,7 @@ const std::string BlitPixelShaderSource = R"(
 )";
 
 
-const std::string ShadowVertexShaderSource = R"(
+const std::string ShadowVertexShaderSourceD3D11 = R"(
     cbuffer object
     {
         float4x4 MatrixObjectToWorld;
@@ -284,7 +251,7 @@ const std::string ShadowVertexShaderSource = R"(
     }
 )";
 
-const std::string ShadowPixelShaderSource = R"(
+const std::string ShadowPixelShaderSourceD3D11 = R"(
     struct VertexOutput
     {
         float4 Position : SV_POSITION;
@@ -296,6 +263,105 @@ const std::string ShadowPixelShaderSource = R"(
     }
 )";
 
+const std::string ShadowVertexShaderSourceVulkan = R"(
+    #version 440
+
+    layout(std140, binding = 0) uniform ObjectDataBuffer
+    {
+        mat4 MatrixObjectToWorld;
+        mat4 MatrixWorldToObject;
+    } ObjectData;
+
+    layout(std140, binding = 1) uniform LightDataBuffer
+    {
+        mat4 LightMatrixView;
+        mat4 LightMatrixProj;
+    } LightData;
+
+
+    layout(location = 0) in vec4  i_Position;
+    layout(location = 1) in vec3  i_Normal;
+    layout(location = 2) in vec2  i_Texcoord0;
+    layout(location = 0) out vec2 o_DepthPos;
+
+    out gl_PerVertex
+    {
+        vec4 gl_Position;
+    };
+
+    void main()
+    {
+        vec4 ModelPosition  = ObjectData.MatrixObjectToWorld * i_Position;
+        vec4 ViewPosition   = LightData.LightMatrixView      * ModelPosition;
+        vec4 HomoPosition   = LightData.LightMatrixProj      * ViewPosition;
+        o_DepthPos          = HomoPosition.zw;
+        gl_Position         = HomoPosition;
+    }
+)";
+
+const std::string ShadowPixelShaderSourceVulkan = R"(
+    #version 440
+    layout(location = 0) in vec2 i_DepthPos;
+    layout(location = 0) out vec4 o_FragColor;
+    void main()
+    {
+        o_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+)";
+
+const std::string DefaultVertexShaderSourceCodeVulkan = R"(
+    #version 440
+
+    layout(std140, binding = 0) uniform ObjectDataBuffer
+    {
+        mat4 MatrixObjectToWorld;
+        mat4 MatrixWorldToObject;
+    } ObjectData;
+
+    layout(std140, binding = 1) uniform SceneDataBuffer
+    {
+        mat4 MatrixView;
+        mat4 InvMatrixView;
+        mat4 MatrixProj;
+        vec3   LightColor;
+        float  Padding0;
+        vec3   LightDirection;
+        float  Padding1;
+    } SceneData;
+
+    layout(std140, binding = 2) uniform LightDataBuffer
+    {
+        mat4 LightMatrixView;
+        mat4 LightMatrixProj;
+    } LightData;
+
+    layout(location = 0) in vec4 i_Position;
+    layout(location = 1) in vec3 i_Normal;
+    layout(location = 2) in vec2 i_Texcoord0;
+
+    layout(location = 0) out vec3 o_Normal;
+    layout(location = 1) out vec3 o_ViewDirWS;
+    layout(location = 2) out vec4 o_LightPos;
+
+    out gl_PerVertex
+    {
+        vec4 gl_Position;
+    };
+
+    void main()
+    {
+        vec4 ModelPosition  = ObjectData.MatrixObjectToWorld * i_Position;
+        vec4 ViewPosition   = SceneData.MatrixView * ModelPosition;
+        vec4 ModelNormal    = vec4(i_Normal, 0.0f);
+        mat4 InvMatrixView = SceneData.InvMatrixView;
+        vec3 CameraPositionWS = vec3(InvMatrixView[0][3], InvMatrixView[1][3], InvMatrixView[2][3]);
+
+        gl_Position = SceneData.MatrixProj * ViewPosition;
+        o_Normal    = normalize( (transpose(ObjectData.MatrixWorldToObject) * ModelNormal).xyz );
+        o_ViewDirWS = CameraPositionWS - ModelPosition.xyz;
+        o_LightPos  = (LightData.LightMatrixView * LightData.LightMatrixProj) * ModelPosition;
+    }
+)";
 
 namespace fullscreen_quad
 {
@@ -307,6 +373,23 @@ namespace fullscreen_quad
         { math::float4(-1.0f, +3.0f, 0.0f, 1), math::normalized_float3::unit_z_neg(),  math::float2(0, -1) }
     };
 }
+
+
+#if USE_VULKAN
+const wchar_t* GFXModuleName = L"GfxInterfaceVulkan.dll";
+const std::string& DefaultVertexShaderSourceCode = DefaultVertexShaderSourceCodeVulkan;
+const std::string& ShadowVertexShaderSource = ShadowVertexShaderSourceVulkan;
+const std::string& ShadowPixelShaderSource = ShadowPixelShaderSourceVulkan;
+const std::string kVsEntryName = "main";
+const std::string kPsEntryName = "main";
+#else
+const wchar_t* GFXModuleName = L"GfxInterfaceD3D11.dll";
+const std::string& DefaultVertexShaderSourceCode = DefaultVertexShaderSourceCodeD3D11;
+const std::string& ShadowVertexShaderSource = ShadowVertexShaderSourceD3D11;
+const std::string& ShadowPixelShaderSource = ShadowPixelShaderSourceD3D11;
+const std::string kVsEntryName = "VSMain";
+const std::string kPsEntryName = "PSMain";
+#endif
 
 namespace engine
 {
@@ -379,13 +462,61 @@ namespace engine
 
     EGfxIntializationError RenderSystem::InitializeGfxDevice()
     {
-        mGfxModule = LoadGfxLibrary(L"GfxInterfaceD3D11.dll");
+        mGfxModule = LoadGfxLibrary(GFXModuleName);
         mGfxDevice = mGfxModule->CreateDevice();
         mMainWindowSwapChain = mGfxDevice->CreateSwapChain(mMainWindowHandle, mClientWidth, mClientHeight, mIsFullScreen);
 
+        GFXI::GraphicPipelineState::CreateInfo PipelineCreateInfo;
+        PipelineCreateInfo.VertexInputLayout.NumBindingArray = NumVertexBinding;
+        PipelineCreateInfo.VertexInputLayout.BindingArray = &InputVertexBinding;
+        PipelineCreateInfo.VertexInputLayout.NumAttributeArray = NumVertexAttribute;
+        PipelineCreateInfo.VertexInputLayout.AttributeArray = InputVertexAttributes;
+        PipelineCreateInfo.ColorBlendState.NumAttachments = 1;
+
+        //if (mShadowPassState == nullptr)
+        {
+            mShadowPassVS = CreateVertexShader(mGfxDevice, ShadowVertexShaderSource, kVsEntryName, std::string("ShadowVS"));
+            mShadowPassPS = CreatePixelShader(mGfxDevice, ShadowPixelShaderSource, kPsEntryName, std::string("ShadowPS"));
+            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mShadowPassVS;
+            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mShadowPassPS;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.X = 0.0f;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Y = 0.0f;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Width = (float)1024;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Height = (float)1024;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.MinDepth = 0.0f;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.MaxDepth = 1.0f;
+            mShadowPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
+        }
+        //if (mSimpleDrawPassState == nullptr)
+        {
+            mSimpleDrawPassVS = CreateVertexShader(mGfxDevice, DefaultVertexShaderSourceCode, kVsEntryName, std::string("ForwardVS"));
+            mSimpleDrawPassPS = CreatePixelShader(mGfxDevice, SimpleColorPixelShaderSourceCode, kPsEntryName, std::string("ForwardPS"));
+            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mSimpleDrawPassVS;
+            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mSimpleDrawPassPS;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Width  = mClientWidth;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Height = mClientHeight;
+            mSimpleDrawPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
+        }
+        //if (mBlitPassState == nullptr)
+        {
+            mBlitPassVS = CreateVertexShader(mGfxDevice, BlitVertexShaderSource, kVsEntryName, std::string("BlitVS"));
+            mBlitPassPS = CreatePixelShader(mGfxDevice, BlitPixelShaderSource, kPsEntryName, std::string("BlitPS"));
+            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mBlitPassVS;
+            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mBlitPassPS;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Width  = mClientWidth;
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Height = mClientHeight;
+            mBlitPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
+
+            GFXI::VertexBuffer::CreateInfo vertexBufferCreateInfo;
+            vertexBufferCreateInfo.DataUsage = GFXI::EDataUsage::Immutable;
+            vertexBufferCreateInfo.BufferSize = fullscreen_quad::FSQuadVertexCount * sizeof(engine::VertexLayout);
+            vertexBufferCreateInfo.InitializedBufferDataPtr = fullscreen_quad::FSQuadVertices;
+            mFullsceenQuadVertices = mGfxDevice->CreateVertexBuffer(vertexBufferCreateInfo);
+        }
+
         GFXI::DepthStencilView::CreateInfo depthStencilCreateInfo;
         depthStencilCreateInfo.Format = GFXI::DepthStencilView::EFormat::D24_UNormInt_S8_UInt;
-        depthStencilCreateInfo.Width = mClientWidth;
+        depthStencilCreateInfo.Width  = mClientWidth;
         depthStencilCreateInfo.Height = mClientHeight;
         depthStencilCreateInfo.UsedByShader = false;
 
@@ -461,18 +592,6 @@ namespace engine
             shadowPass.AttachJob(
                 [&](GFXI::DeferredContext& deviceContext)
                 {
-                    if (mShadowPassState == nullptr)
-                    {
-                        mShadowPassVS = CreateVertexShader(mGfxDevice, ShadowVertexShaderSource, kVsEntryName);
-                        mShadowPassPS = CreatePixelShader(mGfxDevice, ShadowPixelShaderSource, kPsEntryName);
-                        GFXI::GraphicPipelineState::CreateInfo PipelineCreateInfo;
-                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mShadowPassVS;
-                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)]  = mShadowPassPS;
-                        PipelineCreateInfo.VertexInputLayout.ElementCount = InputLayoutCount;
-                        PipelineCreateInfo.VertexInputLayout.ElementArray = InputLayoutArray;
-                        mShadowPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
-                    }
-
                     if (mCubeRenderingQueueShadow == nullptr)
                     {
                         GFXI::ViewportInfo viewport;
@@ -504,17 +623,6 @@ namespace engine
                 [&](GFXI::DeferredContext& deviceContext)
                 {
                     CreateDefaultSamplerState();
-                    if (mSimpleDrawPassState == nullptr)
-                    {
-                        mSimpleDrawPassVS = CreateVertexShader(mGfxDevice, DefaultVertexShaderSourceCode, kVsEntryName);
-                        mSimpleDrawPassPS = CreatePixelShader(mGfxDevice, SimpleColorPixelShaderSourceCode, kPsEntryName);
-                        GFXI::GraphicPipelineState::CreateInfo PipelineCreateInfo;
-                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mSimpleDrawPassVS;
-                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mSimpleDrawPassPS;
-                        PipelineCreateInfo.VertexInputLayout.ElementCount = InputLayoutCount;
-                        PipelineCreateInfo.VertexInputLayout.ElementArray = InputLayoutArray;
-                        mSimpleDrawPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
-                    }
 
                     if (mCubeRenderingQueueFinal == nullptr)
                     {
@@ -547,23 +655,6 @@ namespace engine
                 [&](GFXI::DeferredContext& deviceContext)
                 {
                     CreateDefaultSamplerState();
-                    if (mBlitPassState == nullptr)
-                    {
-                        mBlitPassVS = CreateVertexShader(mGfxDevice, BlitVertexShaderSource, kVsEntryName);
-                        mBlitPassPS = CreatePixelShader(mGfxDevice, BlitPixelShaderSource, kPsEntryName);
-                        GFXI::GraphicPipelineState::CreateInfo PipelineCreateInfo;
-                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mBlitPassVS;
-                        PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mBlitPassPS;
-                        PipelineCreateInfo.VertexInputLayout.ElementCount = InputLayoutCount;
-                        PipelineCreateInfo.VertexInputLayout.ElementArray = InputLayoutArray;
-                        mBlitPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
-
-                        GFXI::VertexBuffer::CreateInfo vertexBufferCreateInfo;
-                        vertexBufferCreateInfo.DataUsage = GFXI::EDataUsage::Immutable;
-                        vertexBufferCreateInfo.BufferSize = fullscreen_quad::FSQuadVertexCount * sizeof(engine::VertexLayout);
-                        vertexBufferCreateInfo.InitializedBufferDataPtr = fullscreen_quad::FSQuadVertices;
-                        mFullsceenQuadVertices = mGfxDevice->CreateVertexBuffer(vertexBufferCreateInfo);
-                    }
 
                     
                     GFXI::ViewportInfo viewport;

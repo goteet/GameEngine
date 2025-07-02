@@ -30,11 +30,11 @@ namespace GFXI
         mD3D11Device.Reset();
     }
 
-    SwapChain* GraphicDeviceD3D11::CreateSwapChain(void* windowHandle, int windowWidth, int windowHeight, bool isFullscreen)
+    SwapChain* GraphicDeviceD3D11::CreateSwapChain(void* windowHandle, int32_t windowWidth, int32_t windowHeight, bool isFullscreen)
     {
         const bool kIsUsedForShaders = true;
-        const int  kSampleCount = 1;
-        const int  kSampleQuality = 0;
+        const uint32_t  kSampleCount = 1;
+        const uint32_t  kSampleQuality = 0;
         const DXGI_FORMAT kBackbufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc;
@@ -76,8 +76,6 @@ namespace GFXI
 
         if (SUCCEEDED(retCreateSwapChain))
         {
-
-
             ///* CreateVertexBuffer SwapChain */
             bool kUsedByShader = true;
             //mBackbufferRenderTarget = std::make_unique<GfxRenderTarget>(ERenderTargetFormat::UNormRGBA8, usedForshader);
@@ -202,47 +200,47 @@ namespace GFXI
 
     void StencilDescMap(const GFXI::GraphicPipelineState::DepthStencilState::StencilDesc& stencilFaceDesc, D3D11_DEPTH_STENCILOP_DESC& outD3D11StencilDesc)
     {
-        outD3D11StencilDesc.StencilFailOp = D3D11StencilOpMap[static_cast<unsigned char>(stencilFaceDesc.StenciFailOp)];
-        outD3D11StencilDesc.StencilDepthFailOp = D3D11StencilOpMap[static_cast<unsigned char>(stencilFaceDesc.DepthFailOp)];
-        outD3D11StencilDesc.StencilPassOp = D3D11StencilOpMap[static_cast<unsigned char>(stencilFaceDesc.StencilPassOp)];
-        outD3D11StencilDesc.StencilFunc = D3D11CompareFunctionMap[static_cast<unsigned char>(stencilFaceDesc.StencilTestFunction)];
+        outD3D11StencilDesc.StencilFailOp       = D3D11StencilOpMap[static_cast<uint32_t>(stencilFaceDesc.StenciFailOp)];
+        outD3D11StencilDesc.StencilDepthFailOp  = D3D11StencilOpMap[static_cast<uint32_t>(stencilFaceDesc.DepthFailOp)];
+        outD3D11StencilDesc.StencilPassOp       = D3D11StencilOpMap[static_cast<uint32_t>(stencilFaceDesc.StencilPassOp)];
+        outD3D11StencilDesc.StencilFunc         = D3D11CompareFunctionMap[static_cast<uint32_t>(stencilFaceDesc.StencilTestFunction)];
     }
 
     GraphicPipelineState* GraphicDeviceD3D11::CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo& createInfo)
     {
         using DepthStencilState = GraphicPipelineState::DepthStencilState;
-        using RasterizerState = GraphicPipelineState::RasterizerState;
+        using RasterizationState = GraphicPipelineState::RasterizationState;
         using ColorBlendState = GraphicPipelineState::ColorBlendState;
 
         const DepthStencilState& depthStencilStateDesc = createInfo.DepthStencilState;
-        const RasterizerState& rasterizerStateDesc = createInfo.RasterizerState;
+        const RasterizationState& rasterizationStateDesc = createInfo.RasterizationState;
         const ColorBlendState& colorBlendStateDesc = createInfo.ColorBlendState;
         D3D11_RASTERIZER_DESC rasterizerDesc;
-        rasterizerDesc.FillMode = D3D11FillModeMap[static_cast<unsigned char>(rasterizerStateDesc.FillMode)];
-        rasterizerDesc.CullMode = D3D11CullModeMap[static_cast<unsigned char>(rasterizerStateDesc.CullMode)];
-        rasterizerDesc.FrontCounterClockwise = rasterizerStateDesc.Frontface == RasterizerState::EFrontFace::CounterClockwise;
-        rasterizerDesc.DepthBias = rasterizerStateDesc.DepthBias;
-        rasterizerDesc.DepthBiasClamp = rasterizerStateDesc.DepthBiasClamp;
-        rasterizerDesc.SlopeScaledDepthBias = rasterizerStateDesc.SlopeScaledDepthBias;
+        rasterizerDesc.FillMode = D3D11FillModeMap[static_cast<uint32_t>(rasterizationStateDesc.FillMode)];
+        rasterizerDesc.CullMode = D3D11CullModeMap[static_cast<uint32_t>(rasterizationStateDesc.CullMode)];
+        rasterizerDesc.FrontCounterClockwise = rasterizationStateDesc.Frontface == RasterizationState::EFrontFace::CounterClockwise;
+        rasterizerDesc.DepthBias = rasterizationStateDesc.DepthBias;
+        rasterizerDesc.DepthBiasClamp = rasterizationStateDesc.DepthBiasClamp;
+        rasterizerDesc.SlopeScaledDepthBias = rasterizationStateDesc.SlopeScaledDepthBias;
         rasterizerDesc.DepthClipEnable = true;
-        rasterizerDesc.ScissorEnable = rasterizerStateDesc.UseScissorClip;
+        rasterizerDesc.ScissorEnable = rasterizationStateDesc.UseScissorClip;
         rasterizerDesc.MultisampleEnable = false;
-        rasterizerDesc.AntialiasedLineEnable = rasterizerStateDesc.UseAntialiasedline;
+        rasterizerDesc.AntialiasedLineEnable = rasterizationStateDesc.UseAntialiasedline;
 
         D3D11_BLEND_DESC colorBlendDesc;
         colorBlendDesc.AlphaToCoverageEnable = false;
         colorBlendDesc.IndependentBlendEnable = false;
-        for (int blendIndex = 0; blendIndex < colorBlendStateDesc.AttachmentCount; blendIndex++)
+        for (uint32_t blendIndex = 0; blendIndex < colorBlendStateDesc.NumAttachments; blendIndex++)
         {
             const ColorBlendState::AttachmentBlendState& attachmentBlendState = colorBlendStateDesc.AttachmentBlendStates[blendIndex];
             D3D11_RENDER_TARGET_BLEND_DESC& attachmentBlendDesc = colorBlendDesc.RenderTarget[blendIndex];
             attachmentBlendDesc.BlendEnable = attachmentBlendState.UsingBlend;
-            attachmentBlendDesc.BlendOp = D3D11BlendOpMap[static_cast<unsigned char>(attachmentBlendState.ColorBlendOp)];
-            attachmentBlendDesc.BlendOpAlpha = D3D11BlendOpMap[static_cast<unsigned char>(attachmentBlendState.AlphaBlendOp)];
-            attachmentBlendDesc.SrcBlend = D3D11BlendFactorMap[static_cast<unsigned char>(attachmentBlendState.ColorSrcFactor)];
-            attachmentBlendDesc.DestBlend = D3D11BlendFactorMap[static_cast<unsigned char>(attachmentBlendState.ColorDstFactor)];
-            attachmentBlendDesc.SrcBlendAlpha = D3D11BlendFactorMap[static_cast<unsigned char>(attachmentBlendState.AlphaSrcFactor)];
-            attachmentBlendDesc.DestBlendAlpha = D3D11BlendFactorMap[static_cast<unsigned char>(attachmentBlendState.AlphaDstFactor)];
+            attachmentBlendDesc.BlendOp         = D3D11BlendOpMap[static_cast<uint32_t>(attachmentBlendState.ColorBlendOp)];
+            attachmentBlendDesc.BlendOpAlpha    = D3D11BlendOpMap[static_cast<uint32_t>(attachmentBlendState.AlphaBlendOp)];
+            attachmentBlendDesc.SrcBlend        = D3D11BlendFactorMap[static_cast<uint32_t>(attachmentBlendState.ColorSrcFactor)];
+            attachmentBlendDesc.DestBlend       = D3D11BlendFactorMap[static_cast<uint32_t>(attachmentBlendState.ColorDstFactor)];
+            attachmentBlendDesc.SrcBlendAlpha   = D3D11BlendFactorMap[static_cast<uint32_t>(attachmentBlendState.AlphaSrcFactor)];
+            attachmentBlendDesc.DestBlendAlpha  = D3D11BlendFactorMap[static_cast<uint32_t>(attachmentBlendState.AlphaDstFactor)];
 
             if (!attachmentBlendState.ColorWriteR || !attachmentBlendState.ColorWriteG || !attachmentBlendState.ColorWriteB || !attachmentBlendState.ColorWriteR)
             {
@@ -258,7 +256,7 @@ namespace GFXI
             }
         }
 
-        for (int BlendIndex = colorBlendStateDesc.AttachmentCount; BlendIndex < 8; BlendIndex++)
+        for (int BlendIndex = colorBlendStateDesc.NumAttachments; BlendIndex < 8; BlendIndex++)
         {
             colorBlendDesc.RenderTarget[BlendIndex].BlendEnable = false;
             colorBlendDesc.RenderTarget[BlendIndex].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
@@ -267,62 +265,84 @@ namespace GFXI
         D3D11_DEPTH_STENCIL_DESC depthStencilDesc;
         depthStencilDesc.DepthEnable = depthStencilStateDesc.UsingDepthTest;
         depthStencilDesc.DepthWriteMask = depthStencilStateDesc.EnableDepthWrite ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
-        depthStencilDesc.DepthFunc = D3D11CompareFunctionMap[static_cast<unsigned char>(depthStencilStateDesc.DepthTestFunction)];
+        depthStencilDesc.DepthFunc = D3D11CompareFunctionMap[static_cast<uint32_t>(depthStencilStateDesc.DepthTestFunction)];
         depthStencilDesc.StencilEnable = depthStencilStateDesc.UsingStencilTest;
         depthStencilDesc.StencilReadMask = depthStencilStateDesc.StencilReadMask;
         depthStencilDesc.StencilWriteMask = depthStencilStateDesc.StencilWriteMask;
         StencilDescMap(depthStencilStateDesc.StencilFrontFace, depthStencilDesc.FrontFace);
         StencilDescMap(depthStencilStateDesc.StencilBackFace, depthStencilDesc.BackFace);
 
-        Shader* vertexShader = createInfo.StageShaders[static_cast<int>(GraphicPipelineState::EShaderStage::Vertex)];
-        Shader* pixelShader = createInfo.StageShaders[static_cast<int>(GraphicPipelineState::EShaderStage::Pixel)];
-        Shader* geometryShader = createInfo.StageShaders[static_cast<int>(GraphicPipelineState::EShaderStage::Geometry)];
-        Shader* domainShader = createInfo.StageShaders[static_cast<int>(GraphicPipelineState::EShaderStage::Domain)];
-        Shader* hullShader = createInfo.StageShaders[static_cast<int>(GraphicPipelineState::EShaderStage::Hull)];
+        Shader* vertexShader    = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Vertex)];
+        Shader* pixelShader     = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Pixel)];
+        Shader* geometryShader  = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Geometry)];
+        Shader* domainShader    = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Domain)];
+        Shader* hullShader      = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Hull)];
         ComPtr<ID3D11InputLayout> D3D11InputLayout = nullptr;
         HRESULT retCreateInputLayout = S_OK;
-        if (vertexShader != nullptr && createInfo.VertexInputLayout.ElementCount > 0)
+        if (vertexShader != nullptr && createInfo.VertexInputLayout.AttributeArray> 0)
         {
-            void* vsBytecode = vertexShader->GetBytecode();
-            unsigned int vsBytecodeLength = vertexShader->GetBytecodeLength();
-            std::vector<D3D11_INPUT_ELEMENT_DESC> inputElements(createInfo.VertexInputLayout.ElementCount);
-            for (int index = 0; index < createInfo.VertexInputLayout.ElementCount; index++)
+            auto FindVertexBinding = [&LayoutDesc = createInfo.VertexInputLayout](uint32_t bindingIndex)
+                -> GraphicPipelineState::VertexInputLayout::Binding*
             {
-                const GraphicPipelineState::VertexInputLayout::InputElement& element = createInfo.VertexInputLayout.ElementArray[index];
+                for (uint32_t index = 0; index < LayoutDesc.NumBindingArray; index++)
+                {
+                    if (LayoutDesc.BindingArray[index].Index == bindingIndex)
+                        return LayoutDesc.BindingArray + index;
+                }
+                return nullptr;
+            };
+
+            std::vector<D3D11_INPUT_ELEMENT_DESC> inputElements(createInfo.VertexInputLayout.NumAttributeArray);
+            for (uint32_t index = 0; index < createInfo.VertexInputLayout.NumAttributeArray; index++)
+            {
+                const GraphicPipelineState::VertexInputLayout::Attribute& attribute = createInfo.VertexInputLayout.AttributeArray[index];
                 D3D11_INPUT_ELEMENT_DESC& d3d11Element = inputElements[index];
-                d3d11Element.InputSlotClass = D3D11InstanceRateMap[static_cast<int>(element.InputRate)];
-                d3d11Element.Format = D3DVertexFormatMap[static_cast<int>(element.VertexFormat)];
-                d3d11Element.SemanticName = element.SemanticName;
-                d3d11Element.SemanticIndex = element.SemanticIndex;
-                d3d11Element.InputSlot = element.BingdingIndex;
-                d3d11Element.AlignedByteOffset = element.Offset;
-                d3d11Element.InstanceDataStepRate = element.InstancedRate;
+
+                GraphicPipelineState::VertexInputLayout::Binding* binding = FindVertexBinding(attribute.BingdingIndex);
+                if (binding == nullptr)
+                {
+                    retCreateInputLayout = E_INVALIDARG;
+                    break;
+                }
+
+                d3d11Element.InputSlotClass = D3D11InstanceRateMap[static_cast<uint32_t>(binding->InputRate)];
+                d3d11Element.Format = D3DVertexFormatMap[static_cast<uint32_t>(attribute.VertexFormat)];
+                d3d11Element.SemanticName = attribute.SemanticName;
+                d3d11Element.SemanticIndex = attribute.SemanticIndex;
+                d3d11Element.InputSlot = attribute.BingdingIndex;
+                d3d11Element.AlignedByteOffset = attribute.VertexOffset;
+                d3d11Element.InstanceDataStepRate = (binding->InputRate == GraphicPipelineState::VertexInputLayout::EInputRate::Instance ? 1 : 0);
             }
 
-            retCreateInputLayout = mD3D11Device->CreateInputLayout(inputElements.data(), static_cast<UINT>(inputElements.size())
-                , vsBytecode, vsBytecodeLength, &D3D11InputLayout);
+            if (retCreateInputLayout == S_OK)
+            {
+                void* vsBytecode = vertexShader->GetBytecode();
+                uint32_t vsBytecodeLength = vertexShader->GetBytecodeLength();
+                retCreateInputLayout = mD3D11Device->CreateInputLayout(inputElements.data(), static_cast<UINT>(inputElements.size())
+                    , vsBytecode, vsBytecodeLength, &D3D11InputLayout);
+            }
         }
 
         ComPtr<ID3D11DepthStencilState> D3D11DepthStencilState = nullptr;
         ComPtr<ID3D11BlendState> D3D11ColorBlendState = nullptr;
         ComPtr<ID3D11RasterizerState> D3D11RasterizerState = nullptr;
 
-        HRESULT retCreateDepthStencilState = mD3D11Device->CreateDepthStencilState(&depthStencilDesc, &D3D11DepthStencilState);
-        HRESULT retCreateColorBlendState = mD3D11Device->CreateBlendState(&colorBlendDesc, &D3D11ColorBlendState);
-        HRESULT retCreateRasterizerState = mD3D11Device->CreateRasterizerState(&rasterizerDesc, &D3D11RasterizerState);
+        HRESULT retCreateDepthStencilState  = mD3D11Device->CreateDepthStencilState(&depthStencilDesc, &D3D11DepthStencilState);
+        HRESULT retCreateColorBlendState    = mD3D11Device->CreateBlendState(&colorBlendDesc, &D3D11ColorBlendState);
+        HRESULT retCreateRasterizerState    = mD3D11Device->CreateRasterizerState(&rasterizerDesc, &D3D11RasterizerState);
 
         if (SUCCEEDED(retCreateDepthStencilState)
             && SUCCEEDED(retCreateColorBlendState)
             && SUCCEEDED(retCreateRasterizerState)
             && SUCCEEDED(retCreateInputLayout))
         {
-            ComPtr<ID3D11VertexShader>      D3D11VertexShader = GetShaderPtr<ID3D11VertexShader>(vertexShader);
-            ComPtr<ID3D11PixelShader>       D3D11PixelShader = GetShaderPtr<ID3D11PixelShader>(pixelShader);
+            ComPtr<ID3D11VertexShader>      D3D11VertexShader   = GetShaderPtr<ID3D11VertexShader>(vertexShader);
+            ComPtr<ID3D11PixelShader>       D3D11PixelShader    = GetShaderPtr<ID3D11PixelShader>(pixelShader);
             ComPtr<ID3D11GeometryShader>    D3D11GeometryShader = GetShaderPtr<ID3D11GeometryShader>(geometryShader);
-            ComPtr<ID3D11DomainShader>      D3D11DomainShader = GetShaderPtr<ID3D11DomainShader>(domainShader);
-            ComPtr<ID3D11HullShader>        D3D11HullShader = GetShaderPtr<ID3D11HullShader>(hullShader);
+            ComPtr<ID3D11DomainShader>      D3D11DomainShader   = GetShaderPtr<ID3D11DomainShader>(domainShader);
+            ComPtr<ID3D11HullShader>        D3D11HullShader     = GetShaderPtr<ID3D11HullShader>(hullShader);
 
-            D3D11_PRIMITIVE_TOPOLOGY primitiveTopology = D3D11PrimitiveTopologyMap[static_cast<int>(createInfo.PrimitiveTopology)];
+            D3D11_PRIMITIVE_TOPOLOGY primitiveTopology = D3D11PrimitiveTopologyMap[static_cast<uint32_t>(createInfo.PrimitiveTopology)];
             return new GraphicPipelineStateD3D11(
                 primitiveTopology, D3D11InputLayout.Detach(),
                 depthStencilDesc, D3D11DepthStencilState.Detach(),
@@ -365,12 +385,12 @@ namespace GFXI
     {
         D3D11_SAMPLER_DESC samplerDesc;
         samplerDesc.Filter = D3D11SamplingFilterMap(createInfo.SamplingFilter);
-        samplerDesc.AddressU = D3DTextureAddressModeMap[static_cast<int>(createInfo.SamplingAddressU)];
-        samplerDesc.AddressV = D3DTextureAddressModeMap[static_cast<int>(createInfo.SamplingAddressV)];
-        samplerDesc.AddressW = D3DTextureAddressModeMap[static_cast<int>(createInfo.SamplingAddressW)];
+        samplerDesc.AddressU = D3DTextureAddressModeMap[static_cast<uint32_t>(createInfo.SamplingAddressU)];
+        samplerDesc.AddressV = D3DTextureAddressModeMap[static_cast<uint32_t>(createInfo.SamplingAddressV)];
+        samplerDesc.AddressW = D3DTextureAddressModeMap[static_cast<uint32_t>(createInfo.SamplingAddressW)];
         samplerDesc.MipLODBias = createInfo.MipLODBias;
         samplerDesc.MaxAnisotropy = createInfo.MaxAnisotropy;
-        samplerDesc.ComparisonFunc = D3D11CompareFunctionMap[static_cast<int>(createInfo.ComparisonFunction)];
+        samplerDesc.ComparisonFunc = D3D11CompareFunctionMap[static_cast<uint32_t>(createInfo.ComparisonFunction)];
         samplerDesc.MinLOD = createInfo.MinLOD;
         samplerDesc.MaxLOD = createInfo.MaxLOD;
         samplerDesc.BorderColor[0] = createInfo.BorderColor[0];
@@ -418,7 +438,7 @@ namespace GFXI
         HRESULT retCompileShader = ::D3DCompile(
             createInfo.ShaderSourceCodeData,
             createInfo.ShaderSourceCodeLength,
-            createInfo.ShaderName,
+            createInfo.ShaderNameString,
             NULL,    //Defines
             NULL,    //Inlcudes
             createInfo.EntryNameString,
@@ -430,7 +450,8 @@ namespace GFXI
 
         if (SUCCEEDED(retCompileShader))
         {
-            return new ShaderBinaryD3D11(createInfo.ShaderType, shaderBlobPtr.Detach());
+            
+            return new ShaderBinaryD3D11(createInfo.ShaderType, shaderBlobPtr.Detach(), createInfo.ShaderNameString, createInfo.EntryNameString);
         }
         else
         {
@@ -453,7 +474,7 @@ namespace GFXI
             HRESULT retCreateShader = mD3D11Device->CreateVertexShader(createInfo.ShaderBinary->GetBytecode(), createInfo.ShaderBinary->GetBytecodeLength(), classLinkage, &shader);
             if (SUCCEEDED(retCreateShader))
             {
-                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach());
+                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach(), createInfo.ShaderBinary->GetShaderName(), createInfo.ShaderBinary->GetEntryPointName());
             }
             break;
         }
@@ -463,7 +484,7 @@ namespace GFXI
             HRESULT retCreateShader = mD3D11Device->CreatePixelShader(createInfo.ShaderBinary->GetBytecode(), createInfo.ShaderBinary->GetBytecodeLength(), classLinkage, &shader);
             if (SUCCEEDED(retCreateShader))
             {
-                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach());
+                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach(), createInfo.ShaderBinary->GetShaderName(), createInfo.ShaderBinary->GetEntryPointName());
             }
             break;
         }
@@ -473,7 +494,7 @@ namespace GFXI
             HRESULT retCreateShader = mD3D11Device->CreateDomainShader(createInfo.ShaderBinary->GetBytecode(), createInfo.ShaderBinary->GetBytecodeLength(), classLinkage, &shader);
             if (SUCCEEDED(retCreateShader))
             {
-                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach());
+                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach(), createInfo.ShaderBinary->GetShaderName(), createInfo.ShaderBinary->GetEntryPointName());
             }
             break;
         }
@@ -483,7 +504,7 @@ namespace GFXI
             HRESULT retCreateShader = mD3D11Device->CreateHullShader(createInfo.ShaderBinary->GetBytecode(), createInfo.ShaderBinary->GetBytecodeLength(), classLinkage, &shader);
             if (SUCCEEDED(retCreateShader))
             {
-                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach());
+                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach(), createInfo.ShaderBinary->GetShaderName(), createInfo.ShaderBinary->GetEntryPointName());
             }
             break;
         }
@@ -493,7 +514,7 @@ namespace GFXI
             HRESULT retCreateShader = mD3D11Device->CreateComputeShader(createInfo.ShaderBinary->GetBytecode(), createInfo.ShaderBinary->GetBytecodeLength(), classLinkage, &shader);
             if (SUCCEEDED(retCreateShader))
             {
-                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach());
+                return NewTShaderInstance(shaderType, shaderBinaryBlob, shader.Detach(), createInfo.ShaderBinary->GetShaderName(), createInfo.ShaderBinary->GetEntryPointName());
             }
             break;
         }
@@ -517,7 +538,7 @@ namespace GFXI
         }
         D3D11_BUFFER_DESC bufferDesc;
         bufferDesc.ByteWidth = createInfo.BufferSize;
-        bufferDesc.Usage = D3D11UsageMap[static_cast<int>(createInfo.DataUsage)];
+        bufferDesc.Usage = D3D11UsageMap[static_cast<uint32_t>(createInfo.DataUsage)];
         bufferDesc.BindFlags = BindFlag;
         bufferDesc.CPUAccessFlags = 0;
         bufferDesc.MiscFlags = 0; //https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_resource_misc_flag

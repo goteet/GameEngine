@@ -10,19 +10,19 @@ namespace GFXI
 
     struct GraphicDeviceVulkan : public GraphicDevice
     {
-        GraphicDeviceVulkan(GraphicModuleVulkan* BelongsTo, VkPhysicalDevice VulkanPhysicalDevice, VkDevice VulkanDevice,
-            uint32_t GraphicQueueFamilyIndex, uint32_t GraphicQueueIndex,
-            uint32_t ComputeQueueFamilyIndex, uint32_t ComputeQueueIndex,
-            uint32_t TransferQueueFamilyIndex, uint32_t TransferQueueIndex);
+        GraphicDeviceVulkan(GraphicModuleVulkan* belongsTo, VkPhysicalDevice vulkanPhysicalDevice, VkDevice vulkanDevice,
+            uint32_t graphicQueueFamilyIndex,   uint32_t graphicQueueIndex,
+            uint32_t computeQueueFamilyIndex,   uint32_t computeQueueIndex,
+            uint32_t transferQueueFamilyIndex,  uint32_t transferQueueIndex);
         virtual ~GraphicDeviceVulkan();
         virtual void Release() override;
 
         virtual SwapChain*              CreateSwapChain(void* windowHandle, int windowWidth, int windowHeight, bool isFullscreen) override;
-        virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) override { return nullptr; }
+        virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) override;
         virtual ComputePipelineState*   CreateComputePipelineState(const ComputePipelineState::CreateInfo&) override { return nullptr; }
-        virtual SamplerState*           CreateSamplerState(const SamplerState::CreateInfo&) override { return nullptr; }
-        virtual ShaderBinary*           CompileShader(const ShaderBinary::CreateInfo&) override { return nullptr; }
-        virtual Shader*                 CreateShader(const Shader::CreateInfo&) override { return nullptr; }
+        virtual SamplerState*           CreateSamplerState(const SamplerState::CreateInfo&) override;
+        virtual ShaderBinary*           CompileShader(const ShaderBinary::CreateInfo&) override;
+        virtual Shader*                 CreateShader(const Shader::CreateInfo&) override;
         virtual VertexBuffer*           CreateVertexBuffer(const VertexBuffer::CreateInfo&) override { return nullptr; }
         virtual IndexBuffer*            CreateIndexBuffer(const IndexBuffer::CreateInfo&) override { return nullptr; }
         virtual UniformBuffer*          CreateUniformbuffer(const UniformBuffer::CreateInfo&) override { return nullptr; }
