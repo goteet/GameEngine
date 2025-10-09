@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.12)
 
 set(Base_InterSourceFiles 
-    ${CMAKE_CURRENT_SOURCE_DIR}/Base/MemoryHelper.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Base/ScopeHelper.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Base/FileHelper.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Base/MemoryHelper.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Base/Serialization.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Base/ScopeHelper.h
 )
 set(Math_InterSourceFiles 
     ${CMAKE_CURRENT_SOURCE_DIR}/Math/PredefinedConstantValues.h
