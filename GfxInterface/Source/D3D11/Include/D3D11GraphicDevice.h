@@ -19,6 +19,7 @@ namespace GFXI
         virtual SwapChain*              CreateSwapChain(void* WindowHandle, int32_t WindowWidth, int32_t WindowHeight, bool IsFullscreen) override;
         virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) override;
         virtual ComputePipelineState*   CreateComputePipelineState(const ComputePipelineState::CreateInfo&) override { return nullptr; }
+        virtual DescriptorSetLayout*    CreateDescriptorSetLayout(const DescriptorSetLayout::CreateInfo&) override { return nullptr;}
         virtual SamplerState*           CreateSamplerState(const SamplerState::CreateInfo&) override;
         virtual ShaderBinary*           CompileShader(const ShaderBinary::CreateInfo&) override;
         virtual Shader*                 CreateShader(const Shader::CreateInfo&) override;

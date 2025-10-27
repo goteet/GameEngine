@@ -74,6 +74,19 @@ GFXI::Shader* CreatePixelShader(GFXI::GraphicDevice* GfxDevice, const std::strin
     }
 }
 
+GFXI::DescriptorSetLayout* CreateDescriptorSetLayout(GFXI::GraphicDevice* GfxDevice, GFXI::DescriptorSetLayout::CreateInfo::DescriptorDesc* descriptorBindingDescs, uint32_t num)
+{
+    GFXI::DescriptorSetLayout::CreateInfo createInfo;
+    createInfo.NumDescriptorBindings = num;// static_cast<uint32_t>(descriptorBindingDescs.size());
+    createInfo.DescriptorBindings = descriptorBindingDescs;
+    return GfxDevice->CreateDescriptorSetLayout(createInfo);
+}
+
+GFXI::DescriptorSetLayout* CreateDescriptorSetLayout(GFXI::GraphicDevice* GfxDevice, std::vector<GFXI::DescriptorSetLayout::CreateInfo::DescriptorDesc>& descriptorBindingDescs)
+{
+    return CreateDescriptorSetLayout(GfxDevice, descriptorBindingDescs.data(), static_cast<uint32_t>(descriptorBindingDescs.size()));
+}
+
 struct ObjectConstantDesc
 {
     math::float4x4 MatrixObjectToWorld;
@@ -217,7 +230,7 @@ const std::string BlitPixelShaderSourceD3D11 = R"(
 )";
 
 
-const std::string ShadowVertexShaderSourceD3D11 = R"(
+const std::string ShadowVertexShaderSourceCodeD3D11 = R"(
     cbuffer object
     {
         float4x4 MatrixObjectToWorld;
@@ -251,7 +264,7 @@ const std::string ShadowVertexShaderSourceD3D11 = R"(
     }
 )";
 
-const std::string ShadowPixelShaderSourceD3D11 = R"(
+const std::string ShadowPixelShaderSourceCodeD3D11 = R"(
     struct VertexOutput
     {
         float4 Position : SV_POSITION;
@@ -263,20 +276,25 @@ const std::string ShadowPixelShaderSourceD3D11 = R"(
     }
 )";
 
-const std::string ShadowVertexShaderSourceVulkan = R"(
+GFXI::DescriptorSetLayout::CreateInfo::DescriptorDesc ShadowDescriptorBindings0 =
+{ GFXI::DescriptorSetLayout::EDescriptorType::UniformBuffer, 1, GFXI::DescriptorSetLayout::EShaderStageFlags::VertexShaderStageBits };
+
+GFXI::DescriptorSetLayout::CreateInfo::DescriptorDesc ShadowDescriptorBindings1 =
+{ GFXI::DescriptorSetLayout::EDescriptorType::UniformBuffer, 1, GFXI::DescriptorSetLayout::EShaderStageFlags::VertexShaderStageBits };
+
+const std::string ShadowVertexShaderSourceCodeVulkan = R"(
     #version 440
-
-    layout(std140, binding = 0) uniform ObjectDataBuffer
-    {
-        mat4 MatrixObjectToWorld;
-        mat4 MatrixWorldToObject;
-    } ObjectData;
-
-    layout(std140, binding = 1) uniform LightDataBuffer
+    layout(std140, set = 0, binding = 0) uniform LightDataBuffer
     {
         mat4 LightMatrixView;
         mat4 LightMatrixProj;
     } LightData;
+
+    layout(std140, set = 1, binding = 0) uniform ObjectDataBuffer
+    {
+        mat4 MatrixObjectToWorld;
+        mat4 MatrixWorldToObject;
+    } ObjectData;
 
 
     layout(location = 0) in vec4  i_Position;
@@ -299,7 +317,7 @@ const std::string ShadowVertexShaderSourceVulkan = R"(
     }
 )";
 
-const std::string ShadowPixelShaderSourceVulkan = R"(
+const std::string ShadowPixelShaderSourceCodeVulkan = R"(
     #version 440
     layout(location = 0) in vec2 i_DepthPos;
     layout(location = 0) out vec4 o_FragColor;
@@ -309,16 +327,22 @@ const std::string ShadowPixelShaderSourceVulkan = R"(
     }
 )";
 
+std::vector<GFXI::DescriptorSetLayout::CreateInfo::DescriptorDesc> DefaultDescriptorBindings0 =
+{
+    { GFXI::DescriptorSetLayout::EDescriptorType::UniformBuffer, 1, GFXI::DescriptorSetLayout::EShaderStageFlags::VertexShaderStageBits | GFXI::DescriptorSetLayout::EShaderStageFlags::PixelShaderStageBits },
+    { GFXI::DescriptorSetLayout::EDescriptorType::UniformBuffer, 1, GFXI::DescriptorSetLayout::EShaderStageFlags::VertexShaderStageBits },
+    { GFXI::DescriptorSetLayout::EDescriptorType::Sampler, 1, GFXI::DescriptorSetLayout::EShaderStageFlags::PixelShaderStageBits }
+};
+
+
+GFXI::DescriptorSetLayout::CreateInfo::DescriptorDesc DefaultDescriptorBindings1 =
+{ GFXI::DescriptorSetLayout::EDescriptorType::UniformBuffer, 1, GFXI::DescriptorSetLayout::EShaderStageFlags::VertexShaderStageBits };
+
 const std::string DefaultVertexShaderSourceCodeVulkan = R"(
     #version 440
 
-    layout(std140, binding = 0) uniform ObjectDataBuffer
-    {
-        mat4 MatrixObjectToWorld;
-        mat4 MatrixWorldToObject;
-    } ObjectData;
 
-    layout(std140, binding = 1) uniform SceneDataBuffer
+    layout(std140, set = 0, binding = 0) uniform SceneDataBuffer
     {
         mat4 MatrixView;
         mat4 InvMatrixView;
@@ -329,11 +353,17 @@ const std::string DefaultVertexShaderSourceCodeVulkan = R"(
         float  Padding1;
     } SceneData;
 
-    layout(std140, binding = 2) uniform LightDataBuffer
+    layout(std140, set = 0, binding = 1) uniform LightDataBuffer
     {
         mat4 LightMatrixView;
         mat4 LightMatrixProj;
     } LightData;
+
+    layout(std140, set = 1, binding = 0) uniform ObjectDataBuffer
+    {
+        mat4 MatrixObjectToWorld;
+        mat4 MatrixWorldToObject;
+    } ObjectData;
 
     layout(location = 0) in vec4 i_Position;
     layout(location = 1) in vec3 i_Normal;
@@ -365,7 +395,7 @@ const std::string DefaultVertexShaderSourceCodeVulkan = R"(
 
 const std::string SimpleColorPixelShaderSourceCodeVulkan = R"(
     #version 440
-    layout(std140, binding = 0) uniform SceneDataBuffer
+    layout(std140, set = 0, binding = 0) uniform SceneDataBuffer
     {
         mat4  MatrixView;
         mat4  InvMatrixView;
@@ -376,7 +406,7 @@ const std::string SimpleColorPixelShaderSourceCodeVulkan = R"(
         float Padding1;
     } SceneData;
 
-    layout(binding = 1) uniform sampler2D ShadowSampler;
+    layout(set = 0, binding = 2) uniform sampler2D ShadowSampler;
 
     layout(location = 0) in vec3 i_Normal;
     layout(location = 1) in vec3 i_ViewDirWS;
@@ -414,6 +444,9 @@ const std::string SimpleColorPixelShaderSourceCodeVulkan = R"(
 )";
 
 
+GFXI::DescriptorSetLayout::CreateInfo::DescriptorDesc BlitDescriptorBindings =
+{ GFXI::DescriptorSetLayout::EDescriptorType::CombinedImageSampler, 1, GFXI::DescriptorSetLayout::EShaderStageFlags::PixelShaderStageBits };
+
 const std::string BlitVertexShaderSourceVulkan = R"(
     #version 440
 
@@ -435,7 +468,7 @@ const std::string BlitVertexShaderSourceVulkan = R"(
 
 const std::string BlitPixelShaderSourceVulkan = R"(
     #version 440
-    layout(binding=0) uniform sampler2D ScreenImageSampler;
+    layout(set = 0, binding = 0) uniform sampler2D ScreenImageSampler;
 
     layout(location=0) in  vec2 i_Texcoord;
     layout(location=0) out vec4 o_FragColor;
@@ -463,8 +496,8 @@ namespace fullscreen_quad
 const wchar_t* GFXModuleName = L"GfxInterfaceVulkan.dll";
 const std::string& DefaultVertexShaderSourceCode = DefaultVertexShaderSourceCodeVulkan;
 const std::string& SimpleColorPixelShaderSourceCode = SimpleColorPixelShaderSourceCodeVulkan;
-const std::string& ShadowVertexShaderSource = ShadowVertexShaderSourceVulkan;
-const std::string& ShadowPixelShaderSource = ShadowPixelShaderSourceVulkan;
+const std::string& ShadowVertexShaderSourceCode = ShadowVertexShaderSourceCodeVulkan;
+const std::string& ShadowPixelShaderSourceCode = ShadowPixelShaderSourceCodeVulkan;
 
 const std::string& BlitVertexShaderSourceCode = BlitVertexShaderSourceVulkan;
 const std::string& BlitPixelShaderSourceCode = BlitPixelShaderSourceVulkan;
@@ -474,8 +507,8 @@ const std::string kPsEntryName = "main";
 const wchar_t* GFXModuleName = L"GfxInterfaceD3D11.dll";
 const std::string& DefaultVertexShaderSourceCode = DefaultVertexShaderSourceCodeD3D11;
 const std::string& SimpleColorPixelShaderSourceCode = SimpleColorPixelShaderSourceCodeD3D11;
-const std::string& ShadowVertexShaderSource = ShadowVertexShaderSourceD3D11;
-const std::string& ShadowPixelShaderSource = ShadowPixelShaderSourceD3D11;
+const std::string& ShadowVertexShaderSourceCode = ShadowVertexShaderSourceCodeD3D11;
+const std::string& ShadowPixelShaderSourceCode = ShadowPixelShaderSourceCodeD3D11;
 const std::string& BlitVertexShaderSourceCode = BlitVertexShaderSourceD3D11;
 const std::string& BlitPixelShaderSourceCode = BlitPixelShaderSourceD3D11;
 const std::string kVsEntryName = "VSMain";
@@ -502,6 +535,12 @@ namespace engine
 
     RenderSystem::~RenderSystem()
     {
+        SafeRelease(mDescriptorSetLayoutShadow0);
+        SafeRelease(mDescriptorSetLayoutShadow1);
+        SafeRelease(mDescriptorSetLayoutSimpleDraw0);
+        SafeRelease(mDescriptorSetLayoutSimpleDraw1);
+        SafeRelease(mDescriptorSetLayoutBlit);
+
         SafeRelease(mFullsceenQuadVertices);
         SafeRelease(mSceneUniformBuffer);
         SafeRelease(mObjectUniformBuffer);
@@ -566,10 +605,15 @@ namespace engine
 
         //if (mShadowPassState == nullptr)
         {
-            mShadowPassVS = CreateVertexShader(mGfxDevice, ShadowVertexShaderSource, kVsEntryName, std::string("ShadowVS"));
-            mShadowPassPS = CreatePixelShader(mGfxDevice, ShadowPixelShaderSource, kPsEntryName, std::string("ShadowPS"));
-            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mShadowPassVS;
-            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mShadowPassPS;
+            mShadowPassVS = CreateVertexShader(mGfxDevice, ShadowVertexShaderSourceCode, kVsEntryName, std::string("ShadowVS"));
+            mShadowPassPS = CreatePixelShader(mGfxDevice, ShadowPixelShaderSourceCode, kPsEntryName, std::string("ShadowPS"));
+            PipelineCreateInfo.ShaderModuleDesc.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mShadowPassVS;
+            PipelineCreateInfo.ShaderModuleDesc.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)]  = mShadowPassPS;
+            mDescriptorSetLayoutShadow0 = CreateDescriptorSetLayout(mGfxDevice, &ShadowDescriptorBindings0, 1);
+            mDescriptorSetLayoutShadow1 = CreateDescriptorSetLayout(mGfxDevice, &ShadowDescriptorBindings1, 1);
+            std::vector<GFXI::DescriptorSetLayout*> layouts = { mDescriptorSetLayoutShadow0, mDescriptorSetLayoutShadow1 };
+            PipelineCreateInfo.ShaderModuleDesc.NumDescriptorSetLayouts = static_cast<uint32_t>(layouts.size());
+            PipelineCreateInfo.ShaderModuleDesc.DescriptorSetLayouts    = layouts.data();
             PipelineCreateInfo.RasterizationState.ViewportInfo.X = 0.0f;
             PipelineCreateInfo.RasterizationState.ViewportInfo.Y = 0.0f;
             PipelineCreateInfo.RasterizationState.ViewportInfo.Width = (float)1024;
@@ -582,20 +626,29 @@ namespace engine
         {
             mSimpleDrawPassVS = CreateVertexShader(mGfxDevice, DefaultVertexShaderSourceCode, kVsEntryName, std::string("ForwardVS"));
             mSimpleDrawPassPS = CreatePixelShader(mGfxDevice, SimpleColorPixelShaderSourceCode, kPsEntryName, std::string("ForwardPS"));
-            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mSimpleDrawPassVS;
-            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mSimpleDrawPassPS;
-            PipelineCreateInfo.RasterizationState.ViewportInfo.Width  = mClientWidth;
-            PipelineCreateInfo.RasterizationState.ViewportInfo.Height = mClientHeight;
+            PipelineCreateInfo.ShaderModuleDesc.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mSimpleDrawPassVS;
+            PipelineCreateInfo.ShaderModuleDesc.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)]  = mSimpleDrawPassPS;
+            mDescriptorSetLayoutSimpleDraw0 = CreateDescriptorSetLayout(mGfxDevice, DefaultDescriptorBindings0);
+            mDescriptorSetLayoutSimpleDraw1 = CreateDescriptorSetLayout(mGfxDevice, &DefaultDescriptorBindings1, 1);
+            std::vector<GFXI::DescriptorSetLayout*> layouts = { mDescriptorSetLayoutSimpleDraw0, mDescriptorSetLayoutSimpleDraw1 };
+            PipelineCreateInfo.ShaderModuleDesc.NumDescriptorSetLayouts = static_cast<uint32_t>(layouts.size());
+            PipelineCreateInfo.ShaderModuleDesc.DescriptorSetLayouts    = layouts.data();
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Width  = static_cast<float>(mClientWidth);
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Height = static_cast<float>(mClientHeight);
             mSimpleDrawPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
         }
         //if (mBlitPassState == nullptr)
         {
             mBlitPassVS = CreateVertexShader(mGfxDevice, BlitVertexShaderSourceCode, kVsEntryName, std::string("BlitVS"));
             mBlitPassPS = CreatePixelShader(mGfxDevice, BlitPixelShaderSourceCode, kPsEntryName, std::string("BlitPS"));
-            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mBlitPassVS;
-            PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mBlitPassPS;
-            PipelineCreateInfo.RasterizationState.ViewportInfo.Width  = mClientWidth;
-            PipelineCreateInfo.RasterizationState.ViewportInfo.Height = mClientHeight;
+            PipelineCreateInfo.ShaderModuleDesc.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mBlitPassVS;
+            PipelineCreateInfo.ShaderModuleDesc.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)]  = mBlitPassPS;
+            mDescriptorSetLayoutBlit = CreateDescriptorSetLayout(mGfxDevice, &BlitDescriptorBindings, 1);
+            PipelineCreateInfo.ShaderModuleDesc.NumDescriptorSetLayouts = 1;
+            PipelineCreateInfo.ShaderModuleDesc.DescriptorSetLayouts = &mDescriptorSetLayoutBlit;
+
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Width = static_cast<float>(mClientWidth);
+            PipelineCreateInfo.RasterizationState.ViewportInfo.Height = static_cast<float>(mClientHeight);
             mBlitPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
 
             GFXI::VertexBuffer::CreateInfo vertexBufferCreateInfo;

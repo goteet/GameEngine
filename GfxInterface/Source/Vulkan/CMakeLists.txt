@@ -6,6 +6,7 @@ set(GfxInterfaceVulkan_Inlcude
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanInclude.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanGraphicDevice.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanGraphicModule.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanPipelineState.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanShader.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanSwapChain.h
 )
@@ -13,6 +14,7 @@ set(GfxInterfaceVulkan_Inlcude
 set(GfxInterfaceVulkan_Source
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanGraphicDevice.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanGraphicModule.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanPipelineState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanShader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanSwapChain.cpp
 )

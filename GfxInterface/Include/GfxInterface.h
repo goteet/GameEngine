@@ -144,7 +144,7 @@ namespace GFXI
         virtual ShaderResourceView* GetShaderResourceView() = 0;
     };
 
-    enum class GfxInterfaceAPI EShaderType : uint8_t
+    enum class GfxInterfaceAPI EShaderType : uint32_t
     {
         VertexShader    = 0,
         PixelShader     = 1,
@@ -152,6 +152,7 @@ namespace GFXI
         DomainShader    = 3,
         HullShader      = 4,
         ComputeShader   = 5,
+        Num = 6
     };
 
     struct GfxInterfaceAPI ShaderBinary : public Object
@@ -188,6 +189,48 @@ namespace GFXI
         virtual uint32_t    GetBytecodeLength() = 0;
     };
 
+
+    struct GfxInterfaceAPI DescriptorSetLayout : public Object
+    {
+        enum class EDescriptorType : uint32_t
+        {
+            Sampler = 0,
+            CombinedImageSampler = 1,
+            UniformBuffer = 2,
+            StorageBuffer = 3,
+            UniformBufferDynamic = 4,
+            StorageBufferDynamic = 5,
+        };
+
+        enum EShaderStageFlags : uint32_t
+        {
+            VertexShaderStageBits   = 0x00000001,
+            PixelShaderStageBits    = 0x00000002,
+            GeometryShaderStageBits = 0x00000004,
+            DomainShaderStageBits   = 0x00000008,
+            HullShaderStageBits     = 0x00000010,
+            ComputeShaderStageBits  = 0x00000020,
+
+            BasicGraphicsStagesBits = VertexShaderStageBits | PixelShaderStageBits,
+            AllGraphicsStagesBits   = VertexShaderStageBits | PixelShaderStageBits | GeometryShaderStageBits | DomainShaderStageBits | HullShaderStageBits,
+            AllStageBits            = 0x7FFFFFFF,
+        };
+        struct CreateInfo
+        {
+            struct DescriptorDesc
+            {
+                EDescriptorType DescriptorType = EDescriptorType::UniformBuffer;
+                uint32_t        NumDescriptors = 1;
+                uint32_t        ShaderStageFlags = 0;
+            };
+
+            uint32_t        NumDescriptorBindings   = 0;
+            DescriptorDesc* DescriptorBindings      = nullptr;
+        };
+
+
+    };
+
     struct GfxInterfaceAPI CommandQueue : public Object
     {
 
@@ -205,7 +248,6 @@ namespace GFXI
 
     struct GfxInterfaceAPI GraphicPipelineState : public Object
     {
-        static const uint32_t kNumShaderStage = 5;
         enum class EShaderStage : uint8_t
         {
             Vertex      = 0,
@@ -368,9 +410,15 @@ namespace GFXI
             bool            UseAntialiasedline      = false;
             ViewportInfo    ViewportInfo;
         };
+        struct ShaderModuleDesc
+        {
+            Shader* StageShaders[(uint32_t)EShaderStage::Num] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+            uint32_t NumDescriptorSetLayouts = 0;
+            DescriptorSetLayout** DescriptorSetLayouts = nullptr;
+        };
         struct CreateInfo
         {
-            Shader*             StageShaders[kNumShaderStage] = { 0, 0, 0, 0, 0 };
+            ShaderModuleDesc    ShaderModuleDesc;
             EPrimitiveTopology  PrimitiveTopology = EPrimitiveTopology::TriangleList;
             VertexInputLayout   VertexInputLayout;
             ColorBlendState     ColorBlendState;
@@ -501,6 +549,7 @@ namespace GFXI
         virtual SwapChain*              CreateSwapChain(void* WindowHandle, int32_t WindowWidth, int32_t WindowHeight, bool IsFullscreen) = 0;
         virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) = 0;
         virtual ComputePipelineState*   CreateComputePipelineState(const ComputePipelineState::CreateInfo&) = 0;
+        virtual DescriptorSetLayout*    CreateDescriptorSetLayout(const DescriptorSetLayout::CreateInfo&) = 0;
         virtual SamplerState*           CreateSamplerState(const SamplerState::CreateInfo&) = 0;
         virtual ShaderBinary*           CompileShader(const ShaderBinary::CreateInfo&) = 0;
         virtual Shader*                 CreateShader(const Shader::CreateInfo&) = 0;

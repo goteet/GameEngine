@@ -22,7 +22,7 @@ namespace GFXI
         virtual unsigned int    GetBytecodeLength() override;
 
     private:
-        EShaderType mShaderType;
+        EShaderType                mShaderType;
         std::vector<unsigned char> mSpirVBinary;
         std::string mName;
         std::string mEntryPoint;
@@ -41,10 +41,10 @@ namespace GFXI
 
         VkShaderModule          GetVulkanShaderModule();
     private:
-        GraphicDeviceVulkan* mBelongsTo;
-        EShaderType mShaderType;
-        VkShaderModule mVulkanShaderModule;
-        std::vector<unsigned char> mSpirVBinary;
+        GraphicDeviceVulkan*        mBelongsTo;
+        EShaderType                 mShaderType;
+        VkShaderModule              mVulkanShaderModule;
+        std::vector<unsigned char>  mSpirVBinary;
         std::string mName;
         std::string mEntryPoint;
     };

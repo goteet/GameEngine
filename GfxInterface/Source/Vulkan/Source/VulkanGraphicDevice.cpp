@@ -1,5 +1,6 @@
 #include "VulkanGraphicDevice.h"
 #include "VulkanGraphicModule.h"
+#include "VulkanPipelineState.h"
 #include "VulkanShader.h"
 #include "VulkanSwapChain.h"
 
@@ -276,6 +277,15 @@ namespace GFXI
         VkStencilOp::VK_STENCIL_OP_INVERT               //Invert = 7
     };
 
+    static const VkDescriptorType VulkanDescriptorTypeMapping[] = {
+        VkDescriptorType::VK_DESCRIPTOR_TYPE_SAMPLER,
+        VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+        VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
+
+    };
 
     void VulkanMapStencilFaceSetting(VkStencilOpState& faceSetting,
         const GraphicPipelineState::DepthStencilState::StencilDesc& faceDesc,
@@ -299,14 +309,14 @@ namespace GFXI
 
         //Stages
         std::vector<VkPipelineShaderStageCreateInfo> Stages;
-        for (int32_t stageIndex = 0; stageIndex < GraphicPipelineState::kNumShaderStage; stageIndex++)
+        for (int32_t stageIndex = 0; stageIndex < static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Num); stageIndex++)
         {
-            if (info.StageShaders[stageIndex] != nullptr)
+            if (info.ShaderModuleDesc.StageShaders[stageIndex] != nullptr)
             {
-                ShaderVulkan* StageShader = reinterpret_cast<ShaderVulkan*>(info.StageShaders[stageIndex]);
+                ShaderVulkan* StageShader = reinterpret_cast<ShaderVulkan*>(info.ShaderModuleDesc.StageShaders[stageIndex]);
                 VkPipelineShaderStageCreateInfo StageCreateInfo;
                 VulkanZeroMemory(StageCreateInfo);
-                StageCreateInfo.stage = VulkanPipelineShaderStageMapping[static_cast<unsigned char>(StageShader->GetShaderType())];
+                StageCreateInfo.stage = VulkanPipelineShaderStageMapping[stageIndex];
                 StageCreateInfo.module = StageShader->GetVulkanShaderModule();
                 StageCreateInfo.pName = StageShader->GetEntryPointName();
                 //TODO: no need to do in current state.
@@ -469,38 +479,17 @@ namespace GFXI
         DynamicStateInfo.pDynamicStates = DynamicStates;
 
         //Layout
-        std::vector<VkDescriptorSetLayoutBinding> LayoutBinding;
-        VkDescriptorSetLayoutBinding binding;
-        binding.binding = 0;
-        binding.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        binding.descriptorCount = 1;
-        binding.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
-        LayoutBinding.emplace_back(binding);
-
-        binding.binding = 1;
-        LayoutBinding.emplace_back(binding);
-
-        //TODO:??
-        //binding.binding = 2;
-        //LayoutBinding.emplace_back(binding);
-
-        VkDescriptorSetLayoutCreateInfo DescriptorSetLayoutCreateInfo;
-        VulkanZeroMemory(DescriptorSetLayoutCreateInfo);
-        DescriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(LayoutBinding.size());
-        DescriptorSetLayoutCreateInfo.pBindings = LayoutBinding.data();
-
-        VkDescriptorSetLayout DescriptorSetLayouts;
-        VkResult RetCreateDescriptorSetLayout = vkCreateDescriptorSetLayout(mVulkanDevice, &DescriptorSetLayoutCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &DescriptorSetLayouts);
-        if (RetCreateDescriptorSetLayout != VkResult::VK_SUCCESS)
+        std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
+        for (uint32_t index = 0; index < info.ShaderModuleDesc.NumDescriptorSetLayouts; index++)
         {
-            return nullptr;
+            VulkanDescriptorSetLayout* VulkanLayout = reinterpret_cast<VulkanDescriptorSetLayout*>(info.ShaderModuleDesc.DescriptorSetLayouts[index]);
+            DescriptorSetLayouts.emplace_back(VulkanLayout->GetVulkanDescriptorSetLayout());
         }
-
 
         VkPipelineLayoutCreateInfo LayoutCreateInfo;
         VulkanZeroMemory(LayoutCreateInfo);
-        LayoutCreateInfo.setLayoutCount = 1;
-        LayoutCreateInfo.pSetLayouts = &DescriptorSetLayouts;
+        LayoutCreateInfo.setLayoutCount = info.ShaderModuleDesc.NumDescriptorSetLayouts;
+        LayoutCreateInfo.pSetLayouts = DescriptorSetLayouts.data();
         LayoutCreateInfo.pushConstantRangeCount = 0;
         LayoutCreateInfo.pPushConstantRanges = nullptr;
 
@@ -508,7 +497,6 @@ namespace GFXI
         VkResult RetCreatePipelineLayout = vkCreatePipelineLayout(mVulkanDevice, &LayoutCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &VulkanPipelineLayout);
         if (RetCreatePipelineLayout != VkResult::VK_SUCCESS)
         {
-            vkDestroyDescriptorSetLayout(mVulkanDevice, DescriptorSetLayouts, GFX_VK_ALLOCATION_CALLBACK);
             return nullptr;
         }
 
@@ -552,7 +540,6 @@ namespace GFXI
         VkResult RetCreateRenderPass = vkCreateRenderPass(mVulkanDevice, &RenderPassCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &VulkanRenderPass);
         if (RetCreateRenderPass != VkResult::VK_SUCCESS)
         {
-            vkDestroyDescriptorSetLayout(mVulkanDevice, DescriptorSetLayouts, GFX_VK_ALLOCATION_CALLBACK);
             vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
             return nullptr;
         }
@@ -580,14 +567,17 @@ namespace GFXI
         VkResult RetCreateGfxPipeline = vkCreateGraphicsPipelines(mVulkanDevice, VK_NULL_HANDLE, 1, &GfxPipelineCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &VulkanPipeline);
         if (RetCreateGfxPipeline == VkResult::VK_SUCCESS)
         {
-            //TOOD:
+            vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
+            vkDestroyRenderPass(mVulkanDevice, VulkanRenderPass, GFX_VK_ALLOCATION_CALLBACK);
+            GraphicPipelineStateVulkan* vulkanPipelineState = new GraphicPipelineStateVulkan(this, VulkanPipeline);
+            return vulkanPipelineState;
+        }
+        else
+        {
+            vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
+            vkDestroyRenderPass(mVulkanDevice, VulkanRenderPass, GFX_VK_ALLOCATION_CALLBACK);
             return nullptr;
         }
-
-        vkDestroyDescriptorSetLayout(mVulkanDevice, DescriptorSetLayouts, GFX_VK_ALLOCATION_CALLBACK);
-        vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
-        vkDestroyRenderPass(mVulkanDevice, VulkanRenderPass, GFX_VK_ALLOCATION_CALLBACK);
-        return nullptr;
     }
 
     //TODO:
@@ -649,6 +639,105 @@ namespace GFXI
             unsigned char* IterEnd = IterBegin + SpirVBinary->GetBytecodeLength();
             std::vector<unsigned char> Binary(IterBegin, IterEnd);
             return new ShaderVulkan(this, SpirVBinary->GetShaderType(), ShaderModule, std::move(Binary), SpirVBinary->GetShaderName(), SpirVBinary->GetEntryPointName());
+        }
+        return nullptr;
+    }
+
+    VkShaderStageFlags VulkanShaderStageFlagsMapping(uint32_t bindingShaderStageFlags)
+    {
+
+        if (bindingShaderStageFlags == GFXI::DescriptorSetLayout::EShaderStageFlags::AllStageBits)
+        {
+            return VK_SHADER_STAGE_ALL;
+        }
+        else
+        {
+            auto CheckStageFlagBits = [&val = bindingShaderStageFlags](uint32_t mask, uint32_t mapping) -> uint32_t
+            { return (val & mask) > 0 ? mapping : 0; };
+
+            typedef GFXI::DescriptorSetLayout::EShaderStageFlags Flags;
+            const uint32_t& v = bindingShaderStageFlags;
+            //TODO:
+            // Implement Domain & Hull Shader.
+            uint32_t VSBits = CheckStageFlagBits(Flags::VertexShaderStageBits,   VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT);
+            uint32_t PSBits = CheckStageFlagBits(Flags::PixelShaderStageBits,    VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT);
+            uint32_t GSBits = CheckStageFlagBits(Flags::GeometryShaderStageBits, VkShaderStageFlagBits::VK_SHADER_STAGE_GEOMETRY_BIT);
+            uint32_t DSBits = CheckStageFlagBits(Flags::DomainShaderStageBits,   0);//VkShaderStageFlagBits::VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT
+            uint32_t HSBits = CheckStageFlagBits(Flags::HullShaderStageBits,     0);//VkShaderStageFlagBits::VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT
+            uint32_t CSBits = CheckStageFlagBits(Flags::ComputeShaderStageBits,  VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT);
+
+            return VSBits | PSBits | GSBits | DSBits | HSBits | CSBits;
+            //TODO: Ray-Tracing.
+            // Provided by VK_KHR_ray_tracing_pipeline
+            //VK_SHADER_STAGE_RAYGEN_BIT_KHR = 0x00000100,
+            //// Provided by VK_KHR_ray_tracing_pipeline
+            //VK_SHADER_STAGE_ANY_HIT_BIT_KHR = 0x00000200,
+            //// Provided by VK_KHR_ray_tracing_pipeline
+            //VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR = 0x00000400,
+            //// Provided by VK_KHR_ray_tracing_pipeline
+            //VK_SHADER_STAGE_MISS_BIT_KHR = 0x00000800,
+            //// Provided by VK_KHR_ray_tracing_pipeline
+            //VK_SHADER_STAGE_INTERSECTION_BIT_KHR = 0x00001000,
+            //// Provided by VK_KHR_ray_tracing_pipeline
+            //VK_SHADER_STAGE_CALLABLE_BIT_KHR = 0x00002000,
+            //// Provided by VK_EXT_mesh_shader
+            //VK_SHADER_STAGE_TASK_BIT_EXT = 0x00000040,
+            //// Provided by VK_EXT_mesh_shader
+            //VK_SHADER_STAGE_MESH_BIT_EXT = 0x00000080,
+            //// Provided by VK_HUAWEI_subpass_shading
+            //VK_SHADER_STAGE_SUBPASS_SHADING_BIT_HUAWEI = 0x00004000,
+            //// Provided by VK_HUAWEI_cluster_culling_shader
+            //VK_SHADER_STAGE_CLUSTER_CULLING_BIT_HUAWEI = 0x00080000,
+            //// Provided by VK_NV_ray_tracing
+            //VK_SHADER_STAGE_RAYGEN_BIT_NV = VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+            //// Provided by VK_NV_ray_tracing
+            //VK_SHADER_STAGE_ANY_HIT_BIT_NV = VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+            //// Provided by VK_NV_ray_tracing
+            //VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+            //// Provided by VK_NV_ray_tracing
+            //VK_SHADER_STAGE_MISS_BIT_NV = VK_SHADER_STAGE_MISS_BIT_KHR,
+            //// Provided by VK_NV_ray_tracing
+            //VK_SHADER_STAGE_INTERSECTION_BIT_NV = VK_SHADER_STAGE_INTERSECTION_BIT_KHR,
+            //// Provided by VK_NV_ray_tracing
+            //VK_SHADER_STAGE_CALLABLE_BIT_NV = VK_SHADER_STAGE_CALLABLE_BIT_KHR,
+            //// Provided by VK_NV_mesh_shader
+            //VK_SHADER_STAGE_TASK_BIT_NV = VK_SHADER_STAGE_TASK_BIT_EXT,
+            //// Provided by VK_NV_mesh_shader
+            //VK_SHADER_STAGE_MESH_BIT_NV =  VK_SHADER_STAGE_MESH_BIT_EXT,
+        }
+    }
+
+    DescriptorSetLayout* GraphicDeviceVulkan::CreateDescriptorSetLayout(const DescriptorSetLayout::CreateInfo& createInfo)
+    {
+        std::vector<VkDescriptorSetLayoutBinding> DescriptorSetLayoutBindings;
+
+        for (uint32_t bindingIndex = 0; bindingIndex < createInfo.NumDescriptorBindings; bindingIndex++)
+        {
+            GFXI::DescriptorSetLayout::CreateInfo::DescriptorDesc& desc = createInfo.DescriptorBindings[bindingIndex];
+
+            VkDescriptorSetLayoutBinding binding;
+
+            //TODO:
+            // fix binding index after update Graphic API.
+            binding.binding         = bindingIndex;
+            binding.descriptorType  = VulkanDescriptorTypeMapping[static_cast<uint32_t>(desc.DescriptorType)];
+            binding.descriptorCount = desc.NumDescriptors;
+            binding.stageFlags      = VulkanShaderStageFlagsMapping(desc.ShaderStageFlags);
+            binding.pImmutableSamplers = nullptr;
+            DescriptorSetLayoutBindings.emplace_back(binding);
+        }
+
+        VkDescriptorSetLayoutCreateInfo DescriptorSetLayoutCreateInfo;
+        VulkanZeroMemory(DescriptorSetLayoutCreateInfo);
+        DescriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(DescriptorSetLayoutBindings.size());
+        DescriptorSetLayoutCreateInfo.pBindings = DescriptorSetLayoutBindings.data();
+
+        VkDescriptorSetLayout DescriptorSetLayouts;
+        VkResult RetCreateDescriptorSetLayout = vkCreateDescriptorSetLayout(mVulkanDevice, &DescriptorSetLayoutCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &DescriptorSetLayouts);
+
+        if (RetCreateDescriptorSetLayout == VkResult::VK_SUCCESS)
+        {
+            return new VulkanDescriptorSetLayout(this, DescriptorSetLayouts);
         }
         return nullptr;
     }

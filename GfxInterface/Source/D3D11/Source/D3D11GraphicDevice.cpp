@@ -272,11 +272,11 @@ namespace GFXI
         StencilDescMap(depthStencilStateDesc.StencilFrontFace, depthStencilDesc.FrontFace);
         StencilDescMap(depthStencilStateDesc.StencilBackFace, depthStencilDesc.BackFace);
 
-        Shader* vertexShader    = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Vertex)];
-        Shader* pixelShader     = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Pixel)];
-        Shader* geometryShader  = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Geometry)];
-        Shader* domainShader    = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Domain)];
-        Shader* hullShader      = createInfo.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Hull)];
+        Shader* vertexShader    = createInfo.ShaderModuleDesc.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Vertex)];
+        Shader* pixelShader     = createInfo.ShaderModuleDesc.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Pixel)];
+        Shader* geometryShader  = createInfo.ShaderModuleDesc.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Geometry)];
+        Shader* domainShader    = createInfo.ShaderModuleDesc.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Domain)];
+        Shader* hullShader      = createInfo.ShaderModuleDesc.StageShaders[static_cast<uint32_t>(GraphicPipelineState::EShaderStage::Hull)];
         ComPtr<ID3D11InputLayout> D3D11InputLayout = nullptr;
         HRESULT retCreateInputLayout = S_OK;
         if (vertexShader != nullptr && createInfo.VertexInputLayout.AttributeArray> 0)

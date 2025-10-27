@@ -92,6 +92,13 @@ namespace engine
         GFXI::Shader* mSimpleDrawPassPS   = nullptr;
         GFXI::Shader* mBlitPassVS         = nullptr;
         GFXI::Shader* mBlitPassPS         = nullptr;
+
+        GFXI::DescriptorSetLayout* mDescriptorSetLayoutShadow0 = nullptr;
+        GFXI::DescriptorSetLayout* mDescriptorSetLayoutShadow1 = nullptr;
+        GFXI::DescriptorSetLayout* mDescriptorSetLayoutSimpleDraw0 = nullptr;
+        GFXI::DescriptorSetLayout* mDescriptorSetLayoutSimpleDraw1 = nullptr;
+        GFXI::DescriptorSetLayout* mDescriptorSetLayoutBlit         = nullptr;
+
         GFXI::GraphicPipelineState* mShadowPassState     = nullptr;
         GFXI::GraphicPipelineState* mSimpleDrawPassState = nullptr;
         GFXI::GraphicPipelineState* mBlitPassState       = nullptr;
