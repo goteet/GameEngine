@@ -29,6 +29,7 @@ namespace GFXI
                     ImageViewCreateInfo.image = Image;
                     ImageViewCreateInfo.viewType = VkImageViewType::VK_IMAGE_VIEW_TYPE_2D;
                     ImageViewCreateInfo.format = VkFormat::VK_FORMAT_B8G8R8A8_UNORM;
+                    //Note: you can use constants like 0, 1 to map the channel.
                     ImageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
                     ImageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
                     ImageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;

@@ -136,7 +136,7 @@ const std::string DefaultVertexShaderSourceCodeD3D11 = R"(
     }
 )";
 
-const std::string SimpleColorPixelShaderSourceCode = R"(
+const std::string SimpleColorPixelShaderSourceCodeD3D11 = R"(
     Texture2D Texture : register(t0);
     sampler Sampler : register(s0);
     cbuffer scene
@@ -180,7 +180,7 @@ const std::string SimpleColorPixelShaderSourceCode = R"(
     }
 )";
 
-const std::string BlitVertexShaderSource = R"(
+const std::string BlitVertexShaderSourceD3D11 = R"(
     struct VertexLayout
     {
         float4 Position : POSITION;
@@ -201,7 +201,7 @@ const std::string BlitVertexShaderSource = R"(
     }
 )";
 
-const std::string BlitPixelShaderSource = R"(
+const std::string BlitPixelShaderSourceD3D11 = R"(
     Texture2D Texture : register(t0);
     sampler Sampler : register(s0);
     struct VertexOutput
@@ -363,6 +363,90 @@ const std::string DefaultVertexShaderSourceCodeVulkan = R"(
     }
 )";
 
+const std::string SimpleColorPixelShaderSourceCodeVulkan = R"(
+    #version 440
+    layout(std140, binding = 0) uniform SceneDataBuffer
+    {
+        mat4  MatrixView;
+        mat4  InvMatrixView;
+        mat4  MatrixProj;
+        vec3  LightColor;
+        float Padding0;
+        vec3  LightDirection;
+        float Padding1;
+    } SceneData;
+
+    layout(binding = 1) uniform sampler2D ShadowSampler;
+
+    layout(location = 0) in vec3 i_Normal;
+    layout(location = 1) in vec3 i_ViewDirWS;
+    layout(location = 2) in vec4 i_LightPos;
+
+    layout(location = 0) out vec4 o_FragColor;
+
+    in vec4 gl_FragCoord;
+
+    void main()
+    {
+        //vec3 projection = i_LightPos.xyz / i_LightPos.w;
+        //projection.y = -projection.y;
+        //vec2 shadowDepthTexcoord = 0.5 * projection.xy + 0.5;
+        //float depth = projection.z;
+        //float shadowDepth = texture(ShadowSampler, shadowDepthTexcoord).r;
+        //return vec4(shadowDepthTexcoord,0,1);
+        //float shadow = shadowDepth + 0.0000025 >= depth ;
+        //o_FragColor = vec4(vec3(1,1,1) * shadow, 1);
+
+        vec3 N = normalize(i_Normal);
+        vec3 L = -SceneData.LightDirection;
+        vec3 V = normalize(i_ViewDirWS);
+        vec3 H = normalize(L + V);
+        float NoL = max(0.0, dot(L, N));
+        float NoH = max(0.0, dot(N, H));
+        vec3 Ambient = vec3(0.15, 0.1, 0.1);
+        vec3 Diffuse = vec3(1.0, 1.0, 1.0) * NoL;
+        float s = pow(NoH, 128);;
+        vec3 Specular = vec3(s, s, s);
+
+        float shadow = 1.0;
+        o_FragColor = vec4((Diffuse + Specular) * SceneData.LightColor * shadow + Ambient, 1.0);
+    }
+)";
+
+
+const std::string BlitVertexShaderSourceVulkan = R"(
+    #version 440
+
+    layout(location = 0) in  vec4 i_Position;
+    layout(location = 2) in  vec2 i_Texcoord;
+    layout(location = 0) out vec2 o_Texcoord;
+
+    out gl_PerVertex
+    {
+        vec4 gl_Position;
+    };
+
+    void main()
+    {
+        gl_Position = i_Position;
+        o_Texcoord = i_Texcoord;
+    }
+)";
+
+const std::string BlitPixelShaderSourceVulkan = R"(
+    #version 440
+    layout(binding=0) uniform sampler2D ScreenImageSampler;
+
+    layout(location=0) in  vec2 i_Texcoord;
+    layout(location=0) out vec4 o_FragColor;
+
+    void main()
+    {
+        vec4 color = texture(ScreenImageSampler, i_Texcoord);
+        o_FragColor = vec4(color.rgb, 1.0);
+    }
+)";
+
 namespace fullscreen_quad
 {
     const unsigned int FSQuadVertexCount = 3;
@@ -378,15 +462,22 @@ namespace fullscreen_quad
 #if USE_VULKAN
 const wchar_t* GFXModuleName = L"GfxInterfaceVulkan.dll";
 const std::string& DefaultVertexShaderSourceCode = DefaultVertexShaderSourceCodeVulkan;
+const std::string& SimpleColorPixelShaderSourceCode = SimpleColorPixelShaderSourceCodeVulkan;
 const std::string& ShadowVertexShaderSource = ShadowVertexShaderSourceVulkan;
 const std::string& ShadowPixelShaderSource = ShadowPixelShaderSourceVulkan;
+
+const std::string& BlitVertexShaderSourceCode = BlitVertexShaderSourceVulkan;
+const std::string& BlitPixelShaderSourceCode = BlitPixelShaderSourceVulkan;
 const std::string kVsEntryName = "main";
 const std::string kPsEntryName = "main";
 #else
 const wchar_t* GFXModuleName = L"GfxInterfaceD3D11.dll";
 const std::string& DefaultVertexShaderSourceCode = DefaultVertexShaderSourceCodeD3D11;
+const std::string& SimpleColorPixelShaderSourceCode = SimpleColorPixelShaderSourceCodeD3D11;
 const std::string& ShadowVertexShaderSource = ShadowVertexShaderSourceD3D11;
 const std::string& ShadowPixelShaderSource = ShadowPixelShaderSourceD3D11;
+const std::string& BlitVertexShaderSourceCode = BlitVertexShaderSourceD3D11;
+const std::string& BlitPixelShaderSourceCode = BlitPixelShaderSourceD3D11;
 const std::string kVsEntryName = "VSMain";
 const std::string kPsEntryName = "PSMain";
 #endif
@@ -499,8 +590,8 @@ namespace engine
         }
         //if (mBlitPassState == nullptr)
         {
-            mBlitPassVS = CreateVertexShader(mGfxDevice, BlitVertexShaderSource, kVsEntryName, std::string("BlitVS"));
-            mBlitPassPS = CreatePixelShader(mGfxDevice, BlitPixelShaderSource, kPsEntryName, std::string("BlitPS"));
+            mBlitPassVS = CreateVertexShader(mGfxDevice, BlitVertexShaderSourceCode, kVsEntryName, std::string("BlitVS"));
+            mBlitPassPS = CreatePixelShader(mGfxDevice, BlitPixelShaderSourceCode, kPsEntryName, std::string("BlitPS"));
             PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Vertex)] = mBlitPassVS;
             PipelineCreateInfo.StageShaders[static_cast<int>(GFXI::GraphicPipelineState::EShaderStage::Pixel)] = mBlitPassPS;
             PipelineCreateInfo.RasterizationState.ViewportInfo.Width  = mClientWidth;

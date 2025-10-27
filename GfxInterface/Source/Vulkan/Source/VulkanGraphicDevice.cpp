@@ -36,6 +36,9 @@ namespace GFXI
 
     SwapChain* GraphicDeviceVulkan::CreateSwapChain(void* windowHandle, int windowWidth, int windowHeight, bool isFullscreen)
     {
+        //TODO: support High-DPI.
+        uint32_t pixelWidth = windowWidth;
+        uint32_t pixelHeight = windowHeight;
         VkWin32SurfaceCreateInfoKHR SurfaceCreateInfo;
         VulkanZeroMemory(SurfaceCreateInfo);
         SurfaceCreateInfo.hwnd = static_cast<HWND>(windowHandle);
@@ -108,6 +111,8 @@ namespace GFXI
                     auto clamp = [](int v, int min, int max) { return (v > max) ? max : (v < min ? min : v); };
                     windowWidth = clamp(windowWidth, SurfaceCaps.minImageExtent.width, SurfaceCaps.maxImageExtent.width);
                     windowHeight = clamp(windowHeight, SurfaceCaps.minImageExtent.height, SurfaceCaps.maxImageExtent.height);
+
+                    //TODO: check and determin swapchain image count.
                     uint32_t NumSwapchainImages = 3;
                     if (SurfaceCaps.maxImageCount != 0)
                     {
@@ -130,8 +135,8 @@ namespace GFXI
                     SwapChainCreateInfo.minImageCount = NumSwapchainImages;
                     SwapChainCreateInfo.imageFormat = VkFormat::VK_FORMAT_B8G8R8A8_UNORM;
                     SwapChainCreateInfo.imageColorSpace = VkColorSpaceKHR::VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-                    SwapChainCreateInfo.imageExtent.width = windowWidth;
-                    SwapChainCreateInfo.imageExtent.height = windowHeight;
+                    SwapChainCreateInfo.imageExtent.width = pixelWidth;
+                    SwapChainCreateInfo.imageExtent.height = pixelHeight;
                     SwapChainCreateInfo.imageArrayLayers = 1;
                     //TODO:
                     // It is possible that you'll render images to a separate image first to perform post-processing.
@@ -156,10 +161,9 @@ namespace GFXI
 
                     if (RetCreateSwapChain == VK_SUCCESS)
                     {
-                        //TODO:
+                        //TODO: create image before creating swapchain.
                         SwapChainVulkan* SwapChain = new SwapChainVulkan(this, VulkanSwapchain);
                         return SwapChain;
-                        
                     }
                 }
             }
@@ -172,7 +176,7 @@ namespace GFXI
         return nullptr;
     }
 
-    //TODO:
+    //TODO: Create PipelineStateObject.
     static const VkShaderStageFlagBits VulkanPipelineShaderStageMapping[] = {
         VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT,
         VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -476,8 +480,9 @@ namespace GFXI
         binding.binding = 1;
         LayoutBinding.emplace_back(binding);
 
-        binding.binding = 2;
-        LayoutBinding.emplace_back(binding);
+        //TODO:??
+        //binding.binding = 2;
+        //LayoutBinding.emplace_back(binding);
 
         VkDescriptorSetLayoutCreateInfo DescriptorSetLayoutCreateInfo;
         VulkanZeroMemory(DescriptorSetLayoutCreateInfo);
@@ -556,18 +561,18 @@ namespace GFXI
         VulkanZeroMemory(GfxPipelineCreateInfo);
         GfxPipelineCreateInfo.stageCount = static_cast<uint32_t>(Stages.size());
         GfxPipelineCreateInfo.pStages = Stages.data();
-        GfxPipelineCreateInfo.pVertexInputState = &VertexInputStateInfo;
-        GfxPipelineCreateInfo.pInputAssemblyState = &InputAssembleInfo;
+        GfxPipelineCreateInfo.pVertexInputState     = &VertexInputStateInfo;
+        GfxPipelineCreateInfo.pInputAssemblyState   = &InputAssembleInfo;
         //VkPipelineTessellationStateCreateInfo* GfxPipelineCreateInfo.pTessellationState;
-        GfxPipelineCreateInfo.pViewportState = &ViewportInfo;
-        GfxPipelineCreateInfo.pRasterizationState = &RasterizationStateInfo;
-        GfxPipelineCreateInfo.pMultisampleState = &MultisampleStateInfo;
-        GfxPipelineCreateInfo.pDepthStencilState = &DepthStencilStateInfo;
-        GfxPipelineCreateInfo.pColorBlendState = &ColorBlendStateInfo;
-        GfxPipelineCreateInfo.pDynamicState = &DynamicStateInfo;
-        GfxPipelineCreateInfo.layout = VulkanPipelineLayout;
-        GfxPipelineCreateInfo.renderPass = VulkanRenderPass;
-        GfxPipelineCreateInfo.subpass = 0;
+        GfxPipelineCreateInfo.pViewportState        = &ViewportInfo;
+        GfxPipelineCreateInfo.pRasterizationState   = &RasterizationStateInfo;
+        GfxPipelineCreateInfo.pMultisampleState     = &MultisampleStateInfo;
+        GfxPipelineCreateInfo.pDepthStencilState    = &DepthStencilStateInfo;
+        GfxPipelineCreateInfo.pColorBlendState      = &ColorBlendStateInfo;
+        GfxPipelineCreateInfo.pDynamicState         = &DynamicStateInfo;
+        GfxPipelineCreateInfo.layout                = VulkanPipelineLayout;
+        GfxPipelineCreateInfo.renderPass            = VulkanRenderPass;
+        GfxPipelineCreateInfo.subpass               = 0;
         //VkPipeline       //GfxPipelineCreateInfo.basePipelineHandle;
         //int32_t          //GfxPipelineCreateInfo.basePipelineIndex;
 
