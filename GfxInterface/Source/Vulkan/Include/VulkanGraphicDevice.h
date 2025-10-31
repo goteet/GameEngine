@@ -1,6 +1,8 @@
 #pragma once
 #include "VulkanInclude.h"
 #include "GfxInterface.h"
+#include "VulkanDeviceContext.h"
+#include "VulkanCommandQueue.h"
 
 
 
@@ -11,9 +13,7 @@ namespace GFXI
     struct GraphicDeviceVulkan : public GraphicDevice
     {
         GraphicDeviceVulkan(GraphicModuleVulkan* belongsTo, VkPhysicalDevice vulkanPhysicalDevice, VkDevice vulkanDevice,
-            uint32_t graphicQueueFamilyIndex,   uint32_t graphicQueueIndex,
-            uint32_t computeQueueFamilyIndex,   uint32_t computeQueueIndex,
-            uint32_t transferQueueFamilyIndex,  uint32_t transferQueueIndex);
+            CommandQueueVulkan graphicQueue, CommandQueueVulkan computeQueue, CommandQueueVulkan transferQueue);
         virtual ~GraphicDeviceVulkan();
         virtual void Release() override;
 
@@ -37,13 +37,12 @@ namespace GFXI
         GraphicModuleVulkan* mBelongsTo;
         VkPhysicalDevice mVulkanPhysicalDevice;
         VkDevice mVulkanDevice;
-        VkQueue  mVulkanGraphicQueue;
-        VkQueue  mVulkanComputeQueue;
-        VkQueue  mVulkanTransferQueue;
-        VkQueue  mVulkanPresentQueue;
 
-        uint32_t mGraphicQueueFamilyIndex,  mGraphicQueueIndex;
-        uint32_t mComputeQueueFamilyIndex,  mComputeQueueIndex;
-        uint32_t mTransferQueueFamilyIndex, mTransferQueueIndex;
+        CommandQueueVulkan mVulkanGraphicQueue;
+        CommandQueueVulkan mVulkanComputeQueue;
+        CommandQueueVulkan mVulkanTransferQueue;
+        CommandQueueVulkan mVulkanPresentQueue;
+
+        //DeviceContextVulkan mDeferredContext;
     };
 }

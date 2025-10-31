@@ -592,6 +592,8 @@ namespace engine
 
     EGfxIntializationError RenderSystem::InitializeGfxDevice()
     {
+        GFXI::RenderTargetView::EFormat RTFormat = GFXI::RenderTargetView::EFormat::R10G10B10A2_UNormInt;
+        GFXI::DepthStencilView::EFormat DSFormat = GFXI::DepthStencilView::EFormat::D24_UNormInt_S8_UInt;
         mGfxModule = LoadGfxLibrary(GFXModuleName);
         mGfxDevice = mGfxModule->CreateDevice();
         mMainWindowSwapChain = mGfxDevice->CreateSwapChain(mMainWindowHandle, mClientWidth, mClientHeight, mIsFullScreen);
@@ -620,6 +622,9 @@ namespace engine
             PipelineCreateInfo.RasterizationState.ViewportInfo.Height = (float)1024;
             PipelineCreateInfo.RasterizationState.ViewportInfo.MinDepth = 0.0f;
             PipelineCreateInfo.RasterizationState.ViewportInfo.MaxDepth = 1.0f;
+            PipelineCreateInfo.RenderAttachemntDesc.NumColorAttachments = 1;
+            PipelineCreateInfo.RenderAttachemntDesc.ColorAttachmentFormats = &RTFormat;
+            PipelineCreateInfo.RenderAttachemntDesc.DepthStencilFormat = DSFormat;
             mShadowPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
         }
         //if (mSimpleDrawPassState == nullptr)
@@ -646,7 +651,6 @@ namespace engine
             mDescriptorSetLayoutBlit = CreateDescriptorSetLayout(mGfxDevice, &BlitDescriptorBindings, 1);
             PipelineCreateInfo.ShaderModuleDesc.NumDescriptorSetLayouts = 1;
             PipelineCreateInfo.ShaderModuleDesc.DescriptorSetLayouts = &mDescriptorSetLayoutBlit;
-
             PipelineCreateInfo.RasterizationState.ViewportInfo.Width = static_cast<float>(mClientWidth);
             PipelineCreateInfo.RasterizationState.ViewportInfo.Height = static_cast<float>(mClientHeight);
             mBlitPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
@@ -664,174 +668,174 @@ namespace engine
         depthStencilCreateInfo.Height = mClientHeight;
         depthStencilCreateInfo.UsedByShader = false;
 
-        mMainWindowDepthStencil = mGfxDevice->CreateDepthStencilView(depthStencilCreateInfo);
-        mTransientBufferRegistry = std::make_unique<TransientBufferRegistry>(mGfxDevice, mMainWindowSwapChain->GetRenderTargetView(), mMainWindowDepthStencil);
+        //mMainWindowDepthStencil = mGfxDevice->CreateDepthStencilView(depthStencilCreateInfo);
+        //mTransientBufferRegistry = std::make_unique<TransientBufferRegistry>(mGfxDevice, mMainWindowSwapChain->GetRenderTargetView(), mMainWindowDepthStencil);
         return EGfxIntializationError::NoError;
     }
 
     void RenderSystem::RenderFrame(Scene& scene)
     {
-        ViewConstantBufferData data;
-        //Update ConstantBufferData
-        {
-            math::float4x4 viewMatrix = math::scale_matrix4x4f(2, 2, 2);
-            math::float3 cameraPositionWS = math::float3(0.0f, 0.0f, -10.0f);
-            math::float3 lightColor = math::float3(1.0f, 1.0f, 1.0f);
-            float lightIntensity = 1.0f;
-            math::float3 lightDirection = math::float3(1.0f, 0.0f, 0.0f);
-
-
-            Camera* defaultCamera = scene.GetDefaultCameraInternal();
-            if (defaultCamera != nullptr)
-            {
-                viewMatrix = defaultCamera->GetUpdatedViewMatrix();
-                cameraPositionWS = defaultCamera->GetSceneNode()->GetWorldPosition();
-            }
-
-            GE::DirectionalLight* defaultLight = scene.GetDirectionalLight(0);
-
-            lightColor = defaultLight->GetColor();
-            lightIntensity = defaultLight->GetIntensity();
-            lightDirection = defaultLight->GetSceneNode()->GetForwardDirection();
-
-            data.ViewMatrix = viewMatrix;
-            data.InvViewMatrix = math::inversed(viewMatrix);
-            data.CameraPositionWS = cameraPositionWS;
-            data.LightColor = lightColor * lightIntensity;
-            data.LightDirection = lightDirection;
-        }
-
-        //Do Rendering.
-        const bool bRestoreToDefaultState = true;
-        {
-            auto CreateDefaultSamplerState = [&]()
-            {
-                if (mDefaultSamplerState == nullptr)
-                {
-                    GFXI::SamplerState::CreateInfo createInfo;
-                    createInfo.SamplingFilter = GFXI::SamplerState::ESamplingFilter::MinLinear_MagLinear_MipLinear;
-                    createInfo.BorderColor[0] = 0;
-                    createInfo.BorderColor[1] = 0;
-                    createInfo.BorderColor[2] = 0;
-                    createInfo.BorderColor[3] = 0;
-                    mDefaultSamplerState = mGfxDevice->CreateSamplerState(createInfo);
-                }
-            };
-
-            RenderFrameGraph MainGraph(mTransientBufferRegistry.get());
-            RFGRenderPass forwardPass = MainGraph.AddRenderPass("test.forward");
-            RFGRenderPass shadowPass = MainGraph.AddRenderPass("test.shadowdepth");
-            RFGRenderPass blitPass = MainGraph.AddRenderPass("test.blit");
-            RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
-            RFGResourceHandle shadowDepth = MainGraph.RequestResource("test.shadowdepth", 1024, 1024, GFXI::DepthStencilView::EFormat::D24_UNormInt_S8_UInt);
-            RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferDSFormat());
-            RFGResourceHandle blitRenderTarget = MainGraph.RequestResource("test.blitrendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
-
-            ClearState state;
-            state.ClearDepth = true;
-            state.ClearStencil = true;
-            state.ClearDepthValue= 1.0;
-            state.ClearStencilValue = 0;
-            shadowPass.BindWriting(shadowDepth, state);
-            shadowPass.AttachJob(
-                [&](GFXI::DeferredContext& deviceContext)
-                {
-                    if (mCubeRenderingQueueShadow == nullptr)
-                    {
-                        GFXI::ViewportInfo viewport;
-                        viewport.X = 0.0f;
-                        viewport.Y = 0.0f;
-                        viewport.Width =  (float)1024;
-                        viewport.Height = (float)1024;
-                        viewport.MinDepth = 0.0f;
-                        viewport.MaxDepth = 1.0f;
-
-                        mGfxDevice->GetDeferredContext()->StartRecordCommandQueue();
-                        mGfxDevice->GetDeferredContext()->SetViewport(viewport);
-                        mGfxDevice->GetDeferredContext()->SetGraphicPipelineState(mShadowPassState);
-                        RenderScene(scene, deviceContext, data, true);
-                        mCubeRenderingQueueShadow = mGfxDevice->GetDeferredContext()->FinishRecordCommandQueue(bRestoreToDefaultState);
-                    }
-                    mGfxDevice->GetImmediateContext()->ExecuteCommandQueue(mCubeRenderingQueueShadow, bRestoreToDefaultState);
-                }
-            );
-
-            state.ClearColor = true;
-            state.ClearDepth = true;
-            state.ClearStencil = true;
-            state.ClearColorValue = math::float4{ 0.15f, 0.0f, 0.0f, 1.0f };
-            forwardPass.BindReading(shadowDepth);
-            forwardPass.BindWriting(renderTarget, state);
-            forwardPass.BindWriting(depthStencil, state);
-            forwardPass.AttachJob(
-                [&](GFXI::DeferredContext& deviceContext)
-                {
-                    CreateDefaultSamplerState();
-
-                    if (mCubeRenderingQueueFinal == nullptr)
-                    {
-                        GFXI::ViewportInfo viewport;
-                        viewport.X = 0.0f;
-                        viewport.Y = 0.0f;
-                        viewport.Width =  (float)mClientWidth;
-                        viewport.Height = (float)mClientHeight;
-                        viewport.MinDepth = 0.0f;
-                        viewport.MaxDepth = 1.0f;
-
-                        mGfxDevice->GetDeferredContext()->StartRecordCommandQueue();
-                        mGfxDevice->GetDeferredContext()->SetGraphicSamplerStates(GFXI::GraphicPipelineState::EShaderStage::Pixel, 0, 1, &mDefaultSamplerState);
-                        mGfxDevice->GetDeferredContext()->SetViewport(viewport);
-                        mGfxDevice->GetDeferredContext()->SetGraphicPipelineState(mSimpleDrawPassState);
-
-                        RenderScene(scene, deviceContext, data, false);
-
-                        mCubeRenderingQueueFinal = mGfxDevice->GetDeferredContext()->FinishRecordCommandQueue(bRestoreToDefaultState);
-                    }                
-                    mGfxDevice->GetImmediateContext()->ExecuteCommandQueue(mCubeRenderingQueueFinal, bRestoreToDefaultState);
-                }
-            );
-
-            state.ClearColorValue.set(0.0f, 0.0f, 0.0f, 1.0f);
-            blitPass.BindReading(renderTarget);
-            blitPass.BindWriting(blitRenderTarget, state);
-            blitPass.BindWriting(depthStencil, state);
-            blitPass.AttachJob(
-                [&](GFXI::DeferredContext& deviceContext)
-                {
-                    CreateDefaultSamplerState();
-
-                    
-                    GFXI::ViewportInfo viewport;
-                    viewport.X = 0.0f;
-                    viewport.Y = 0.0f;
-                    viewport.Width =  (float)mClientWidth;
-                    viewport.Height = (float)mClientHeight;
-                    viewport.MinDepth = 0.0f;
-                    viewport.MaxDepth = 1.0f;
-
-                    if(mBlitRenderingQueue == nullptr)
-                    {
-                        mGfxDevice->GetDeferredContext()->StartRecordCommandQueue();
-                        mGfxDevice->GetDeferredContext()->SetViewport(viewport);
-                        mGfxDevice->GetDeferredContext()->SetGraphicPipelineState(mBlitPassState);
-                        mGfxDevice->GetDeferredContext()->SetGraphicSamplerStates(GFXI::GraphicPipelineState::EShaderStage::Pixel, 0, 1, &mDefaultSamplerState);
-
-                        GFXI::DeviceContext::VertexBufferBinding binding;
-                        binding.VertexBuffer = mFullsceenQuadVertices;
-                        binding.ElementStride = sizeof(engine::VertexLayout);
-                        binding.BufferOffset = 0;
-                        mGfxDevice->GetDeferredContext()->SetVertexBuffers(0, 1, &binding);
-                        mGfxDevice->GetDeferredContext()->Draw(3, 0);
-                        mBlitRenderingQueue = mGfxDevice->GetDeferredContext()->FinishRecordCommandQueue(bRestoreToDefaultState);
-                    }
-                    mGfxDevice->GetImmediateContext()->ExecuteCommandQueue(mBlitRenderingQueue, bRestoreToDefaultState);
-                }
-            );
-            MainGraph.BindOutput(blitRenderTarget);
-            MainGraph.BindOutput(depthStencil);
-            MainGraph.Compile();
-            MainGraph.Execute(*mGfxDevice->GetDeferredContext());
-        }
+        //ViewConstantBufferData data;
+        ////Update ConstantBufferData
+        //{
+        //    math::float4x4 viewMatrix = math::scale_matrix4x4f(2, 2, 2);
+        //    math::float3 cameraPositionWS = math::float3(0.0f, 0.0f, -10.0f);
+        //    math::float3 lightColor = math::float3(1.0f, 1.0f, 1.0f);
+        //    float lightIntensity = 1.0f;
+        //    math::float3 lightDirection = math::float3(1.0f, 0.0f, 0.0f);
+        //
+        //
+        //    Camera* defaultCamera = scene.GetDefaultCameraInternal();
+        //    if (defaultCamera != nullptr)
+        //    {
+        //        viewMatrix = defaultCamera->GetUpdatedViewMatrix();
+        //        cameraPositionWS = defaultCamera->GetSceneNode()->GetWorldPosition();
+        //    }
+        //
+        //    GE::DirectionalLight* defaultLight = scene.GetDirectionalLight(0);
+        //
+        //    lightColor = defaultLight->GetColor();
+        //    lightIntensity = defaultLight->GetIntensity();
+        //    lightDirection = defaultLight->GetSceneNode()->GetForwardDirection();
+        //
+        //    data.ViewMatrix = viewMatrix;
+        //    data.InvViewMatrix = math::inversed(viewMatrix);
+        //    data.CameraPositionWS = cameraPositionWS;
+        //    data.LightColor = lightColor * lightIntensity;
+        //    data.LightDirection = lightDirection;
+        //}
+        //
+        ////Do Rendering.
+        //const bool bRestoreToDefaultState = true;
+        //{
+        //    auto CreateDefaultSamplerState = [&]()
+        //    {
+        //        if (mDefaultSamplerState == nullptr)
+        //        {
+        //            GFXI::SamplerState::CreateInfo createInfo;
+        //            createInfo.SamplingFilter = GFXI::SamplerState::ESamplingFilter::MinLinear_MagLinear_MipLinear;
+        //            createInfo.BorderColor[0] = 0;
+        //            createInfo.BorderColor[1] = 0;
+        //            createInfo.BorderColor[2] = 0;
+        //            createInfo.BorderColor[3] = 0;
+        //            mDefaultSamplerState = mGfxDevice->CreateSamplerState(createInfo);
+        //        }
+        //    };
+        //
+        //    RenderFrameGraph MainGraph(mTransientBufferRegistry.get());
+        //    RFGRenderPass forwardPass = MainGraph.AddRenderPass("test.forward");
+        //    RFGRenderPass shadowPass = MainGraph.AddRenderPass("test.shadowdepth");
+        //    RFGRenderPass blitPass = MainGraph.AddRenderPass("test.blit");
+        //    RFGResourceHandle renderTarget = MainGraph.RequestResource("test.rendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
+        //    RFGResourceHandle shadowDepth = MainGraph.RequestResource("test.shadowdepth", 1024, 1024, GFXI::DepthStencilView::EFormat::D24_UNormInt_S8_UInt);
+        //    RFGResourceHandle depthStencil = MainGraph.RequestResource("test.depthstencil", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferDSFormat());
+        //    RFGResourceHandle blitRenderTarget = MainGraph.RequestResource("test.blitrendertarget", MainGraph.GetBackbufferWidth(), MainGraph.GetBackbufferHeight(), MainGraph.GetBackbufferRTFormat());
+        //
+        //    ClearState state;
+        //    state.ClearDepth = true;
+        //    state.ClearStencil = true;
+        //    state.ClearDepthValue= 1.0;
+        //    state.ClearStencilValue = 0;
+        //    shadowPass.BindWriting(shadowDepth, state);
+        //    shadowPass.AttachJob(
+        //        [&](GFXI::DeferredContext& deviceContext)
+        //        {
+        //            if (mCubeRenderingQueueShadow == nullptr)
+        //            {
+        //                GFXI::ViewportInfo viewport;
+        //                viewport.X = 0.0f;
+        //                viewport.Y = 0.0f;
+        //                viewport.Width =  (float)1024;
+        //                viewport.Height = (float)1024;
+        //                viewport.MinDepth = 0.0f;
+        //                viewport.MaxDepth = 1.0f;
+        //
+        //                mGfxDevice->GetDeferredContext()->StartRecordCommandQueue();
+        //                mGfxDevice->GetDeferredContext()->SetViewport(viewport);
+        //                mGfxDevice->GetDeferredContext()->SetGraphicPipelineState(mShadowPassState);
+        //                RenderScene(scene, deviceContext, data, true);
+        //                mCubeRenderingQueueShadow = mGfxDevice->GetDeferredContext()->FinishRecordCommandQueue(bRestoreToDefaultState);
+        //            }
+        //            mGfxDevice->GetImmediateContext()->ExecuteCommandQueue(mCubeRenderingQueueShadow, bRestoreToDefaultState);
+        //        }
+        //    );
+        //
+        //    state.ClearColor = true;
+        //    state.ClearDepth = true;
+        //    state.ClearStencil = true;
+        //    state.ClearColorValue = math::float4{ 0.15f, 0.0f, 0.0f, 1.0f };
+        //    //forwardPass.BindReading(shadowDepth);
+        //    forwardPass.BindWriting(renderTarget, state);
+        //    forwardPass.BindWriting(depthStencil, state);
+        //    forwardPass.AttachJob(
+        //        [&](GFXI::DeferredContext& deviceContext)
+        //        {
+        //            CreateDefaultSamplerState();
+        //
+        //            if (mCubeRenderingQueueFinal == nullptr)
+        //            {
+        //                GFXI::ViewportInfo viewport;
+        //                viewport.X = 0.0f;
+        //                viewport.Y = 0.0f;
+        //                viewport.Width =  (float)mClientWidth;
+        //                viewport.Height = (float)mClientHeight;
+        //                viewport.MinDepth = 0.0f;
+        //                viewport.MaxDepth = 1.0f;
+        //
+        //                mGfxDevice->GetDeferredContext()->StartRecordCommandQueue();
+        //                mGfxDevice->GetDeferredContext()->SetGraphicSamplerStates(GFXI::GraphicPipelineState::EShaderStage::Pixel, 0, 1, &mDefaultSamplerState);
+        //                mGfxDevice->GetDeferredContext()->SetViewport(viewport);
+        //                mGfxDevice->GetDeferredContext()->SetGraphicPipelineState(mSimpleDrawPassState);
+        //
+        //                RenderScene(scene, deviceContext, data, false);
+        //
+        //                mCubeRenderingQueueFinal = mGfxDevice->GetDeferredContext()->FinishRecordCommandQueue(bRestoreToDefaultState);
+        //            }                
+        //            mGfxDevice->GetImmediateContext()->ExecuteCommandQueue(mCubeRenderingQueueFinal, bRestoreToDefaultState);
+        //        }
+        //    );
+        //
+        //    state.ClearColorValue.set(0.0f, 0.0f, 0.0f, 1.0f);
+        //    blitPass.BindReading(renderTarget);
+        //    blitPass.BindWriting(blitRenderTarget, state);
+        //    blitPass.BindWriting(depthStencil, state);
+        //    blitPass.AttachJob(
+        //        [&](GFXI::DeferredContext& deviceContext)
+        //        {
+        //            CreateDefaultSamplerState();
+        //
+        //            
+        //            GFXI::ViewportInfo viewport;
+        //            viewport.X = 0.0f;
+        //            viewport.Y = 0.0f;
+        //            viewport.Width =  (float)mClientWidth;
+        //            viewport.Height = (float)mClientHeight;
+        //            viewport.MinDepth = 0.0f;
+        //            viewport.MaxDepth = 1.0f;
+        //
+        //            if(mBlitRenderingQueue == nullptr)
+        //            {
+        //                mGfxDevice->GetDeferredContext()->StartRecordCommandQueue();
+        //                mGfxDevice->GetDeferredContext()->SetViewport(viewport);
+        //                mGfxDevice->GetDeferredContext()->SetGraphicPipelineState(mBlitPassState);
+        //                mGfxDevice->GetDeferredContext()->SetGraphicSamplerStates(GFXI::GraphicPipelineState::EShaderStage::Pixel, 0, 1, &mDefaultSamplerState);
+        //
+        //                GFXI::DeviceContext::VertexBufferBinding binding;
+        //                binding.VertexBuffer = mFullsceenQuadVertices;
+        //                binding.ElementStride = sizeof(engine::VertexLayout);
+        //                binding.BufferOffset = 0;
+        //                mGfxDevice->GetDeferredContext()->SetVertexBuffers(0, 1, &binding);
+        //                mGfxDevice->GetDeferredContext()->Draw(3, 0);
+        //                mBlitRenderingQueue = mGfxDevice->GetDeferredContext()->FinishRecordCommandQueue(bRestoreToDefaultState);
+        //            }
+        //            mGfxDevice->GetImmediateContext()->ExecuteCommandQueue(mBlitRenderingQueue, bRestoreToDefaultState);
+        //        }
+        //    );
+        //    MainGraph.BindOutput(blitRenderTarget);
+        //    MainGraph.BindOutput(depthStencil);
+        //    MainGraph.Compile();
+        //    MainGraph.Execute(*mGfxDevice->GetDeferredContext());
+        //}
 
         mMainWindowSwapChain->Present();
     }

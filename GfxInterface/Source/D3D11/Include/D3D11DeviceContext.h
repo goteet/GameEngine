@@ -111,8 +111,8 @@ namespace GFXI
         virtual void UnmapBuffer(Buffer* buffer)  override { mContextWrapper.UnmapBuffer(buffer); }
         virtual void UpdateBuffer(Buffer* buffer, const void* data) override { mContextWrapper.UpdateSubresource(buffer, data); }
 
-        virtual void StartRecordCommandQueue() override {}
-        virtual CommandQueue* FinishRecordCommandQueue(bool bRestoreToDefaultState) override;
+        virtual void            BeginRecordCommands(const RenderingInfo&) override {}
+        virtual CommandQueue*   EndRecordCommands(bool bRestoreToDefaultState) override;
     private:
         BaseContextWrapper mContextWrapper;
     };

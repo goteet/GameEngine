@@ -146,6 +146,7 @@ namespace GFXI
 
                 {
                     bool bFoundSwapchainExtension = false;
+                    bool bFoundDynamicRenderingExtension = false;
                     std::vector<VkExtensionProperties> Extensions(NumExtensions);
                     vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &NumExtensions, Extensions.data());
                     
@@ -154,10 +155,24 @@ namespace GFXI
                         if (strcmp(Extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
                         {
                             bFoundSwapchainExtension = true;
-                            break;
+                            if (bFoundDynamicRenderingExtension)
+                            {
+                                break;
+                            }
                         }
+
+                        if (strcmp(Extension.extensionName, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) == 0)
+                        {
+                            bFoundDynamicRenderingExtension = true;
+                            if (bFoundSwapchainExtension)
+                            {
+                                break;
+                            }
+                        }
+
+                        
                     }
-                    if (!bFoundSwapchainExtension)
+                    if (!bFoundSwapchainExtension || !bFoundDynamicRenderingExtension)
                     {
                         continue;
                     }
@@ -307,30 +322,36 @@ namespace GFXI
             }
         }
 
+        VkPhysicalDeviceDynamicRenderingFeatures DynamicRenderingFeatureCreateInfo;
+        VulkanZeroMemory(DynamicRenderingFeatureCreateInfo);
+        DynamicRenderingFeatureCreateInfo.dynamicRendering = VK_TRUE;
+
         VkDeviceCreateInfo DeviceCreateInfo;
         VulkanZeroMemory(DeviceCreateInfo, VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
+        DeviceCreateInfo.pNext = &DynamicRenderingFeatureCreateInfo;
         DeviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(DeviceQueueCreateInfos.size());
         DeviceCreateInfo.pQueueCreateInfos = DeviceQueueCreateInfos.data();
         DeviceCreateInfo.pEnabledFeatures = &Info.Features;
         const char* Layers[] = { ENGINE_VK_VALIDATION_LAYER_NAME };
-        const char* Extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+        std::vector<const char*> Extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME };
         if (mEnableDebugLayer)
         {
             DeviceCreateInfo.enabledLayerCount = 1;
             DeviceCreateInfo.ppEnabledLayerNames = Layers;
         }
-        DeviceCreateInfo.enabledExtensionCount= 1;
-        DeviceCreateInfo.ppEnabledExtensionNames = Extensions;
+        DeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(Extensions.size());
+        DeviceCreateInfo.ppEnabledExtensionNames = Extensions.data();
 
         VkDevice VulkanDevice;
         VkResult RetCreateDevice = vkCreateDevice(Info.Device, &DeviceCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &VulkanDevice);
 
         if (RetCreateDevice == VkResult::VK_SUCCESS)
         {
-            return new GraphicDeviceVulkan(this, Info.Device, VulkanDevice,
-                Info.GraphicQueueFamilyIndex,  Info.GraphicQueueIndex,
-                Info.ComputeQueueFamilyIndex,  Info.ComputeQueueIndex,
-                Info.TransferQueueFamilyIndex, Info.TransferQueueIndex);
+            return new GraphicDeviceVulkan(this, Info.Device, VulkanDevice
+                , CommandQueueVulkan(VulkanDevice, Info.GraphicQueueFamilyIndex, Info.GraphicQueueIndex)
+                , CommandQueueVulkan(VulkanDevice, Info.ComputeQueueFamilyIndex, Info.ComputeQueueIndex)
+                , CommandQueueVulkan(VulkanDevice, Info.TransferQueueFamilyIndex, Info.TransferQueueIndex)
+            );
         }
 
         return nullptr;

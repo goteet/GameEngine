@@ -416,14 +416,25 @@ namespace GFXI
             uint32_t NumDescriptorSetLayouts = 0;
             DescriptorSetLayout** DescriptorSetLayouts = nullptr;
         };
+        struct RenderAttachemntDesc
+        {
+            uint32_t SubPassIndex    = 0;
+            //TODO: Must equal to  VkRenderingInfo::viewMask.
+            uint32_t AticveViewMask    = 0;
+            uint32_t NumColorAttachments = 0;
+            RenderTargetView::EFormat*  ColorAttachmentFormats = nullptr;
+            DepthStencilView::EFormat   DepthStencilFormat = DepthStencilView::EFormat::D24_UNormInt_S8_UInt;
+
+        };
         struct CreateInfo
         {
-            ShaderModuleDesc    ShaderModuleDesc;
-            EPrimitiveTopology  PrimitiveTopology = EPrimitiveTopology::TriangleList;
-            VertexInputLayout   VertexInputLayout;
-            ColorBlendState     ColorBlendState;
-            DepthStencilState   DepthStencilState;
-            RasterizationState  RasterizationState;
+            ShaderModuleDesc        ShaderModuleDesc;
+            RenderAttachemntDesc    RenderAttachemntDesc;
+            EPrimitiveTopology      PrimitiveTopology = EPrimitiveTopology::TriangleList;
+            VertexInputLayout       VertexInputLayout;
+            ColorBlendState         ColorBlendState;
+            DepthStencilState       DepthStencilState;
+            RasterizationState      RasterizationState;
         };
     };
 
@@ -534,8 +545,48 @@ namespace GFXI
 
     struct GfxInterfaceAPI DeferredContext : public DeviceContext
     {
-        virtual void            StartRecordCommandQueue() = 0;
-        virtual CommandQueue*   FinishRecordCommandQueue(bool bRestoreToDefaultState) = 0;
+        struct RenderingInfo
+        {
+            enum class StoreOp : uint8_t
+            {
+                None        = 0,
+                DontCare    = 1,
+                Store       = 2
+            };
+
+            enum class LoadOp : uint8_t
+            {
+                None        = 0,
+                DontCare    = 1,
+                Load        = 2,
+                Clear       = 3
+            };
+            struct RenderTargetDesc
+            {
+                RenderTargetView* View          = nullptr;
+                RenderTargetView* ResolvedView  = nullptr;
+                float   ClearValue[4]   = { 0.0f, 0.0f, 0.0f, 0.0f };
+                StoreOp StoreOp         = StoreOp::None;
+                LoadOp  LoadOp          = LoadOp::None;
+                bool    EnableResolve   = false;
+            };
+            struct DepthStencilDesc
+            {
+                DepthStencilView* View          = nullptr;
+                float       DepthClearValue     = 0.0f;
+                uint32_t    StencilClearValue   = 0;
+                StoreOp     StoreOp             = StoreOp::None;
+                LoadOp      LoadOp              = LoadOp::None;
+            };
+            uint32_t            ActiveViewMask      = 0;
+            uint32_t            NumRenderTargets    = 0;
+            uint32_t            SwapchainWidth      = 0;
+            uint32_t            SwapchainHeight     = 0;
+            RenderTargetDesc*   RenderTargets       = nullptr;
+            DepthStencilDesc    DepthStencil;
+        };
+        virtual void            BeginRecordCommands(const RenderingInfo&) = 0;
+        virtual CommandQueue*   EndRecordCommands(bool bRestoreToDefaultState) = 0;
     };
 
     struct GfxInterfaceAPI SwapChain : public Object

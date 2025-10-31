@@ -365,7 +365,7 @@ namespace GFXI
         D3D11CommandQueue->OnExecute(mContextWrapper.mD3D11Context.Get(), bRestoreToDefaultState);
     }
 
-    CommandQueue* DeferredContextD3D11::FinishRecordCommandQueue(bool bRestoreToDefaultState)
+    CommandQueue* DeferredContextD3D11::EndRecordCommands(bool bRestoreToDefaultState)
     {
         ComPtr<ID3D11CommandList> commandList;
         HRESULT retQueueCommandList = mContextWrapper.mD3D11Context->FinishCommandList(!bRestoreToDefaultState, &commandList);

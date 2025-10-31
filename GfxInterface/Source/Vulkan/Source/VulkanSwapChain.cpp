@@ -7,20 +7,24 @@
 
 namespace GFXI
 {
-    SwapChainVulkan::SwapChainVulkan(GraphicDeviceVulkan* belongsTo, VkSwapchainKHR swapChain)
-        : mBelongsTo(belongsTo)
+    SwapChainVulkan::SwapChainVulkan(GraphicDeviceVulkan* belongsTo, VkSwapchainKHR swapChain, CommandQueueVulkan presentQueue)
+        : BaseDeviceResourceVulkan(belongsTo)
         , mVulkanSwapChain(swapChain)
+        , mVulkanPresentQueue(presentQueue)
     {
-        uint32_t NumImages = 0;
-        VkDevice VulkanDevice = mBelongsTo->GetVulkanDevice();
-        VkResult RetGetImages = vkGetSwapchainImagesKHR(VulkanDevice, mVulkanSwapChain, &NumImages, nullptr);
-        if (RetGetImages == VkResult::VK_SUCCESS && NumImages > 0)
+        VkFenceCreateInfo VukanFenceCreateInfo;
+        VulkanZeroMemory(VukanFenceCreateInfo);
+        VukanFenceCreateInfo.flags = VkFenceCreateFlagBits::VK_FENCE_CREATE_SIGNALED_BIT;
+        vkCreateFence(GetVulkanDevice(), &VukanFenceCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &mNextFrameFence_ForTest);
+
+        VkResult RetGetImages = vkGetSwapchainImagesKHR(GetVulkanDevice(), mVulkanSwapChain, &mNumBackbufferImages, nullptr);
+        if (RetGetImages == VkResult::VK_SUCCESS && mNumBackbufferImages > 0)
         {
-            std::vector<VkImage> mSwapChainImages(NumImages);
-            RetGetImages = vkGetSwapchainImagesKHR(VulkanDevice, mVulkanSwapChain, &NumImages, mSwapChainImages.data());
+            mBackbufferImages.resize(mNumBackbufferImages);
+            RetGetImages = vkGetSwapchainImagesKHR(GetVulkanDevice(), mVulkanSwapChain, &mNumBackbufferImages, mBackbufferImages.data());
             if (RetGetImages == VkResult::VK_SUCCESS)
             {
-                for (VkImage Image : mSwapChainImages)
+                for (VkImage Image : mBackbufferImages)
                 {
                     VkImageViewCreateInfo ImageViewCreateInfo;
                     VkImageView ImageView;
@@ -40,15 +44,35 @@ namespace GFXI
                     ImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
                     ImageViewCreateInfo.subresourceRange.layerCount = 1;
 
-                    VkResult RetCreateImageView = vkCreateImageView(VulkanDevice, &ImageViewCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &ImageView);
+                    VkResult RetCreateImageView = vkCreateImageView(GetVulkanDevice(), &ImageViewCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &ImageView);
+
+                    BackbufferContext context;
+
                     if (RetCreateImageView == VkResult::VK_SUCCESS)
                     {
-                        mImageViews.emplace_back(ImageView);
+                        VkSemaphoreCreateInfo VulkanSemaphoreCreateInfo;
+                        VulkanZeroMemory(VulkanSemaphoreCreateInfo);
+
+                        VkSemaphore Semaphore;
+                        VkResult RetCreateImageSemaphore = vkCreateSemaphore(GetVulkanDevice(), &VulkanSemaphoreCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &Semaphore);
+                        if (RetCreateImageSemaphore  != VkResult::VK_SUCCESS)
+                        {
+                            //TODO:
+                        }
+
+                        context.ImageView = ImageView;
+                        context.RetrieveSemaphore = Semaphore;
+                        //VkFramebufferCreateInfo FrameBufferCreateInfo;
+                        //VulkanZeroMemory(FrameBufferCreateInfo);
+                        //mBackbufferImageViews.renderPass;
+                        //mBackbufferImageViews.attachmentCount;
+                        //mBackbufferImageViews.pAttachments;
+                        //mBackbufferImageViews.width;
+                        //mBackbufferImageViews.height;
+                        //mBackbufferImageViews.layers = 1;
                     }
-                    else
-                    {
-                        mImageViews.emplace_back(nullptr);
-                    }
+                    
+                    mBackbufferContext.emplace_back(context);
                 }
             }
         }
@@ -56,15 +80,20 @@ namespace GFXI
 
     SwapChainVulkan::~SwapChainVulkan()
     {
-        VkDevice VulkanDevice = mBelongsTo->GetVulkanDevice();
-        for (VkImageView ImageView : mImageViews)
+        vkDestroyFence(GetVulkanDevice(), mNextFrameFence_ForTest, GFX_VK_ALLOCATION_CALLBACK);
+        for (BackbufferContext context : mBackbufferContext)
         {
-            if (ImageView != nullptr)
+            if (context.RetrieveSemaphore != nullptr)
             {
-                vkDestroyImageView(VulkanDevice, ImageView, GFX_VK_ALLOCATION_CALLBACK);
+                vkDestroySemaphore(GetVulkanDevice(), context.RetrieveSemaphore, GFX_VK_ALLOCATION_CALLBACK);
+            }
+            if (context.ImageView != nullptr)
+            {
+                vkDestroyImageView(GetVulkanDevice(), context.ImageView, GFX_VK_ALLOCATION_CALLBACK);
             }
         }
-        vkDestroySwapchainKHR(VulkanDevice, mVulkanSwapChain, GFX_VK_ALLOCATION_CALLBACK);
+        mBackbufferContext.clear();
+        vkDestroySwapchainKHR(GetVulkanDevice(), mVulkanSwapChain, GFX_VK_ALLOCATION_CALLBACK);
     }
 
     void SwapChainVulkan::Release()
@@ -79,5 +108,19 @@ namespace GFXI
 
     void SwapChainVulkan::Present()
     {
+        VkPresentInfoKHR PresentInfo;
+        VulkanZeroMemory(PresentInfo);
+        PresentInfo.waitSemaphoreCount = 0;
+        PresentInfo.pWaitSemaphores;
+        PresentInfo.swapchainCount = 1;
+        PresentInfo.pSwapchains = &mVulkanSwapChain;
+        PresentInfo.pImageIndices = &mCurrentBackbufferImageIndex;
+        PresentInfo.pResults = nullptr;
+        vkQueuePresentKHR(mVulkanPresentQueue.GetVulkanQueue(), &PresentInfo);
+
+        mCurrentBackbufferImageIndex = (mCurrentBackbufferImageIndex + 1) % mNumBackbufferImages;
+        //vkWaitForFences(mBelongsTo->GetVulkanDevice(), 1, &mNextFrameFence_ForTest, VK_TRUE, UINT64_MAX);
+        //vkResetFences(mBelongsTo->GetVulkanDevice(), 1, &mNextFrameFence_ForTest);
+        //vkQueueSubmit()
     }
 }
