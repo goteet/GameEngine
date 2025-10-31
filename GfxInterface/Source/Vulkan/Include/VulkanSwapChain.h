@@ -20,6 +20,7 @@ namespace GFXI
         GraphicDeviceVulkan* mBelongsTo;
         VkSwapchainKHR mVulkanSwapChain;
 
-        std::vector<VkImageView> mImageViews;
+        std::vector<VkImage>        mBackbufferImages;
+        std::vector<VkImageView>    mBackbufferImageViews;
     };
 }

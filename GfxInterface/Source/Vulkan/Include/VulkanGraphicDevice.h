@@ -21,6 +21,7 @@ namespace GFXI
         virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) override;
         virtual ComputePipelineState*   CreateComputePipelineState(const ComputePipelineState::CreateInfo&) override { return nullptr; }
         virtual DescriptorSetLayout*    CreateDescriptorSetLayout(const DescriptorSetLayout::CreateInfo&) override;
+        virtual RenderPass*             CreateRenderPass(const RenderPass::CreateInfo&) override;
         virtual SamplerState*           CreateSamplerState(const SamplerState::CreateInfo&) override;
         virtual ShaderBinary*           CompileShader(const ShaderBinary::CreateInfo&) override;
         virtual Shader*                 CreateShader(const Shader::CreateInfo&) override;

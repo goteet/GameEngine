@@ -36,6 +36,7 @@ MapVulkanStruct(VkPipelineDynamicStateCreateInfo,       VK_STRUCTURE_TYPE_PIPELI
 MapVulkanStruct(VkPipelineLayoutCreateInfo,             VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
 MapVulkanStruct(VkRenderPassCreateInfo,                 VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
 MapVulkanStruct(VkDescriptorSetLayoutCreateInfo,        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
+MapVulkanStruct(VkFramebufferCreateInfo,                VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
 
 #undef MapVulkanStruct
 

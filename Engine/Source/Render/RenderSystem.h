@@ -85,6 +85,10 @@ namespace engine
         GFXI::CommandQueue* mCubeRenderingQueueShadow = nullptr;
         GFXI::CommandQueue* mCubeRenderingQueueFinal = nullptr;
         GFXI::CommandQueue* mBlitRenderingQueue = nullptr;
+
+        GFXI::RenderPass* mShadowPass     = nullptr;
+        GFXI::RenderPass* mForwardPass    = nullptr;
+        GFXI::RenderPass* mBlitPass       = nullptr;
         
         GFXI::Shader* mShadowPassVS       = nullptr;
         GFXI::Shader* mShadowPassPS       = nullptr;

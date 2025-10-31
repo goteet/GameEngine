@@ -40,6 +40,9 @@ namespace GFXI
         //TODO: support High-DPI.
         uint32_t pixelWidth = windowWidth;
         uint32_t pixelHeight = windowHeight;
+
+        //We create a new surface to check
+        // if device & related queue support presenting surfaces.
         VkWin32SurfaceCreateInfoKHR SurfaceCreateInfo;
         VulkanZeroMemory(SurfaceCreateInfo);
         SurfaceCreateInfo.hwnd = static_cast<HWND>(windowHandle);
@@ -69,7 +72,8 @@ namespace GFXI
                 mVulkanPresentQueue = (PresentQueueFamilyIndex == mComputeQueueFamilyIndex) ? mVulkanComputeQueue : mVulkanGraphicQueue;
 
                 bool bSupportBGRA8_SRGB = false;
-                bool bSupportFIFOPresent = false;
+                bool bSupportPresentFIFORelaxed = false;
+                bool bSupportPresentMailbox = false;
                 uint32_t NumSurfaceFormats = 0;
                 uint32_t NumPresentModes = 0;
                 std::vector<VkSurfaceFormatKHR> SurfaceFormats;
@@ -96,15 +100,27 @@ namespace GFXI
                     vkGetPhysicalDeviceSurfacePresentModesKHR(mVulkanPhysicalDevice, Surface, &NumPresentModes, PresentModes.data());
                     for (VkPresentModeKHR& PresentMode : PresentModes)
                     {
-                        if (PresentMode == VkPresentModeKHR::VK_PRESENT_MODE_FIFO_KHR)
+                        if (PresentMode == VkPresentModeKHR::VK_PRESENT_MODE_FIFO_RELAXED_KHR)
                         {
-                            bSupportFIFOPresent = true;
-                            break;
+                            bSupportPresentFIFORelaxed = true;
+                            if (bSupportPresentMailbox)
+                            {
+                                break;
+                            }
+                        }
+                        else if (PresentMode == VkPresentModeKHR::VK_PRESENT_MODE_MAILBOX_KHR)
+                        {
+                            bSupportPresentMailbox = true;
+
+                            if (bSupportPresentFIFORelaxed)
+                            {
+                                break;
+                            }
                         }
                     }
                 }
 
-                if (bSupportBGRA8_SRGB && bSupportFIFOPresent)
+                if (bSupportBGRA8_SRGB && (bSupportPresentFIFORelaxed || bSupportPresentMailbox))
                 {
                     VkSurfaceCapabilitiesKHR SurfaceCaps;
                     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mVulkanPhysicalDevice, Surface, &SurfaceCaps);
@@ -114,7 +130,7 @@ namespace GFXI
                     windowHeight = clamp(windowHeight, SurfaceCaps.minImageExtent.height, SurfaceCaps.maxImageExtent.height);
 
                     //TODO: check and determin swapchain image count.
-                    uint32_t NumSwapchainImages = 3;
+                    uint32_t NumSwapchainImages = bSupportPresentMailbox ? 3 : 2;
                     if (SurfaceCaps.maxImageCount != 0)
                     {
                         NumSwapchainImages = clamp(NumSwapchainImages, SurfaceCaps.minImageCount, SurfaceCaps.maxImageCount);
@@ -151,7 +167,9 @@ namespace GFXI
                     SwapChainCreateInfo.pQueueFamilyIndices = nullptr;
                     SwapChainCreateInfo.preTransform = SurfacePreTransform;
                     SwapChainCreateInfo.compositeAlpha = SurfaceCompositeAlpha;
-                    SwapChainCreateInfo.presentMode = VkPresentModeKHR::VK_PRESENT_MODE_FIFO_KHR;
+                    SwapChainCreateInfo.presentMode = bSupportPresentMailbox
+                        ? VkPresentModeKHR::VK_PRESENT_MODE_MAILBOX_KHR
+                        : VkPresentModeKHR::VK_PRESENT_MODE_FIFO_RELAXED_KHR;
                     SwapChainCreateInfo.clipped = VK_TRUE;
                     //TODO:
                     // Set to last if re-creating swapchain.
@@ -473,7 +491,10 @@ namespace GFXI
 
         VkPipelineDynamicStateCreateInfo DynamicStateInfo;
         VulkanZeroMemory(DynamicStateInfo);
-        VkDynamicState DynamicStates[] = { VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT, VkDynamicState::VK_DYNAMIC_STATE_SCISSOR };
+        VkDynamicState DynamicStates[] = {
+            VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT,
+            VkDynamicState::VK_DYNAMIC_STATE_SCISSOR
+        };
         uint32_t NumDynamicState = sizeof(DynamicStates) / sizeof(VkDynamicState);
         DynamicStateInfo.dynamicStateCount = NumDynamicState;
         DynamicStateInfo.pDynamicStates = DynamicStates;
@@ -482,7 +503,7 @@ namespace GFXI
         std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
         for (uint32_t index = 0; index < info.ShaderModuleDesc.NumDescriptorSetLayouts; index++)
         {
-            VulkanDescriptorSetLayout* VulkanLayout = reinterpret_cast<VulkanDescriptorSetLayout*>(info.ShaderModuleDesc.DescriptorSetLayouts[index]);
+            DescriptorSetLayoutVulkan* VulkanLayout = reinterpret_cast<DescriptorSetLayoutVulkan*>(info.ShaderModuleDesc.DescriptorSetLayouts[index]);
             DescriptorSetLayouts.emplace_back(VulkanLayout->GetVulkanDescriptorSetLayout());
         }
 
@@ -500,49 +521,8 @@ namespace GFXI
             return nullptr;
         }
 
-        //RenderPass
-        VkRenderPassCreateInfo RenderPassCreateInfo;
-        VulkanZeroMemory(RenderPassCreateInfo);
+        RenderPassVulkan* VulkanRenderPass = reinterpret_cast<RenderPassVulkan*>(info.RenderPassDesc.RenderPass);
 
-        VkAttachmentDescription RenderPassAttachment;
-        RenderPassAttachment.flags = 0;
-        RenderPassAttachment.format = VkFormat::VK_FORMAT_B8G8R8A8_UNORM;
-        RenderPassAttachment.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
-        RenderPassAttachment.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
-        RenderPassAttachment.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
-        RenderPassAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        RenderPassAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        RenderPassAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-        RenderPassAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-        VkAttachmentReference colorAttachmentRef;
-        colorAttachmentRef.attachment = 0;
-        colorAttachmentRef.layout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        VkSubpassDescription RenderPassSubpass;
-        RenderPassSubpass.flags = 0;
-        RenderPassSubpass.pipelineBindPoint = VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS;
-        RenderPassSubpass.inputAttachmentCount = 0;
-        RenderPassSubpass.pInputAttachments = nullptr; 
-        RenderPassSubpass.colorAttachmentCount = 1;
-        RenderPassSubpass.pColorAttachments = &colorAttachmentRef;
-        RenderPassSubpass.pResolveAttachments = nullptr;
-        RenderPassSubpass.pDepthStencilAttachment = nullptr;
-        RenderPassSubpass.preserveAttachmentCount = 0;
-        RenderPassSubpass.pPreserveAttachments = nullptr;
-
-        RenderPassCreateInfo.attachmentCount = 1;
-        RenderPassCreateInfo.pAttachments = &RenderPassAttachment;
-        RenderPassCreateInfo.subpassCount = 1;
-        RenderPassCreateInfo.pSubpasses = &RenderPassSubpass;
-
-        VkRenderPass VulkanRenderPass;
-        VkResult RetCreateRenderPass = vkCreateRenderPass(mVulkanDevice, &RenderPassCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &VulkanRenderPass);
-        if (RetCreateRenderPass != VkResult::VK_SUCCESS)
-        {
-            vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
-            return nullptr;
-        }
 
         VkGraphicsPipelineCreateInfo GfxPipelineCreateInfo;
         VulkanZeroMemory(GfxPipelineCreateInfo);
@@ -558,8 +538,8 @@ namespace GFXI
         GfxPipelineCreateInfo.pColorBlendState      = &ColorBlendStateInfo;
         GfxPipelineCreateInfo.pDynamicState         = &DynamicStateInfo;
         GfxPipelineCreateInfo.layout                = VulkanPipelineLayout;
-        GfxPipelineCreateInfo.renderPass            = VulkanRenderPass;
-        GfxPipelineCreateInfo.subpass               = 0;
+        GfxPipelineCreateInfo.renderPass            = VulkanRenderPass->GetVulkanRenderPass();
+        GfxPipelineCreateInfo.subpass               = info.RenderPassDesc.SubPassIndex;
         //VkPipeline       //GfxPipelineCreateInfo.basePipelineHandle;
         //int32_t          //GfxPipelineCreateInfo.basePipelineIndex;
 
@@ -568,14 +548,12 @@ namespace GFXI
         if (RetCreateGfxPipeline == VkResult::VK_SUCCESS)
         {
             vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
-            vkDestroyRenderPass(mVulkanDevice, VulkanRenderPass, GFX_VK_ALLOCATION_CALLBACK);
             GraphicPipelineStateVulkan* vulkanPipelineState = new GraphicPipelineStateVulkan(this, VulkanPipeline);
             return vulkanPipelineState;
         }
         else
         {
             vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
-            vkDestroyRenderPass(mVulkanDevice, VulkanRenderPass, GFX_VK_ALLOCATION_CALLBACK);
             return nullptr;
         }
     }
@@ -737,7 +715,53 @@ namespace GFXI
 
         if (RetCreateDescriptorSetLayout == VkResult::VK_SUCCESS)
         {
-            return new VulkanDescriptorSetLayout(this, DescriptorSetLayouts);
+            return new DescriptorSetLayoutVulkan(this, DescriptorSetLayouts);
+        }
+        return nullptr;
+    }
+
+    RenderPass* GraphicDeviceVulkan::CreateRenderPass(const RenderPass::CreateInfo& Info)
+    {
+        VkRenderPassCreateInfo RenderPassCreateInfo;
+        VulkanZeroMemory(RenderPassCreateInfo);
+
+        VkAttachmentDescription RenderPassAttachment;
+        RenderPassAttachment.flags = 0;
+        RenderPassAttachment.format = VkFormat::VK_FORMAT_B8G8R8A8_UNORM;
+        RenderPassAttachment.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
+        RenderPassAttachment.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
+        RenderPassAttachment.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
+        RenderPassAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        RenderPassAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        RenderPassAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+        RenderPassAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentReference colorAttachmentRef;
+        colorAttachmentRef.attachment = 0;
+        colorAttachmentRef.layout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription RenderPassSubpass;
+        RenderPassSubpass.flags = 0;
+        RenderPassSubpass.pipelineBindPoint = VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS;
+        RenderPassSubpass.inputAttachmentCount = 0;
+        RenderPassSubpass.pInputAttachments = nullptr;
+        RenderPassSubpass.colorAttachmentCount = 1;
+        RenderPassSubpass.pColorAttachments = &colorAttachmentRef;
+        RenderPassSubpass.pResolveAttachments = nullptr;
+        RenderPassSubpass.pDepthStencilAttachment = nullptr;
+        RenderPassSubpass.preserveAttachmentCount = 0;
+        RenderPassSubpass.pPreserveAttachments = nullptr;
+
+        RenderPassCreateInfo.attachmentCount = 1;
+        RenderPassCreateInfo.pAttachments = &RenderPassAttachment;
+        RenderPassCreateInfo.subpassCount = 1;
+        RenderPassCreateInfo.pSubpasses = &RenderPassSubpass;
+
+        VkRenderPass VulkanRenderPass;
+        VkResult RetCreateRenderPass = vkCreateRenderPass(mVulkanDevice, &RenderPassCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &VulkanRenderPass);
+        if (RetCreateRenderPass == VkResult::VK_SUCCESS)
+        {
+            return new RenderPassVulkan(this, VulkanRenderPass);
         }
         return nullptr;
     }

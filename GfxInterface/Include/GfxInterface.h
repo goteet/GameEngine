@@ -231,6 +231,15 @@ namespace GFXI
 
     };
 
+    struct RenderPass : public Object
+    {
+        struct CreateInfo
+        {
+            uint32_t NumSubPasses   = 0;
+            uint32_t NumAttachments = 0;
+        };
+    };
+
     struct GfxInterfaceAPI CommandQueue : public Object
     {
 
@@ -416,9 +425,15 @@ namespace GFXI
             uint32_t NumDescriptorSetLayouts = 0;
             DescriptorSetLayout** DescriptorSetLayouts = nullptr;
         };
+        struct RenderPassDesc
+        {
+            RenderPass* RenderPass = nullptr;
+            uint32_t    SubPassIndex = 0;
+        };
         struct CreateInfo
         {
             ShaderModuleDesc    ShaderModuleDesc;
+            RenderPassDesc      RenderPassDesc;
             EPrimitiveTopology  PrimitiveTopology = EPrimitiveTopology::TriangleList;
             VertexInputLayout   VertexInputLayout;
             ColorBlendState     ColorBlendState;
@@ -550,6 +565,7 @@ namespace GFXI
         virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) = 0;
         virtual ComputePipelineState*   CreateComputePipelineState(const ComputePipelineState::CreateInfo&) = 0;
         virtual DescriptorSetLayout*    CreateDescriptorSetLayout(const DescriptorSetLayout::CreateInfo&) = 0;
+        virtual RenderPass*             CreateRenderPass(const RenderPass::CreateInfo&) = 0;
         virtual SamplerState*           CreateSamplerState(const SamplerState::CreateInfo&) = 0;
         virtual ShaderBinary*           CompileShader(const ShaderBinary::CreateInfo&) = 0;
         virtual Shader*                 CreateShader(const Shader::CreateInfo&) = 0;

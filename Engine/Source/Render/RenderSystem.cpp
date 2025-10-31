@@ -535,6 +535,10 @@ namespace engine
 
     RenderSystem::~RenderSystem()
     {
+        SafeRelease(mShadowPass);
+        SafeRelease(mForwardPass);
+        SafeRelease(mBlitPass);
+
         SafeRelease(mDescriptorSetLayoutShadow0);
         SafeRelease(mDescriptorSetLayoutShadow1);
         SafeRelease(mDescriptorSetLayoutSimpleDraw0);
@@ -596,6 +600,10 @@ namespace engine
         mGfxDevice = mGfxModule->CreateDevice();
         mMainWindowSwapChain = mGfxDevice->CreateSwapChain(mMainWindowHandle, mClientWidth, mClientHeight, mIsFullScreen);
 
+        mShadowPass  = mGfxDevice->CreateRenderPass(GFXI::RenderPass::CreateInfo());
+        mForwardPass = mGfxDevice->CreateRenderPass(GFXI::RenderPass::CreateInfo());
+        mBlitPass    = mGfxDevice->CreateRenderPass(GFXI::RenderPass::CreateInfo());
+
         GFXI::GraphicPipelineState::CreateInfo PipelineCreateInfo;
         PipelineCreateInfo.VertexInputLayout.NumBindingArray = NumVertexBinding;
         PipelineCreateInfo.VertexInputLayout.BindingArray = &InputVertexBinding;
@@ -620,6 +628,8 @@ namespace engine
             PipelineCreateInfo.RasterizationState.ViewportInfo.Height = (float)1024;
             PipelineCreateInfo.RasterizationState.ViewportInfo.MinDepth = 0.0f;
             PipelineCreateInfo.RasterizationState.ViewportInfo.MaxDepth = 1.0f;
+            PipelineCreateInfo.RenderPassDesc.RenderPass = mShadowPass;
+            PipelineCreateInfo.RenderPassDesc.SubPassIndex = 0;
             mShadowPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
         }
         //if (mSimpleDrawPassState == nullptr)
@@ -635,6 +645,8 @@ namespace engine
             PipelineCreateInfo.ShaderModuleDesc.DescriptorSetLayouts    = layouts.data();
             PipelineCreateInfo.RasterizationState.ViewportInfo.Width  = static_cast<float>(mClientWidth);
             PipelineCreateInfo.RasterizationState.ViewportInfo.Height = static_cast<float>(mClientHeight);
+            PipelineCreateInfo.RenderPassDesc.RenderPass = mForwardPass;
+            PipelineCreateInfo.RenderPassDesc.SubPassIndex = 0;
             mSimpleDrawPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
         }
         //if (mBlitPassState == nullptr)
@@ -646,9 +658,10 @@ namespace engine
             mDescriptorSetLayoutBlit = CreateDescriptorSetLayout(mGfxDevice, &BlitDescriptorBindings, 1);
             PipelineCreateInfo.ShaderModuleDesc.NumDescriptorSetLayouts = 1;
             PipelineCreateInfo.ShaderModuleDesc.DescriptorSetLayouts = &mDescriptorSetLayoutBlit;
-
             PipelineCreateInfo.RasterizationState.ViewportInfo.Width = static_cast<float>(mClientWidth);
             PipelineCreateInfo.RasterizationState.ViewportInfo.Height = static_cast<float>(mClientHeight);
+            PipelineCreateInfo.RenderPassDesc.RenderPass = mBlitPass;
+            PipelineCreateInfo.RenderPassDesc.SubPassIndex = 0;
             mBlitPassState = mGfxDevice->CreateGraphicPipelineState(PipelineCreateInfo);
 
             GFXI::VertexBuffer::CreateInfo vertexBufferCreateInfo;
@@ -760,7 +773,7 @@ namespace engine
             state.ClearDepth = true;
             state.ClearStencil = true;
             state.ClearColorValue = math::float4{ 0.15f, 0.0f, 0.0f, 1.0f };
-            forwardPass.BindReading(shadowDepth);
+            //forwardPass.BindReading(shadowDepth);
             forwardPass.BindWriting(renderTarget, state);
             forwardPass.BindWriting(depthStencil, state);
             forwardPass.AttachJob(

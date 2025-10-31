@@ -16,11 +16,11 @@ namespace GFXI
         VkResult RetGetImages = vkGetSwapchainImagesKHR(VulkanDevice, mVulkanSwapChain, &NumImages, nullptr);
         if (RetGetImages == VkResult::VK_SUCCESS && NumImages > 0)
         {
-            std::vector<VkImage> mSwapChainImages(NumImages);
-            RetGetImages = vkGetSwapchainImagesKHR(VulkanDevice, mVulkanSwapChain, &NumImages, mSwapChainImages.data());
+            mBackbufferImages.resize(NumImages);
+            RetGetImages = vkGetSwapchainImagesKHR(VulkanDevice, mVulkanSwapChain, &NumImages, mBackbufferImages.data());
             if (RetGetImages == VkResult::VK_SUCCESS)
             {
-                for (VkImage Image : mSwapChainImages)
+                for (VkImage Image : mBackbufferImages)
                 {
                     VkImageViewCreateInfo ImageViewCreateInfo;
                     VkImageView ImageView;
@@ -43,11 +43,23 @@ namespace GFXI
                     VkResult RetCreateImageView = vkCreateImageView(VulkanDevice, &ImageViewCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &ImageView);
                     if (RetCreateImageView == VkResult::VK_SUCCESS)
                     {
-                        mImageViews.emplace_back(ImageView);
+                        mBackbufferImageViews.emplace_back(ImageView);
+
+                        VkFramebufferCreateInfo FrameBufferCreateInfo;
+                        VulkanZeroMemory(FrameBufferCreateInfo);
+
+                        //mBackbufferImageViews.renderPass;
+                        //mBackbufferImageViews.attachmentCount;
+                        //mBackbufferImageViews.pAttachments;
+                        //mBackbufferImageViews.width;
+                        //mBackbufferImageViews.height;
+                        //mBackbufferImageViews.layers = 1;
+
+
                     }
                     else
                     {
-                        mImageViews.emplace_back(nullptr);
+                        mBackbufferImageViews.emplace_back(nullptr);
                     }
                 }
             }
@@ -57,7 +69,7 @@ namespace GFXI
     SwapChainVulkan::~SwapChainVulkan()
     {
         VkDevice VulkanDevice = mBelongsTo->GetVulkanDevice();
-        for (VkImageView ImageView : mImageViews)
+        for (VkImageView ImageView : mBackbufferImageViews)
         {
             if (ImageView != nullptr)
             {
