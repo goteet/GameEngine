@@ -8,10 +8,10 @@ namespace engine
     class TransientBufferRegistry
     {
     public:
-        TransientBufferRegistry(GFXI::GraphicDevice* creatorPtr, GFXI::RenderTargetView* defaultBackbufferRT, GFXI::DepthStencilView* tempDS);
+        TransientBufferRegistry(GFXI::GraphicDevice* creatorPtr, GFXI::RenderTargetView* defaultBackBufferRT, GFXI::DepthStencilView* tempDS);
         ~TransientBufferRegistry();
-        GFXI::RenderTargetView* GetDefaultBackbufferRT() { return mDefaultBackbufferRT; }
-        GFXI::DepthStencilView* GetDefaultBackbufferDS() { return mDefaultBackbufferDSTemp; }
+        GFXI::RenderTargetView* GetDefaultBackBufferRT() { return mDefaultBackBufferRT; }
+        GFXI::DepthStencilView* GetDefaultBackBufferDS() { return mDefaultBackBufferDSTemp; }
         GFXI::RenderTargetView* AllocateRenderTarget(GFXI::RenderTargetView::EFormat format, unsigned int width, unsigned int height, bool usedByShader);
         GFXI::DepthStencilView* AllocateDepthStencil(GFXI::DepthStencilView::EFormat format, unsigned int width, unsigned int height, bool usedByShader);
         void RecycleRenderTarget(GFXI::RenderTargetView* texture);
@@ -20,8 +20,8 @@ namespace engine
 
     private:
         GFXI::GraphicDevice* mGfxResourceDevice;
-        GFXI::RenderTargetView* mDefaultBackbufferRT;
-        GFXI::DepthStencilView* mDefaultBackbufferDSTemp;
+        GFXI::RenderTargetView* mDefaultBackBufferRT;
+        GFXI::DepthStencilView* mDefaultBackBufferDSTemp;
 
         std::vector<GFXI::RenderTargetView*> mRenderTargets;
         std::vector<GFXI::DepthStencilView*> mDepthStencils;

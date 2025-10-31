@@ -1,5 +1,5 @@
 #include "D3D11Buffer.h"
-#include "D3D11CommandQueue.h"
+#include "D3D11CommandBuffer.h"
 #include "D3D11DeviceContext.h"
 #include "D3D11GraphicDevice.h"
 #include "D3D11PipelineState.h"
@@ -359,20 +359,38 @@ namespace GFXI
         }
     }
 
-    void ImmediateContextD3D11::ExecuteCommandQueue(CommandQueue* commandQueue, bool bRestoreToDefaultState)
+    void ImmediateContextD3D11::ExecuteCommandBuffer(CommandBuffer* commandQueue, bool bRestoreToDefaultState)
     {
-        CommandQueueD3D11* D3D11CommandQueue = dynamic_cast<CommandQueueD3D11*>(commandQueue);
-        D3D11CommandQueue->OnExecute(mContextWrapper.mD3D11Context.Get(), bRestoreToDefaultState);
+        CommandBufferD3D11* commandBuffer = dynamic_cast<CommandBufferD3D11*>(commandQueue);
+        commandBuffer->OnExecute(mContextWrapper.mD3D11Context.Get(), bRestoreToDefaultState);
     }
 
-    CommandQueue* DeferredContextD3D11::FinishRecordCommandQueue(bool bRestoreToDefaultState)
+    bool DeferredContextD3D11::BeginRecordCommandBuffer(const RenderingInfo&)
     {
+        if (mInsideRecording)
+        {
+            return false;
+        }
+        else
+        {
+            mInsideRecording = true;
+            return true;
+        }
+    }
+
+    CommandBuffer* DeferredContextD3D11::EndRecordCommandBuffer(bool bRestoreToDefaultState)
+    {
+        mInsideRecording = false;
         ComPtr<ID3D11CommandList> commandList;
         HRESULT retQueueCommandList = mContextWrapper.mD3D11Context->FinishCommandList(!bRestoreToDefaultState, &commandList);
+        
         if (SUCCEEDED(retQueueCommandList))
         {
-            return CommandQueueD3D11::GetOrCreateNewCommandQueue(commandList.Detach());
+            return CommandBufferD3D11::GetOrCreateNewCommandQueue(commandList.Detach());
         }
-        return nullptr;
+        else
+        {
+            return nullptr;
+        }
     }
 }

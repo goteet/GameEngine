@@ -5,7 +5,7 @@ set(GfxInterface_Include ${CMAKE_CURRENT_SOURCE_DIR}/../../Include/GfxInterface.
 set(GfxInterfaceD3D11_Include
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/D3D11Include.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/D3D11Buffer.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include/D3D11CommandQueue.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/D3D11CommandBuffer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/D3D11DeviceContext.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/D3D11GraphicDevice.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/D3D11GraphicModule.h
@@ -18,7 +18,7 @@ set(GfxInterfaceD3D11_Include
 
 set(GfxInterfaceD3D11_Source
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/D3D11Buffer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Source/D3D11CommandQueue.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/D3D11CommandBuffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/D3D11DeviceContext.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/D3D11GraphicDevice.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/D3D11GraphicModule.cpp

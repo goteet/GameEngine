@@ -31,15 +31,37 @@ namespace GFXI
         GreaterEqual    = 7,
     };
 
+    enum class EDataUsage : uint8_t
+    {
+        Default = 0, Immutable = 1, Dynamic = 2, Staging = 3
+    };
+
+    enum class GfxInterfaceAPI EShaderType : uint8_t
+    {
+        VertexShader    = 0,
+        PixelShader     = 1,
+        GeometryShader  = 2,
+        DomainShader    = 3,
+        HullShader      = 4,
+        ComputeShader   = 5,
+        Num             = 6
+    };
+
+    enum class GfxInterfaceAPI ECommandType : uint8_t
+    {
+        Graphic = 0, Compute = 1, Transfer = 2
+    };
+
+    enum GfxInterfaceAPI ECommandWaitStage : uint32_t
+    {
+        ColorAttachmentOutput = 1,
+    };
+
+
     struct GfxInterfaceAPI Object
     {
         virtual ~Object() = default;
         virtual void Release() = 0;
-    };
-
-    enum class EDataUsage : uint8_t
-    {
-        Default = 0, Immutable = 1, Dynamic = 2, Staging = 3
     };
 
     struct GfxInterfaceAPI Buffer : public Object
@@ -91,6 +113,11 @@ namespace GFXI
         };
     };
 
+    struct GfxInterfaceAPI Semaphore : public Object
+    {
+
+    };
+
     struct GfxInterfaceAPI Texture2D : public Object
     {
         virtual uint32_t    GetWidth() = 0;
@@ -109,10 +136,11 @@ namespace GFXI
         {
             R10G10B10A2_UNormInt,
             R8G8B8A8_UNormInt,
+            B8G8R8A8_UNormInt,
         };
         struct CreateInfo
         {
-            EFormat     Format          = EFormat::R8G8B8A8_UNormInt;
+            EFormat     Format          = EFormat::B8G8R8A8_UNormInt;
             EDataUsage  DataUsage       = EDataUsage::Default;
             uint32_t    Width;
             uint32_t    Height;
@@ -122,6 +150,7 @@ namespace GFXI
         virtual EFormat             GetFormat() = 0;
         virtual EDataUsage          GetUsage() = 0;
         virtual ShaderResourceView* GetShaderResourceView() = 0;
+        virtual Semaphore*          GetAvailableSemaphore() = 0;
     };
 
     struct GfxInterfaceAPI DepthStencilView : public Texture2D
@@ -144,16 +173,6 @@ namespace GFXI
         virtual ShaderResourceView* GetShaderResourceView() = 0;
     };
 
-    enum class GfxInterfaceAPI EShaderType : uint32_t
-    {
-        VertexShader    = 0,
-        PixelShader     = 1,
-        GeometryShader  = 2,
-        DomainShader    = 3,
-        HullShader      = 4,
-        ComputeShader   = 5,
-        Num = 6
-    };
 
     struct GfxInterfaceAPI ShaderBinary : public Object
     {
@@ -231,7 +250,7 @@ namespace GFXI
 
     };
 
-    struct GfxInterfaceAPI CommandQueue : public Object
+    struct GfxInterfaceAPI CommandBuffer : public Object
     {
 
     };
@@ -416,14 +435,25 @@ namespace GFXI
             uint32_t NumDescriptorSetLayouts = 0;
             DescriptorSetLayout** DescriptorSetLayouts = nullptr;
         };
+        struct RenderAttachemntDesc
+        {
+            uint32_t SubPassIndex    = 0;
+            //TODO: Must equal to  VkRenderingInfo::viewMask.
+            uint32_t AticveViewMask    = 0;
+            uint32_t NumColorAttachments = 0;
+            RenderTargetView::EFormat*  ColorAttachmentFormats = nullptr;
+            DepthStencilView::EFormat   DepthStencilFormat = DepthStencilView::EFormat::D24_UNormInt_S8_UInt;
+
+        };
         struct CreateInfo
         {
-            ShaderModuleDesc    ShaderModuleDesc;
-            EPrimitiveTopology  PrimitiveTopology = EPrimitiveTopology::TriangleList;
-            VertexInputLayout   VertexInputLayout;
-            ColorBlendState     ColorBlendState;
-            DepthStencilState   DepthStencilState;
-            RasterizationState  RasterizationState;
+            ShaderModuleDesc        ShaderModuleDesc;
+            RenderAttachemntDesc    RenderAttachemntDesc;
+            EPrimitiveTopology      PrimitiveTopology = EPrimitiveTopology::TriangleList;
+            VertexInputLayout       VertexInputLayout;
+            ColorBlendState         ColorBlendState;
+            DepthStencilState       DepthStencilState;
+            RasterizationState      RasterizationState;
         };
     };
 
@@ -529,13 +559,54 @@ namespace GFXI
     struct GfxInterfaceAPI ImmediateContext : public DeviceContext
     {
         //virtual void FillEntireBuffer(Buffer*, const void* dataPtr) = 0;
-        virtual void ExecuteCommandQueue(CommandQueue*, bool bRestoreToDefaultState) = 0;
+        virtual void ExecuteCommandBuffer(CommandBuffer*, bool bRestoreToDefaultState) = 0;
     };
 
     struct GfxInterfaceAPI DeferredContext : public DeviceContext
     {
-        virtual void            StartRecordCommandQueue() = 0;
-        virtual CommandQueue*   FinishRecordCommandQueue(bool bRestoreToDefaultState) = 0;
+        struct RenderingInfo
+        {
+            enum class StoreOp : uint8_t
+            {
+                None        = 0,
+                DontCare    = 1,
+                Store       = 2
+            };
+
+            enum class LoadOp : uint8_t
+            {
+                None        = 0,
+                DontCare    = 1,
+                Load        = 2,
+                Clear       = 3
+            };
+            struct RenderTargetDesc
+            {
+                RenderTargetView* View          = nullptr;
+                RenderTargetView* ResolvedView  = nullptr;
+                float   ClearValue[4]   = { 0.0f, 0.0f, 0.0f, 0.0f };
+                StoreOp StoreOp         = StoreOp::None;
+                LoadOp  LoadOp          = LoadOp::None;
+                bool    EnableResolve   = false;
+            };
+            struct DepthStencilDesc
+            {
+                DepthStencilView* View          = nullptr;
+                float       DepthClearValue     = 0.0f;
+                uint32_t    StencilClearValue   = 0;
+                StoreOp     StoreOp             = StoreOp::None;
+                LoadOp      LoadOp              = LoadOp::None;
+            };
+            uint32_t            ActiveViewMask      = 0;
+            uint32_t            NumRenderTargets    = 0;
+            uint32_t            SwapchainWidth      = 0;
+            uint32_t            SwapchainHeight     = 0;
+            RenderTargetDesc*   RenderTargets       = nullptr;
+            DepthStencilDesc    DepthStencil;
+        };
+        virtual bool            BeginRecordCommandBuffer(const RenderingInfo&) = 0;
+        virtual CommandBuffer*  EndRecordCommandBuffer(bool bRestoreToDefaultState) = 0;
+        virtual bool            IsInsideRecording() = 0;
     };
 
     struct GfxInterfaceAPI SwapChain : public Object
@@ -544,9 +615,116 @@ namespace GFXI
         virtual void                Present() = 0;
     };
 
+
+    struct RenderingInfo
+    {
+        enum class StoreOp : uint8_t
+        {
+            None = 0,
+            DontCare = 1,
+            Store = 2
+        };
+
+        enum class LoadOp : uint8_t
+        {
+            None = 0,
+            DontCare = 1,
+            Load = 2,
+            Clear = 3
+        };
+        struct RenderTargetDesc
+        {
+            RenderTargetView* View = nullptr;
+            RenderTargetView* ResolvedView = nullptr;
+            float   ClearValue[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            StoreOp StoreOp = StoreOp::None;
+            LoadOp  LoadOp = LoadOp::None;
+            bool    EnableResolve = false;
+        };
+        struct DepthStencilDesc
+        {
+            DepthStencilView* View = nullptr;
+            float       DepthClearValue = 0.0f;
+            uint32_t    StencilClearValue = 0;
+            StoreOp     StoreOp = StoreOp::None;
+            LoadOp      LoadOp = LoadOp::None;
+        };
+        uint32_t            ActiveViewMask = 0;
+        uint32_t            NumRenderTargets = 0;
+        uint32_t            SwapchainWidth = 0;
+        uint32_t            SwapchainHeight = 0;
+        RenderTargetDesc*   RenderTargets = nullptr;
+        DepthStencilDesc    DepthStencil;
+    };
+
+    struct GfxInterfaceAPI CommonCommands
+    {
+        virtual bool BeginRecord()  = 0;
+        virtual void EndRecord()    = 0;
+        virtual bool IsRecording()  = 0;
+
+        virtual void AddWaitSemaphore(Semaphore*, ECommandWaitStage) = 0;
+        virtual void AddSignalSemaphore(Semaphore*) = 0;
+    };
+
+    struct GfxInterfaceAPI TransferCommands
+    {
+
+    };
+
+    struct GfxInterfaceAPI ComputeCommands
+    {
+
+    };
+
+    struct GfxInterfaceAPI GraphicCommands
+    {
+        virtual void BeginRendering(const RenderingInfo&) = 0;
+        virtual void EndRendering() = 0;
+        virtual bool IsInsideRenderPass() = 0;
+    };
+
+    struct GfxInterfaceAPI TransferCommandBuffer : public Object
+        , public CommonCommands
+        , public TransferCommands
+    { };
+
+    struct GfxInterfaceAPI ComputeCommandBuffer : public Object
+        , public CommonCommands
+        , public TransferCommands
+        , public ComputeCommands
+    { };
+
+    struct GfxInterfaceAPI GraphicCommandBuffer : public Object
+        , public CommonCommands
+        , public TransferCommands
+        , public ComputeCommands
+        , public GraphicCommands
+    { };
+
+    template<typename CommandBufferType>
+    struct GfxInterfaceAPI TCommandPool : public Object
+    {
+        virtual CommandBufferType* CreateCommandBuffer() = 0;
+    };
+
+    using TransferCommandPool = TCommandPool<TransferCommandBuffer>;
+    using ComputeCommandPool  = TCommandPool<ComputeCommandBuffer>;
+    using GraphicCommandPool  = TCommandPool<GraphicCommandBuffer>;
+
+    template<typename CommandBufferType>
+    struct GfxInterfaceAPI TCommandQueue : public Object
+    {
+        virtual void ExecuteCommandBuffer(CommandBufferType*) = 0;
+    };
+
+    using TransferCommandQueue = TCommandQueue<TransferCommandBuffer>;
+    using ComputeCommandQueue  = TCommandQueue<ComputeCommandBuffer>;
+    using GraphicCommandQueue  = TCommandQueue<GraphicCommandBuffer>;
+
     struct GfxInterfaceAPI GraphicDevice : public Object
     {
-        virtual SwapChain*              CreateSwapChain(void* WindowHandle, int32_t WindowWidth, int32_t WindowHeight, bool IsFullscreen) = 0;
+        virtual SwapChain*              CreateSwapChain(void* WindowHandle, int canvasWidth, int canvasHeight, bool IsFullscreen) = 0;
         virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) = 0;
         virtual ComputePipelineState*   CreateComputePipelineState(const ComputePipelineState::CreateInfo&) = 0;
         virtual DescriptorSetLayout*    CreateDescriptorSetLayout(const DescriptorSetLayout::CreateInfo&) = 0;
@@ -560,6 +738,12 @@ namespace GFXI
         virtual DepthStencilView*       CreateDepthStencilView(const DepthStencilView::CreateInfo&) = 0;
         virtual ImmediateContext*       GetImmediateContext() = 0;
         virtual DeferredContext*        GetDeferredContext() = 0;
+        virtual TransferCommandPool*    CreateTransferCommandPool() = 0;
+        virtual ComputeCommandPool*     CreateComputeCommandPool() = 0;
+        virtual GraphicCommandPool*     CreateGraphicCommandPool() = 0;
+        virtual TransferCommandQueue*   GetTransferCommandQueue() = 0;
+        virtual ComputeCommandQueue*    GetComputeCommandQueue() = 0;
+        virtual GraphicCommandQueue*    GetGraphicCommandQueue() = 0;
     };
 
     struct GfxInterfaceAPI GraphicModule : public Object

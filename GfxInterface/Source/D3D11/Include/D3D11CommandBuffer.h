@@ -8,19 +8,19 @@ namespace GFXI
 {
     using Microsoft::WRL::ComPtr;
 
-    struct CommandQueueD3D11 : public CommandQueue
+    struct CommandBufferD3D11 : public CommandBuffer
     {;
-        ~CommandQueueD3D11();
+        ~CommandBufferD3D11();
         virtual void Release() override;
 
         static void FreeAllUnusedCommandQueues();
-        static CommandQueueD3D11* GetOrCreateNewCommandQueue(ID3D11CommandList* commandList);
+        static CommandBufferD3D11* GetOrCreateNewCommandQueue(ID3D11CommandList* commandList);
         
         void OnExecute(ID3D11DeviceContext* immediateContext, bool bRestoreToDefaultState);
 
     private:
-        static std::vector<CommandQueueD3D11*> mUnusedCommandQueues;
-        CommandQueueD3D11(ID3D11CommandList* commandList);
+        static std::vector<CommandBufferD3D11*> mUnusedCommandQueues;
+        CommandBufferD3D11(ID3D11CommandList* commandList);
 
         ComPtr<ID3D11CommandList> mD3D11CommandList;
     };

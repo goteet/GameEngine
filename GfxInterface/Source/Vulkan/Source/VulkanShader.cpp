@@ -62,6 +62,7 @@ namespace GFXI
 
     void ShaderVulkan::Release()
     {
+        delete this;
     }
 
     EShaderType ShaderVulkan::GetShaderType()

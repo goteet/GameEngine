@@ -23,12 +23,12 @@ namespace engine
         NoError = 0,
         DeviceCreationFail,
         CreateSwapchainFail,
-        CreateBackbufferDSFail,
-        CreateBackbufferRTVFail,
-        CreateBackbufferSRVFail,
+        CreateBackBufferDSFail,
+        CreateBackBufferRTVFail,
+        CreateBackBufferSRVFail,
         CreateDeferredContextFail,
         RetrieveDXGIFactoryFail,
-        RetrieveBackbufferFail,
+        RetrieveBackBufferFail,
     };
 
     class RenderSystem : public GE::RenderSystem
@@ -82,9 +82,9 @@ namespace engine
 
         GFXI::SamplerState* mDefaultSamplerState = nullptr;
 
-        GFXI::CommandQueue* mCubeRenderingQueueShadow = nullptr;
-        GFXI::CommandQueue* mCubeRenderingQueueFinal = nullptr;
-        GFXI::CommandQueue* mBlitRenderingQueue = nullptr;
+        GFXI::CommandBuffer* mCubeRenderingQueueShadow = nullptr;
+        GFXI::CommandBuffer* mCubeRenderingQueueFinal = nullptr;
+        GFXI::CommandBuffer* mBlitRenderingQueue = nullptr;
         
         GFXI::Shader* mShadowPassVS       = nullptr;
         GFXI::Shader* mShadowPassPS       = nullptr;
@@ -110,5 +110,7 @@ namespace engine
         GFXI::UniformBuffer* mObjectUniformBuffer = nullptr;
         GFXI::UniformBuffer* mLightViewUniformBuffer = nullptr;
 
+        GFXI::GraphicCommandPool* mGfxCommandPool = nullptr;
+        GFXI::GraphicCommandBuffer* mGfxCommandBuffer = nullptr;
     };
 }

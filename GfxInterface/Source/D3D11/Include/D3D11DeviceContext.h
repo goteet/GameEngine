@@ -77,7 +77,7 @@ namespace GFXI
         virtual void ClearStencilBuffer(DepthStencilView* depthStencilView, unsigned char stencil) override { mContextWrapper.ClearStencilBuffer(depthStencilView, stencil); }
         virtual void ClearDepthStencil(DepthStencilView* depthStencilView, float depth, unsigned char stencil) override { mContextWrapper.ClearDepthStencil(depthStencilView, depth, stencil); }
         virtual void ClearDepthStencil(DepthStencilView* depthStencilView, bool d, bool s, float dv, unsigned char sv) override { mContextWrapper.ClearDepthStencil(depthStencilView, d, s, dv, sv); }
-        virtual void ExecuteCommandQueue(CommandQueue*, bool bRestoreToDefaultState) override;
+        virtual void ExecuteCommandBuffer(CommandBuffer*, bool bRestoreToDefaultState) override;
         virtual MappedBuffer MapBuffer(Buffer* buffer, EMapMethod mapMethod) override { return mContextWrapper.MapBuffer(buffer, mapMethod); }
         virtual void UnmapBuffer(Buffer* buffer)  override { mContextWrapper.UnmapBuffer(buffer); }
         virtual void UpdateBuffer(Buffer* buffer, const void* data) override { mContextWrapper.UpdateSubresource(buffer, data); }
@@ -111,9 +111,11 @@ namespace GFXI
         virtual void UnmapBuffer(Buffer* buffer)  override { mContextWrapper.UnmapBuffer(buffer); }
         virtual void UpdateBuffer(Buffer* buffer, const void* data) override { mContextWrapper.UpdateSubresource(buffer, data); }
 
-        virtual void StartRecordCommandQueue() override {}
-        virtual CommandQueue* FinishRecordCommandQueue(bool bRestoreToDefaultState) override;
+        virtual bool            BeginRecordCommandBuffer(const RenderingInfo&) override;
+        virtual CommandBuffer*  EndRecordCommandBuffer(bool bRestoreToDefaultState) override;
+        virtual bool            IsInsideRecording() override { return mInsideRecording; }
     private:
         BaseContextWrapper mContextWrapper;
+        bool mInsideRecording = false;
     };
 }

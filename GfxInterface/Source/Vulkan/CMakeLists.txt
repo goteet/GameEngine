@@ -4,6 +4,11 @@ set(GfxInterface_Include ${CMAKE_CURRENT_SOURCE_DIR}/../../Include/GfxInterface.
 
 set(GfxInterfaceVulkan_Inlcude
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanInclude.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanCommandBuffer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanCommandPool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanCommandQueue.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanSemaphore.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanDeviceResource.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanGraphicDevice.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanGraphicModule.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/VulkanPipelineState.h
@@ -12,6 +17,11 @@ set(GfxInterfaceVulkan_Inlcude
 )
 
 set(GfxInterfaceVulkan_Source
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanCommandBuffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanCommandPool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanCommandQueue.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanSemaphore.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanDeviceResource.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanGraphicDevice.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanGraphicModule.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Source/VulkanPipelineState.cpp

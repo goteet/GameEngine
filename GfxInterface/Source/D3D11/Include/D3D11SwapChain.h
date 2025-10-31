@@ -21,7 +21,7 @@ namespace GFXI
         virtual void Present() override;
 
     private:
-        RenderTargetD3D11*      mDefaultBackbuffer;
+        RenderTargetD3D11*      mDefaultBackBuffer;
         ComPtr<IDXGISwapChain1> mSwapChain;
     };
 }

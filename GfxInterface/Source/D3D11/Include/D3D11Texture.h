@@ -29,6 +29,7 @@ namespace GFXI
         virtual EDataUsage      GetUsage()  override { return EDataUsage::Default; }
         virtual bool IsUsedByShader() override { return mUsedByShader; }
         virtual ShaderResourceView* GetShaderResourceView() override { return &mShaderResourceView; }
+        virtual Semaphore*          GetAvailableSemaphore() override { return nullptr;}
 
         ID3D11RenderTargetView*     GetRenderTargetView()   { return mRenderTargetView.Get(); }
         ID3D11ShaderResourceView*   GetShaderResourceViewImpl() { return mShaderResourceView.GetD3D11ShaderResourceView(); }

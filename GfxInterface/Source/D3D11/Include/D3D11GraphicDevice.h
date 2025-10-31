@@ -28,9 +28,14 @@ namespace GFXI
         virtual UniformBuffer*          CreateUniformbuffer(const UniformBuffer::CreateInfo&) override;
         virtual RenderTargetView*       CreateRenderTargetView(const RenderTargetView::CreateInfo&) override;
         virtual DepthStencilView*       CreateDepthStencilView(const DepthStencilView::CreateInfo&) override;
-
         virtual ImmediateContext*       GetImmediateContext() override  { return &mImmediateContext; }
         virtual DeferredContext*        GetDeferredContext()  override  { return &mDeferredContext; }
+        virtual GraphicCommandPool*     CreateGraphicCommandPool()  override { return nullptr; }
+        virtual ComputeCommandPool*     CreateComputeCommandPool() override { return nullptr; }
+        virtual TransferCommandPool*    CreateTransferCommandPool() override { return nullptr; }
+        virtual GraphicCommandQueue*    GetGraphicCommandQueue() override { return nullptr; }
+        virtual ComputeCommandQueue*    GetComputeCommandQueue() override { return nullptr; }
+        virtual TransferCommandQueue*   GetTransferCommandQueue() override { return nullptr; }
 
     private:
         GraphicModuleD3D11*     mBelongsTo;

@@ -54,10 +54,10 @@ namespace engine
         bool AttachJob(RFGRenderPass pass, std::function<void(GFXI::DeferredContext&)> job);
         void CreateTestFrameGraph();
 
-        int GetBackbufferWidth() const;
-        int GetBackbufferHeight() const;
-        GFXI::RenderTargetView::EFormat GetBackbufferRTFormat() const;
-        GFXI::DepthStencilView::EFormat GetBackbufferDSFormat() const;
+        int GetBackBufferWidth() const;
+        int GetBackBufferHeight() const;
+        GFXI::RenderTargetView::EFormat GetBackBufferRTFormat() const;
+        GFXI::DepthStencilView::EFormat GetBackBufferDSFormat() const;
         int GetWidth(const RFGResourceHandle&) const;
         int GetHeigt(const RFGResourceHandle&) const;
         int GetFormat(const RFGResourceHandle&) const;
@@ -121,8 +121,8 @@ namespace engine
         std::vector<RFGResource> mResources;
         std::vector<int> mCompiledNodeExecuteOrder;
         TransientBufferRegistry* mTransientBufferRegistry;
-        int mBackbufferRTIndex;
-        int mBackbufferDSIndex;
+        int mBackBufferRTIndex;
+        int mBackBufferDSIndex;
     };
 }
 

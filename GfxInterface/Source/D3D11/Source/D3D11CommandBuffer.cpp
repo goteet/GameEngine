@@ -1,20 +1,20 @@
-#include "D3D11CommandQueue.h"
+#include "D3D11CommandBuffer.h"
 
 namespace GFXI
 {
-    std::vector<CommandQueueD3D11*> CommandQueueD3D11::mUnusedCommandQueues;
+    std::vector<CommandBufferD3D11*> CommandBufferD3D11::mUnusedCommandQueues;
 
-    CommandQueueD3D11::CommandQueueD3D11(ID3D11CommandList* commandList)
+    CommandBufferD3D11::CommandBufferD3D11(ID3D11CommandList* commandList)
         : mD3D11CommandList(commandList)
     {
 
     }
 
-    CommandQueueD3D11::~CommandQueueD3D11()
+    CommandBufferD3D11::~CommandBufferD3D11()
     {
         mD3D11CommandList.Reset();
     }
-    void CommandQueueD3D11::Release()
+    void CommandBufferD3D11::Release()
     {
         mD3D11CommandList.Reset();
         {
@@ -23,9 +23,9 @@ namespace GFXI
         }
     }
 
-    void CommandQueueD3D11::FreeAllUnusedCommandQueues()
+    void CommandBufferD3D11::FreeAllUnusedCommandQueues()
     {
-        std::vector<CommandQueueD3D11*> pendingDeletedCommandQueues;
+        std::vector<CommandBufferD3D11*> pendingDeletedCommandQueues;
 
         {
             //TODO:multi-thread-support.
@@ -38,10 +38,10 @@ namespace GFXI
         }
     }
 
-    CommandQueueD3D11* CommandQueueD3D11::GetOrCreateNewCommandQueue(ID3D11CommandList* commandList)
+    CommandBufferD3D11* CommandBufferD3D11::GetOrCreateNewCommandQueue(ID3D11CommandList* commandList)
     {
         //TODO: multi-thread-support.
-        CommandQueueD3D11* newQueue = nullptr;
+        CommandBufferD3D11* newQueue = nullptr;
         if (mUnusedCommandQueues.size() > 0)
         {
             newQueue = mUnusedCommandQueues.back();
@@ -50,12 +50,12 @@ namespace GFXI
         }
         else
         {
-            newQueue = new CommandQueueD3D11(commandList);
+            newQueue = new CommandBufferD3D11(commandList);
         }
         return newQueue;
     }
 
-    void CommandQueueD3D11::OnExecute(ID3D11DeviceContext* immediateContext, bool bRestoreToDefaultState)
+    void CommandBufferD3D11::OnExecute(ID3D11DeviceContext* immediateContext, bool bRestoreToDefaultState)
     {
         immediateContext->ExecuteCommandList(mD3D11CommandList.Get(), !bRestoreToDefaultState);
     }

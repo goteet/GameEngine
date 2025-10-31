@@ -5,16 +5,16 @@ namespace GFXI
 {
     SwapChainD3D11::SwapChainD3D11(IDXGISwapChain1* swapChain, RenderTargetD3D11* defaultBackBuffer)
         : mSwapChain(swapChain)
-        , mDefaultBackbuffer(defaultBackBuffer)
+        , mDefaultBackBuffer(defaultBackBuffer)
     {
         
     }
 
     SwapChainD3D11::~SwapChainD3D11()
     {
-        if (mDefaultBackbuffer)
+        if (mDefaultBackBuffer)
         {
-            mDefaultBackbuffer->Release();
+            mDefaultBackBuffer->Release();
         }
         mSwapChain.Reset();
     }
@@ -26,7 +26,7 @@ namespace GFXI
 
     RenderTargetView* SwapChainD3D11::GetRenderTargetView()
     {
-        return mDefaultBackbuffer;
+        return mDefaultBackBuffer;
     }
 
     void SwapChainD3D11::Present()

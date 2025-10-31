@@ -3,6 +3,7 @@
 #include "VulkanPipelineState.h"
 #include "VulkanShader.h"
 #include "VulkanSwapChain.h"
+#include "VulkanCommandPool.h"
 
 
 
@@ -10,24 +11,23 @@ namespace GFXI
 {
     GraphicDeviceVulkan::GraphicDeviceVulkan(GraphicModuleVulkan* belongsTo,
         VkPhysicalDevice physicalDevice,    VkDevice device,
-        uint32_t graphicQueueFamilyIndex,   uint32_t graphicQueueIndex,
-        uint32_t computeQueueFamilyIndex,   uint32_t computeQueueIndex,
-        uint32_t transferQueueFamilyIndex,  uint32_t transferQueueIndex
+        VulkanCommandQueue graphicQueue,
+        VulkanCommandQueue computeQueue,
+        VulkanCommandQueue transferQueue
     )
         : mBelongsTo(belongsTo)
         , mVulkanPhysicalDevice(physicalDevice)
         , mVulkanDevice(device)
-        , mGraphicQueueFamilyIndex(graphicQueueFamilyIndex),   mGraphicQueueIndex(graphicQueueIndex)
-        , mComputeQueueFamilyIndex(computeQueueFamilyIndex),   mComputeQueueIndex(computeQueueIndex)
-        , mTransferQueueFamilyIndex(transferQueueFamilyIndex), mTransferQueueIndex(transferQueueIndex)
+        , mTransferQueue(this, transferQueue)
+        , mComputeQueue (this, computeQueue)
+        , mGraphicQueue (this, graphicQueue)
     {
-        vkGetDeviceQueue(device, graphicQueueFamilyIndex,  graphicQueueIndex,  &mVulkanGraphicQueue);
-        vkGetDeviceQueue(device, computeQueueFamilyIndex,  computeQueueIndex,  &mVulkanComputeQueue);
-        vkGetDeviceQueue(device, transferQueueFamilyIndex, transferQueueIndex, &mVulkanTransferQueue);
+
     }
 
     GraphicDeviceVulkan::~GraphicDeviceVulkan()
     {
+        vkDeviceWaitIdle(mVulkanDevice);
         vkDestroyDevice(mVulkanDevice, GFX_VK_ALLOCATION_CALLBACK);
     }
     void GraphicDeviceVulkan::Release()
@@ -35,142 +35,190 @@ namespace GFXI
         delete this;
     }
 
-    SwapChain* GraphicDeviceVulkan::CreateSwapChain(void* windowHandle, int windowWidth, int windowHeight, bool isFullscreen)
+    const VkFormat VulkanRenderTargetFormatMapping[] = {
+        VkFormat::VK_FORMAT_A2B10G10R10_UNORM_PACK32,   // R10G10B10A2_UNormInt
+        VkFormat::VK_FORMAT_R8G8B8A8_UNORM,             // R8G8B8A8_UNormInt
+        VkFormat::VK_FORMAT_B8G8R8A8_UNORM,             // B8G8R8A8_UNormInt
+    };
+
+    static const VkFormat VulkanDepthFormatMapping[] = {
+        VkFormat::VK_FORMAT_D24_UNORM_S8_UINT,          //D24_UNormInt_S8_UInt
+        VkFormat::VK_FORMAT_D32_SFLOAT,                 //D32_SFloat        
+    };
+
+    static const VkFormat VulkanStencilFormatMapping[] = {
+        VkFormat::VK_FORMAT_D24_UNORM_S8_UINT,          //D24_UNormInt_S8_UInt
+        VkFormat::VK_FORMAT_UNDEFINED,                  //D32_SFloat        
+    };
+
+    SwapChain* GraphicDeviceVulkan::CreateSwapChain(void* windowHandle, int canvasWidth, int canvasHeight, bool isFullscreen)
     {
         //TODO: support High-DPI.
-        uint32_t pixelWidth = windowWidth;
-        uint32_t pixelHeight = windowHeight;
-        VkWin32SurfaceCreateInfoKHR SurfaceCreateInfo;
-        VulkanZeroMemory(SurfaceCreateInfo);
-        SurfaceCreateInfo.hwnd = static_cast<HWND>(windowHandle);
-        SurfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
+        uint32_t pixelWidth  = canvasWidth;
+        uint32_t pixelHeight = canvasHeight;
 
-        VkSurfaceKHR Surface = nullptr;
-        VkResult RetCreateSurface = vkCreateWin32SurfaceKHR(mBelongsTo->GetInstance(), &SurfaceCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &Surface);
+        //TODO:
+        // Support Multiple Platforms.
+        //
+        // We create a new surface to check
+        // if device & related queue support presenting surfaces.
+        VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
+        VulkanZeroMemory(surfaceCreateInfo);
+        surfaceCreateInfo.hwnd = static_cast<HWND>(windowHandle);
+        surfaceCreateInfo.hinstance = GetModuleHandle(nullptr);
 
-        if (RetCreateSurface == VkResult::VK_SUCCESS)
+        VkSurfaceKHR vulkanSurface = nullptr;
+        VkResult retCreateSurface = vkCreateWin32SurfaceKHR(mBelongsTo->GetInstance(), &surfaceCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &vulkanSurface);
+
+        if (retCreateSurface == VkResult::VK_SUCCESS)
         {
-
             //TODO: There will be some DeviceQueueFamily that only support Presentation.
             // I think the dedicated presentation queue is aimed for peformance, but I need more study in it.
             // and if dedicated presentation queue need to be used, we should create it in CreateDevice ahead.
             // so we follow the strategy in UE4 use compute/gfx queue for presentation.
-            uint32_t PresentQueueFamilyIndex = mComputeQueueFamilyIndex;
+            //TODO:
+            // vkGetPhysicalDeviceWin32PresentationSupportKHR
+            // This platform-specific function can be called prior to creating a surface.
+            bool bUseComputeQueueToPresent = true;
             VkBool32 bSupportPresent = false;
-            VkResult RetCheckSurfaceSupport = vkGetPhysicalDeviceSurfaceSupportKHR(mVulkanPhysicalDevice, mComputeQueueFamilyIndex, Surface, &bSupportPresent);
-            if (RetCheckSurfaceSupport != VkResult::VK_SUCCESS || !bSupportPresent)
+            VkResult retCheckSurfaceSupport = vkGetPhysicalDeviceSurfaceSupportKHR(mVulkanPhysicalDevice, mComputeQueue.GetQueue().GetFamilyIndex(), vulkanSurface, &bSupportPresent);
+            if (retCheckSurfaceSupport != VkResult::VK_SUCCESS || !bSupportPresent || !bUseComputeQueueToPresent)
             {
-                PresentQueueFamilyIndex = mGraphicQueueFamilyIndex;
-                RetCheckSurfaceSupport = vkGetPhysicalDeviceSurfaceSupportKHR(mVulkanPhysicalDevice, mGraphicQueueFamilyIndex, Surface, &bSupportPresent);
+                bUseComputeQueueToPresent = false;
+                retCheckSurfaceSupport = vkGetPhysicalDeviceSurfaceSupportKHR(mVulkanPhysicalDevice, mGraphicQueue.GetQueue().GetFamilyIndex(), vulkanSurface, &bSupportPresent);
             }
 
             if (bSupportPresent)
             {
-                mVulkanPresentQueue = (PresentQueueFamilyIndex == mComputeQueueFamilyIndex) ? mVulkanComputeQueue : mVulkanGraphicQueue;
-
+                //TODO:
+                bUseComputeQueueToPresent = false;
+                mPresentQueue = bUseComputeQueueToPresent
+                    ? mComputeQueue.GetQueue()
+                    : mGraphicQueue.GetQueue();
+                
                 bool bSupportBGRA8_SRGB = false;
-                bool bSupportFIFOPresent = false;
-                uint32_t NumSurfaceFormats = 0;
-                uint32_t NumPresentModes = 0;
-                std::vector<VkSurfaceFormatKHR> SurfaceFormats;
-                std::vector<VkPresentModeKHR> PresentModes;
-                vkGetPhysicalDeviceSurfaceFormatsKHR(mVulkanPhysicalDevice, Surface, &NumSurfaceFormats, nullptr);
-                vkGetPhysicalDeviceSurfacePresentModesKHR(mVulkanPhysicalDevice, Surface, &NumPresentModes, nullptr);
-                if (NumSurfaceFormats > 0)
+                bool bSupportPresentFIFORelaxed = false;
+                bool bSupportPresentMailbox = false;
+                uint32_t numSurfaceFormats = 0;
+                uint32_t numPresentModes = 0;
+                std::vector<VkSurfaceFormatKHR> surfaceFormats;
+                std::vector<VkPresentModeKHR> presentModes;
+                vkGetPhysicalDeviceSurfaceFormatsKHR(mVulkanPhysicalDevice, vulkanSurface, &numSurfaceFormats, nullptr);
+                vkGetPhysicalDeviceSurfacePresentModesKHR(mVulkanPhysicalDevice, vulkanSurface, &numPresentModes, nullptr);
+                if (numSurfaceFormats > 0)
                 {
-                    SurfaceFormats.resize(NumSurfaceFormats);
-                    vkGetPhysicalDeviceSurfaceFormatsKHR(mVulkanPhysicalDevice, Surface, &NumSurfaceFormats, SurfaceFormats.data());
-                    for (VkSurfaceFormatKHR& Format : SurfaceFormats)
+                    surfaceFormats.resize(numSurfaceFormats);
+                    vkGetPhysicalDeviceSurfaceFormatsKHR(mVulkanPhysicalDevice, vulkanSurface, &numSurfaceFormats, surfaceFormats.data());
+                    for (VkSurfaceFormatKHR& surfaceFormat : surfaceFormats)
                     {
-                        if (Format.colorSpace == VkColorSpaceKHR::VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-                            && Format.format == VkFormat::VK_FORMAT_B8G8R8A8_UNORM)
+                        //TODO: support input testing.
+                        if (surfaceFormat.colorSpace == VkColorSpaceKHR::VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+                            && surfaceFormat.format == VkFormat::VK_FORMAT_B8G8R8A8_UNORM)
                         {
                             bSupportBGRA8_SRGB = true;
                             break;
                         }
                     }
                 }
-                if (NumPresentModes > 0)
+                if (numPresentModes > 0)
                 {
-                    PresentModes.resize(NumPresentModes);
-                    vkGetPhysicalDeviceSurfacePresentModesKHR(mVulkanPhysicalDevice, Surface, &NumPresentModes, PresentModes.data());
-                    for (VkPresentModeKHR& PresentMode : PresentModes)
+                    presentModes.resize(numPresentModes);
+                    vkGetPhysicalDeviceSurfacePresentModesKHR(mVulkanPhysicalDevice, vulkanSurface, &numPresentModes, presentModes.data());
+                    for (VkPresentModeKHR& presentMode : presentModes)
                     {
-                        if (PresentMode == VkPresentModeKHR::VK_PRESENT_MODE_FIFO_KHR)
+                        if (presentMode == VkPresentModeKHR::VK_PRESENT_MODE_FIFO_RELAXED_KHR)
                         {
-                            bSupportFIFOPresent = true;
-                            break;
+                            bSupportPresentFIFORelaxed = true;
+                            if (bSupportPresentMailbox)
+                            {
+                                break;
+                            }
+                        }
+                        else if (presentMode == VkPresentModeKHR::VK_PRESENT_MODE_MAILBOX_KHR)
+                        {
+                            bSupportPresentMailbox = true;
+
+                            if (bSupportPresentFIFORelaxed)
+                            {
+                                break;
+                            }
                         }
                     }
                 }
 
-                if (bSupportBGRA8_SRGB && bSupportFIFOPresent)
+                if (bSupportBGRA8_SRGB && (bSupportPresentFIFORelaxed || bSupportPresentMailbox))
                 {
-                    VkSurfaceCapabilitiesKHR SurfaceCaps;
-                    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mVulkanPhysicalDevice, Surface, &SurfaceCaps);
+                    VkSurfaceCapabilitiesKHR surfaceCaps;
+                    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mVulkanPhysicalDevice, vulkanSurface, &surfaceCaps);
 
                     auto clamp = [](int v, int min, int max) { return (v > max) ? max : (v < min ? min : v); };
-                    windowWidth = clamp(windowWidth, SurfaceCaps.minImageExtent.width, SurfaceCaps.maxImageExtent.width);
-                    windowHeight = clamp(windowHeight, SurfaceCaps.minImageExtent.height, SurfaceCaps.maxImageExtent.height);
+                    canvasWidth = clamp(canvasWidth, surfaceCaps.minImageExtent.width, surfaceCaps.maxImageExtent.width);
+                    canvasHeight = clamp(canvasHeight, surfaceCaps.minImageExtent.height, surfaceCaps.maxImageExtent.height);
 
                     //TODO: check and determin swapchain image count.
-                    uint32_t NumSwapchainImages = 3;
-                    if (SurfaceCaps.maxImageCount != 0)
+                    uint32_t numSwapchainImages = bSupportPresentMailbox ? 3 : 2;
+                    if (surfaceCaps.maxImageCount != 0)
                     {
-                        NumSwapchainImages = clamp(NumSwapchainImages, SurfaceCaps.minImageCount, SurfaceCaps.maxImageCount);
+                        numSwapchainImages = clamp(numSwapchainImages, surfaceCaps.minImageCount, surfaceCaps.maxImageCount);
                     }
 
-                    VkSurfaceTransformFlagBitsKHR SurfacePreTransform =
-                        (SurfaceCaps.supportedTransforms & VkSurfaceTransformFlagBitsKHR::VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
+                    VkSurfaceTransformFlagBitsKHR surfacePreTransform =
+                        (surfaceCaps.supportedTransforms & VkSurfaceTransformFlagBitsKHR::VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
                         ? VkSurfaceTransformFlagBitsKHR::VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR
-                        : SurfaceCaps.currentTransform;
+                        : surfaceCaps.currentTransform;
 
-                    VkCompositeAlphaFlagBitsKHR SurfaceCompositeAlpha =
-                        (SurfaceCaps.supportedCompositeAlpha & VkCompositeAlphaFlagBitsKHR::VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
+                    VkCompositeAlphaFlagBitsKHR surfaceCompositeAlpha =
+                        (surfaceCaps.supportedCompositeAlpha & VkCompositeAlphaFlagBitsKHR::VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
                         ? VkCompositeAlphaFlagBitsKHR::VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR
                         : VkCompositeAlphaFlagBitsKHR::VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
 
-                    VkSwapchainCreateInfoKHR SwapChainCreateInfo;
-                    VulkanZeroMemory(SwapChainCreateInfo);
-                    SwapChainCreateInfo.surface = Surface;
-                    SwapChainCreateInfo.minImageCount = NumSwapchainImages;
-                    SwapChainCreateInfo.imageFormat = VkFormat::VK_FORMAT_B8G8R8A8_UNORM;
-                    SwapChainCreateInfo.imageColorSpace = VkColorSpaceKHR::VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-                    SwapChainCreateInfo.imageExtent.width = pixelWidth;
-                    SwapChainCreateInfo.imageExtent.height = pixelHeight;
-                    SwapChainCreateInfo.imageArrayLayers = 1;
+                    RenderTargetView::EFormat renderTargetViewFormat = RenderTargetView::EFormat::B8G8R8A8_UNormInt;
+                    uint32_t swapChainWidth  = pixelWidth;
+                    uint32_t swapChainHeight = pixelHeight;
+                    VkSwapchainCreateInfoKHR swapChainCreateInfo;
+                    VulkanZeroMemory(swapChainCreateInfo);
+                    swapChainCreateInfo.surface = vulkanSurface;
+                    swapChainCreateInfo.minImageCount = numSwapchainImages;
+                    swapChainCreateInfo.imageFormat = VulkanRenderTargetFormatMapping[static_cast<uint32_t>(renderTargetViewFormat)];
+                    swapChainCreateInfo.imageColorSpace = VkColorSpaceKHR::VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+                    swapChainCreateInfo.imageExtent.width = swapChainWidth;
+                    swapChainCreateInfo.imageExtent.height = swapChainHeight;
+                    swapChainCreateInfo.imageArrayLayers = 1;
                     //TODO:
                     // It is possible that you'll render images to a separate image first to perform post-processing.
                     // In that case you may use a value like VK_IMAGE_USAGE_TRANSFER_DST_BIT instead
                     // and use a memory operation to transfer the rendered image to a swap chain image.
-                    SwapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+                    swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT; //VK_IMAGE_USAGE_SAMPLED_BIT | 
                     // An image is owned by one queue family at a time and ownership must be explicitly transferred before using it in another queue family.
                     // This option offers the best performance.
-                    SwapChainCreateInfo.imageSharingMode = VkSharingMode::VK_SHARING_MODE_EXCLUSIVE;
-                    SwapChainCreateInfo.queueFamilyIndexCount = 0;
-                    SwapChainCreateInfo.pQueueFamilyIndices = nullptr;
-                    SwapChainCreateInfo.preTransform = SurfacePreTransform;
-                    SwapChainCreateInfo.compositeAlpha = SurfaceCompositeAlpha;
-                    SwapChainCreateInfo.presentMode = VkPresentModeKHR::VK_PRESENT_MODE_FIFO_KHR;
-                    SwapChainCreateInfo.clipped = VK_TRUE;
+                    swapChainCreateInfo.imageSharingMode = VkSharingMode::VK_SHARING_MODE_EXCLUSIVE;
+                    swapChainCreateInfo.queueFamilyIndexCount = 0;
+                    swapChainCreateInfo.pQueueFamilyIndices = nullptr;
+                    swapChainCreateInfo.preTransform = surfacePreTransform;
+                    swapChainCreateInfo.compositeAlpha = surfaceCompositeAlpha;
+                    swapChainCreateInfo.presentMode = bSupportPresentMailbox
+                        ? VkPresentModeKHR::VK_PRESENT_MODE_MAILBOX_KHR
+                        : VkPresentModeKHR::VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+                    swapChainCreateInfo.clipped = VK_TRUE;
                     //TODO:
                     // Set to last if re-creating swapchain.
-                    SwapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+                    swapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
-                    VkSwapchainKHR VulkanSwapchain;
-                    VkResult RetCreateSwapChain = vkCreateSwapchainKHR(mVulkanDevice, &SwapChainCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &VulkanSwapchain);
+                    VkSwapchainKHR vulkanSwapchain;
+                    VkResult retCreateSwapChain = vkCreateSwapchainKHR(mVulkanDevice, &swapChainCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &vulkanSwapchain);
 
-                    if (RetCreateSwapChain == VK_SUCCESS)
+                    if (retCreateSwapChain == VK_SUCCESS)
                     {
                         //TODO: create image before creating swapchain.
-                        SwapChainVulkan* SwapChain = new SwapChainVulkan(this, VulkanSwapchain);
-                        return SwapChain;
+                        SwapChainVulkan* SwapChain = new SwapChainVulkan(this, vulkanSwapchain, vulkanSurface, mPresentQueue
+                            , renderTargetViewFormat, swapChainWidth, swapChainHeight);
+                        return SwapChain;             
                     }
                 }
             }
             else
             {
-                vkDestroySurfaceKHR(mBelongsTo->GetInstance(), Surface, GFX_VK_ALLOCATION_CALLBACK);
+                vkDestroySurfaceKHR(mBelongsTo->GetInstance(), vulkanSurface, GFX_VK_ALLOCATION_CALLBACK);
             }
         }
 
@@ -186,6 +234,7 @@ namespace GFXI
         VkShaderStageFlagBits::VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
         VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT
     };
+
     static const VkFormat VulkanVertexFormatMapping[] = {
         VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT,    //RGBA32_SFloat
         VkFormat::VK_FORMAT_R8G8B8A8_UINT,          //RGBA32_UInt
@@ -417,6 +466,7 @@ namespace GFXI
 
         //Depth Stencil
         VkPipelineDepthStencilStateCreateInfo DepthStencilStateInfo;
+        VulkanZeroMemory(DepthStencilStateInfo);
         DepthStencilStateInfo.depthTestEnable   = info.DepthStencilState.UsingDepthTest ? VK_TRUE : VK_FALSE;
         DepthStencilStateInfo.depthWriteEnable  = info.DepthStencilState.EnableDepthWrite ? VK_TRUE : VK_FALSE;
         DepthStencilStateInfo.depthCompareOp    = VulkanCompareOpMapping[static_cast<uint32_t>(info.DepthStencilState.DepthTestFunction)];
@@ -473,7 +523,10 @@ namespace GFXI
 
         VkPipelineDynamicStateCreateInfo DynamicStateInfo;
         VulkanZeroMemory(DynamicStateInfo);
-        VkDynamicState DynamicStates[] = { VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT, VkDynamicState::VK_DYNAMIC_STATE_SCISSOR };
+        VkDynamicState DynamicStates[] = {
+            VkDynamicState::VK_DYNAMIC_STATE_VIEWPORT,
+            VkDynamicState::VK_DYNAMIC_STATE_SCISSOR
+        };
         uint32_t NumDynamicState = sizeof(DynamicStates) / sizeof(VkDynamicState);
         DynamicStateInfo.dynamicStateCount = NumDynamicState;
         DynamicStateInfo.pDynamicStates = DynamicStates;
@@ -482,7 +535,7 @@ namespace GFXI
         std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
         for (uint32_t index = 0; index < info.ShaderModuleDesc.NumDescriptorSetLayouts; index++)
         {
-            VulkanDescriptorSetLayout* VulkanLayout = reinterpret_cast<VulkanDescriptorSetLayout*>(info.ShaderModuleDesc.DescriptorSetLayouts[index]);
+            DescriptorSetLayoutVulkan* VulkanLayout = reinterpret_cast<DescriptorSetLayoutVulkan*>(info.ShaderModuleDesc.DescriptorSetLayouts[index]);
             DescriptorSetLayouts.emplace_back(VulkanLayout->GetVulkanDescriptorSetLayout());
         }
 
@@ -500,54 +553,24 @@ namespace GFXI
             return nullptr;
         }
 
-        //RenderPass
-        VkRenderPassCreateInfo RenderPassCreateInfo;
-        VulkanZeroMemory(RenderPassCreateInfo);
-
-        VkAttachmentDescription RenderPassAttachment;
-        RenderPassAttachment.flags = 0;
-        RenderPassAttachment.format = VkFormat::VK_FORMAT_B8G8R8A8_UNORM;
-        RenderPassAttachment.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
-        RenderPassAttachment.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
-        RenderPassAttachment.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
-        RenderPassAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        RenderPassAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        RenderPassAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-        RenderPassAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-        VkAttachmentReference colorAttachmentRef;
-        colorAttachmentRef.attachment = 0;
-        colorAttachmentRef.layout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        VkSubpassDescription RenderPassSubpass;
-        RenderPassSubpass.flags = 0;
-        RenderPassSubpass.pipelineBindPoint = VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS;
-        RenderPassSubpass.inputAttachmentCount = 0;
-        RenderPassSubpass.pInputAttachments = nullptr; 
-        RenderPassSubpass.colorAttachmentCount = 1;
-        RenderPassSubpass.pColorAttachments = &colorAttachmentRef;
-        RenderPassSubpass.pResolveAttachments = nullptr;
-        RenderPassSubpass.pDepthStencilAttachment = nullptr;
-        RenderPassSubpass.preserveAttachmentCount = 0;
-        RenderPassSubpass.pPreserveAttachments = nullptr;
-
-        RenderPassCreateInfo.attachmentCount = 1;
-        RenderPassCreateInfo.pAttachments = &RenderPassAttachment;
-        RenderPassCreateInfo.subpassCount = 1;
-        RenderPassCreateInfo.pSubpasses = &RenderPassSubpass;
-
-        VkRenderPass VulkanRenderPass;
-        VkResult RetCreateRenderPass = vkCreateRenderPass(mVulkanDevice, &RenderPassCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &VulkanRenderPass);
-        if (RetCreateRenderPass != VkResult::VK_SUCCESS)
+        VkPipelineRenderingCreateInfo RenderingCreateInfo;
+        VulkanZeroMemory(RenderingCreateInfo);
+        std::vector<VkFormat> ColorAttachmentFormats(info.RenderAttachemntDesc.NumColorAttachments);
+        for (uint32_t index = 0; index < info.RenderAttachemntDesc.NumColorAttachments; index++)
         {
-            vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
-            return nullptr;
+            ColorAttachmentFormats[index] = VulkanRenderTargetFormatMapping[static_cast<uint32_t>(info.RenderAttachemntDesc.ColorAttachmentFormats[index])];
         }
+        RenderingCreateInfo.viewMask                = info.RenderAttachemntDesc.AticveViewMask;
+        RenderingCreateInfo.colorAttachmentCount    = info.RenderAttachemntDesc.NumColorAttachments;
+        RenderingCreateInfo.pColorAttachmentFormats = ColorAttachmentFormats.data();
+        RenderingCreateInfo.depthAttachmentFormat   = VulkanDepthFormatMapping[static_cast<uint32_t>(info.RenderAttachemntDesc.DepthStencilFormat)];
+        RenderingCreateInfo.stencilAttachmentFormat = VulkanStencilFormatMapping[static_cast<uint32_t>(info.RenderAttachemntDesc.DepthStencilFormat)];
 
         VkGraphicsPipelineCreateInfo GfxPipelineCreateInfo;
         VulkanZeroMemory(GfxPipelineCreateInfo);
-        GfxPipelineCreateInfo.stageCount = static_cast<uint32_t>(Stages.size());
-        GfxPipelineCreateInfo.pStages = Stages.data();
+        GfxPipelineCreateInfo.pNext                 = &RenderingCreateInfo;
+        GfxPipelineCreateInfo.stageCount            = static_cast<uint32_t>(Stages.size());
+        GfxPipelineCreateInfo.pStages               = Stages.data();
         GfxPipelineCreateInfo.pVertexInputState     = &VertexInputStateInfo;
         GfxPipelineCreateInfo.pInputAssemblyState   = &InputAssembleInfo;
         //VkPipelineTessellationStateCreateInfo* GfxPipelineCreateInfo.pTessellationState;
@@ -558,8 +581,8 @@ namespace GFXI
         GfxPipelineCreateInfo.pColorBlendState      = &ColorBlendStateInfo;
         GfxPipelineCreateInfo.pDynamicState         = &DynamicStateInfo;
         GfxPipelineCreateInfo.layout                = VulkanPipelineLayout;
-        GfxPipelineCreateInfo.renderPass            = VulkanRenderPass;
-        GfxPipelineCreateInfo.subpass               = 0;
+        GfxPipelineCreateInfo.renderPass            = VK_NULL_HANDLE;
+        GfxPipelineCreateInfo.subpass               = info.RenderAttachemntDesc.SubPassIndex;
         //VkPipeline       //GfxPipelineCreateInfo.basePipelineHandle;
         //int32_t          //GfxPipelineCreateInfo.basePipelineIndex;
 
@@ -568,14 +591,12 @@ namespace GFXI
         if (RetCreateGfxPipeline == VkResult::VK_SUCCESS)
         {
             vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
-            vkDestroyRenderPass(mVulkanDevice, VulkanRenderPass, GFX_VK_ALLOCATION_CALLBACK);
             GraphicPipelineStateVulkan* vulkanPipelineState = new GraphicPipelineStateVulkan(this, VulkanPipeline);
             return vulkanPipelineState;
         }
         else
         {
             vkDestroyPipelineLayout(mVulkanDevice, VulkanPipelineLayout, GFX_VK_ALLOCATION_CALLBACK);
-            vkDestroyRenderPass(mVulkanDevice, VulkanRenderPass, GFX_VK_ALLOCATION_CALLBACK);
             return nullptr;
         }
     }
@@ -641,6 +662,26 @@ namespace GFXI
             return new ShaderVulkan(this, SpirVBinary->GetShaderType(), ShaderModule, std::move(Binary), SpirVBinary->GetShaderName(), SpirVBinary->GetEntryPointName());
         }
         return nullptr;
+    }
+
+    TransferCommandPool* GraphicDeviceVulkan::CreateTransferCommandPool()
+    {
+        return new TransferCommandPoolVulkan(this, mTransferQueue.GetQueue().GetFamilyIndex());
+    }
+
+    ComputeCommandPool* GraphicDeviceVulkan::CreateComputeCommandPool()
+    {
+        return new ComputeCommandPoolVulkan(this, mComputeQueue.GetQueue().GetFamilyIndex());
+    }
+
+    GraphicCommandPool* GraphicDeviceVulkan::CreateGraphicCommandPool()
+    {
+        return new GraphicCommandPoolVulkan(this, mGraphicQueue.GetQueue().GetFamilyIndex());
+    }
+
+    VkInstance GraphicDeviceVulkan::GetVulkanInstance()
+    {
+        return mBelongsTo->GetInstance();
     }
 
     VkShaderStageFlags VulkanShaderStageFlagsMapping(uint32_t bindingShaderStageFlags)
@@ -723,7 +764,7 @@ namespace GFXI
             binding.descriptorType  = VulkanDescriptorTypeMapping[static_cast<uint32_t>(desc.DescriptorType)];
             binding.descriptorCount = desc.NumDescriptors;
             binding.stageFlags      = VulkanShaderStageFlagsMapping(desc.ShaderStageFlags);
-            binding.pImmutableSamplers = nullptr;
+            binding.pImmutableSamplers = VK_NULL_HANDLE;
             DescriptorSetLayoutBindings.emplace_back(binding);
         }
 
@@ -737,7 +778,7 @@ namespace GFXI
 
         if (RetCreateDescriptorSetLayout == VkResult::VK_SUCCESS)
         {
-            return new VulkanDescriptorSetLayout(this, DescriptorSetLayouts);
+            return new DescriptorSetLayoutVulkan(this, DescriptorSetLayouts);
         }
         return nullptr;
     }

@@ -1,7 +1,8 @@
 #pragma once
 #include "VulkanInclude.h"
 #include "GfxInterface.h"
-
+#include "VulkanCommandQueue.h"
+#include "VulkanCommandBuffer.h"
 
 
 namespace GFXI
@@ -11,13 +12,11 @@ namespace GFXI
     struct GraphicDeviceVulkan : public GraphicDevice
     {
         GraphicDeviceVulkan(GraphicModuleVulkan* belongsTo, VkPhysicalDevice vulkanPhysicalDevice, VkDevice vulkanDevice,
-            uint32_t graphicQueueFamilyIndex,   uint32_t graphicQueueIndex,
-            uint32_t computeQueueFamilyIndex,   uint32_t computeQueueIndex,
-            uint32_t transferQueueFamilyIndex,  uint32_t transferQueueIndex);
+            VulkanCommandQueue graphicQueue, VulkanCommandQueue computeQueue, VulkanCommandQueue transferQueue);
         virtual ~GraphicDeviceVulkan();
         virtual void Release() override;
 
-        virtual SwapChain*              CreateSwapChain(void* windowHandle, int windowWidth, int windowHeight, bool isFullscreen) override;
+        virtual SwapChain*              CreateSwapChain(void* windowHandle, int canvasWidth, int canvasHeight, bool isFullscreen) override;
         virtual GraphicPipelineState*   CreateGraphicPipelineState(const GraphicPipelineState::CreateInfo&) override;
         virtual ComputePipelineState*   CreateComputePipelineState(const ComputePipelineState::CreateInfo&) override { return nullptr; }
         virtual DescriptorSetLayout*    CreateDescriptorSetLayout(const DescriptorSetLayout::CreateInfo&) override;
@@ -31,19 +30,25 @@ namespace GFXI
         virtual DepthStencilView*       CreateDepthStencilView(const DepthStencilView::CreateInfo&) override { return nullptr; }
         virtual ImmediateContext*       GetImmediateContext() override { return nullptr; }
         virtual DeferredContext*        GetDeferredContext()  override { return nullptr; }
+        virtual TransferCommandPool*    CreateTransferCommandPool() override;
+        virtual ComputeCommandPool*     CreateComputeCommandPool()  override;
+        virtual GraphicCommandPool*     CreateGraphicCommandPool()  override;
+        virtual TransferCommandQueue*   GetTransferCommandQueue() override { return &mTransferQueue; }
+        virtual ComputeCommandQueue*    GetComputeCommandQueue()  override { return &mComputeQueue; }
+        virtual GraphicCommandQueue*    GetGraphicCommandQueue()  override { return &mGraphicQueue; }
 
-        VkDevice GetVulkanDevice() { return mVulkanDevice; }
+        VkDevice                        GetVulkanDevice() { return mVulkanDevice; }
+        VkInstance                      GetVulkanInstance();
+
     private:
         GraphicModuleVulkan* mBelongsTo;
         VkPhysicalDevice mVulkanPhysicalDevice;
         VkDevice mVulkanDevice;
-        VkQueue  mVulkanGraphicQueue;
-        VkQueue  mVulkanComputeQueue;
-        VkQueue  mVulkanTransferQueue;
-        VkQueue  mVulkanPresentQueue;
 
-        uint32_t mGraphicQueueFamilyIndex,  mGraphicQueueIndex;
-        uint32_t mComputeQueueFamilyIndex,  mComputeQueueIndex;
-        uint32_t mTransferQueueFamilyIndex, mTransferQueueIndex;
+        VulkanCommandQueue          mPresentQueue;
+    public:
+        TransferCommandQueueVulkan  mTransferQueue;
+        ComputeCommandQueueVulkan   mComputeQueue;
+        GraphicCommandQueueVulkan   mGraphicQueue;
     };
 }

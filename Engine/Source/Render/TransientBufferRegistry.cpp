@@ -2,10 +2,10 @@
 
 namespace engine
 {
-    TransientBufferRegistry::TransientBufferRegistry(GFXI::GraphicDevice* creatorPtr, GFXI::RenderTargetView* defaultBackbufferRT, GFXI::DepthStencilView* defaultBackbufferDS)
+    TransientBufferRegistry::TransientBufferRegistry(GFXI::GraphicDevice* creatorPtr, GFXI::RenderTargetView* defaultBackBufferRT, GFXI::DepthStencilView* defaultBackBufferDS)
         : mGfxResourceDevice(creatorPtr)
-        , mDefaultBackbufferRT(defaultBackbufferRT)
-        , mDefaultBackbufferDSTemp(defaultBackbufferDS)
+        , mDefaultBackBufferRT(defaultBackBufferRT)
+        , mDefaultBackBufferDSTemp(defaultBackBufferDS)
     {
 
     }

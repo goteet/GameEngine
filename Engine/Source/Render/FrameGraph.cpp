@@ -25,18 +25,18 @@ namespace engine
     RenderFrameGraph::RenderFrameGraph(TransientBufferRegistry* registry)
         : mTransientBufferRegistry(registry)
     {
-        RFGResource& BackbufferRT = CreateNewResource("backbuffer.rendertarget",
-            registry->GetDefaultBackbufferRT()->GetWidth(),
-            registry->GetDefaultBackbufferRT()->GetHeight(),
-            registry->GetDefaultBackbufferRT()->GetFormat());
+        RFGResource& BackBufferRT = CreateNewResource("backbuffer.rendertarget",
+            registry->GetDefaultBackBufferRT()->GetWidth(),
+            registry->GetDefaultBackBufferRT()->GetHeight(),
+            registry->GetDefaultBackBufferRT()->GetFormat());
 
-        mBackbufferRTIndex = BackbufferRT.Index;
+        mBackBufferRTIndex = BackBufferRT.Index;
 
-        RFGResource& BackbufferDS = CreateNewResource("backbuffer.depthstencil",
-            registry->GetDefaultBackbufferDS()->GetWidth(),
-            registry->GetDefaultBackbufferDS()->GetHeight(),
-            registry->GetDefaultBackbufferDS()->GetFormat());
-        mBackbufferDSIndex = BackbufferDS.Index;
+        RFGResource& BackBufferDS = CreateNewResource("backbuffer.depthstencil",
+            registry->GetDefaultBackBufferDS()->GetWidth(),
+            registry->GetDefaultBackBufferDS()->GetHeight(),
+            registry->GetDefaultBackBufferDS()->GetFormat());
+        mBackBufferDSIndex = BackBufferDS.Index;
     }
 
     RFGRenderPass RenderFrameGraph::AddRenderPass(const std::string& name)
@@ -102,7 +102,7 @@ namespace engine
 
         std::queue<int> floodResourceQueue;
         std::stack<int> executeNodes;
-        floodResourceQueue.emplace(mBackbufferRTIndex);
+        floodResourceQueue.emplace(mBackBufferRTIndex);
 
         while (!floodResourceQueue.empty())
         {
@@ -218,13 +218,13 @@ namespace engine
             RFGResource& resOutput = mResources[resource.Index];
             if (resOutput.RenderTarget)
             {
-                RFGResource& resBackbuffer = mResources[mBackbufferRTIndex];
-                MoveResource(resOutput, resBackbuffer);
+                RFGResource& resBackBuffer = mResources[mBackBufferRTIndex];
+                MoveResource(resOutput, resBackBuffer);
             }
             else
             {
-                RFGResource& resBackbuffer = mResources[mBackbufferDSIndex];
-                MoveResource(resOutput, resBackbuffer);
+                RFGResource& resBackBuffer = mResources[mBackBufferDSIndex];
+                MoveResource(resOutput, resBackBuffer);
             }
         }
     }
@@ -243,10 +243,10 @@ namespace engine
 
     void RenderFrameGraph::CreateTestFrameGraph()
     {
-        RFGResourceHandle resShadowmap = RequestResource("shadow.depthmap", GetBackbufferWidth(), GetBackbufferHeight(), GetBackbufferDSFormat());
-        RFGResourceHandle resForwardColor = RequestResource("render.forward.color", GetBackbufferWidth(), GetBackbufferHeight(), GetBackbufferRTFormat());
-        RFGResourceHandle resDepthColor = RequestResource("render.depth.color", GetBackbufferWidth(), GetBackbufferHeight(), GetBackbufferRTFormat());
-        RFGResourceHandle resFinal = RequestResource("render.final", GetBackbufferWidth(), GetBackbufferHeight(), GetBackbufferRTFormat());
+        RFGResourceHandle resShadowmap = RequestResource("shadow.depthmap", GetBackBufferWidth(), GetBackBufferHeight(), GetBackBufferDSFormat());
+        RFGResourceHandle resForwardColor = RequestResource("render.forward.color", GetBackBufferWidth(), GetBackBufferHeight(), GetBackBufferRTFormat());
+        RFGResourceHandle resDepthColor = RequestResource("render.depth.color", GetBackBufferWidth(), GetBackBufferHeight(), GetBackBufferRTFormat());
+        RFGResourceHandle resFinal = RequestResource("render.final", GetBackBufferWidth(), GetBackBufferHeight(), GetBackBufferRTFormat());
         RFGRenderPass nodeShadowMapDepth = AddRenderPass("render.shadowmap");
         RFGRenderPass nodeForward = AddRenderPass("render.forward");
         RFGRenderPass nodeDepthToRT = AddRenderPass("render.depth2rt");
@@ -266,35 +266,35 @@ namespace engine
         //BindOutput(resForwardColor);
     }
 
-    int RenderFrameGraph::GetBackbufferWidth() const
+    int RenderFrameGraph::GetBackBufferWidth() const
     {
-        return mTransientBufferRegistry->GetDefaultBackbufferRT()->GetWidth();
+        return mTransientBufferRegistry->GetDefaultBackBufferRT()->GetWidth();
     }
 
-    int RenderFrameGraph::GetBackbufferHeight() const
+    int RenderFrameGraph::GetBackBufferHeight() const
     {
-        return mTransientBufferRegistry->GetDefaultBackbufferRT()->GetHeight();
+        return mTransientBufferRegistry->GetDefaultBackBufferRT()->GetHeight();
     }
 
-    GFXI::RenderTargetView::EFormat RenderFrameGraph::GetBackbufferRTFormat() const
+    GFXI::RenderTargetView::EFormat RenderFrameGraph::GetBackBufferRTFormat() const
     {
-        return mTransientBufferRegistry->GetDefaultBackbufferRT()->GetFormat();
+        return mTransientBufferRegistry->GetDefaultBackBufferRT()->GetFormat();
     }
 
-    GFXI::DepthStencilView::EFormat RenderFrameGraph::GetBackbufferDSFormat() const
+    GFXI::DepthStencilView::EFormat RenderFrameGraph::GetBackBufferDSFormat() const
     {
-        return mTransientBufferRegistry->GetDefaultBackbufferDS()->GetFormat();
+        return mTransientBufferRegistry->GetDefaultBackBufferDS()->GetFormat();
     }
 
     int RenderFrameGraph::GetWidth(const RFGResourceHandle& handle) const
     {
-        if (handle.Index == mBackbufferRTIndex)
+        if (handle.Index == mBackBufferRTIndex)
         {
-            return GetBackbufferWidth();
+            return GetBackBufferWidth();
         }
-        else if (handle.Index == mBackbufferDSIndex)
+        else if (handle.Index == mBackBufferDSIndex)
         {
-            return mTransientBufferRegistry->GetDefaultBackbufferDS()->GetWidth();
+            return mTransientBufferRegistry->GetDefaultBackBufferDS()->GetWidth();
         }
         else
         {
@@ -304,13 +304,13 @@ namespace engine
 
     int RenderFrameGraph::GetHeigt(const RFGResourceHandle& handle) const
     {
-        if (handle.Index == mBackbufferRTIndex)
+        if (handle.Index == mBackBufferRTIndex)
         {
-            return GetBackbufferHeight();
+            return GetBackBufferHeight();
         }
-        else if (handle.Index == mBackbufferDSIndex)
+        else if (handle.Index == mBackBufferDSIndex)
         {
-            return mTransientBufferRegistry->GetDefaultBackbufferDS()->GetHeight();
+            return mTransientBufferRegistry->GetDefaultBackBufferDS()->GetHeight();
         }
         else
         {
@@ -320,13 +320,13 @@ namespace engine
 
     int RenderFrameGraph::GetFormat(const RFGResourceHandle& handle) const
     {
-        if (handle.Index == mBackbufferRTIndex)
+        if (handle.Index == mBackBufferRTIndex)
         {
-            return static_cast<int>(GetBackbufferRTFormat());
+            return static_cast<int>(GetBackBufferRTFormat());
         }
-        else if (handle.Index == mBackbufferDSIndex)
+        else if (handle.Index == mBackBufferDSIndex)
         {
-            return static_cast<int>(mTransientBufferRegistry->GetDefaultBackbufferDS()->GetFormat());
+            return static_cast<int>(mTransientBufferRegistry->GetDefaultBackBufferDS()->GetFormat());
         }
         else
         {
@@ -424,9 +424,9 @@ namespace engine
         int rtCount = 0;
         for (int renderTargetIndex : node.WritingRenderTargetAliasing)
         {
-            if (renderTargetIndex == mBackbufferRTIndex)
+            if (renderTargetIndex == mBackBufferRTIndex)
             {
-                renderTargets[rtCount] = registry->GetDefaultBackbufferRT();
+                renderTargets[rtCount] = registry->GetDefaultBackBufferRT();
             }
             else
             {
@@ -442,9 +442,9 @@ namespace engine
         if (node.WritingDepthStencil != -1)
         {
             node.WritingDepthStencilAliasing = GetAliasingResourceIndex(node.WritingDepthStencil);
-            if (node.WritingDepthStencilAliasing == mBackbufferDSIndex)
+            if (node.WritingDepthStencilAliasing == mBackBufferDSIndex)
             {
-                depthStencil = registry->GetDefaultBackbufferDS();
+                depthStencil = registry->GetDefaultBackBufferDS();
             }
             else
             {

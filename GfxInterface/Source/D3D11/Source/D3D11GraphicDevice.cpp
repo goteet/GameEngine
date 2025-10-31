@@ -1,6 +1,6 @@
 #include <string>
 #include "D3D11Buffer.h"
-#include "D3D11CommandQueue.h"
+#include "D3D11CommandBuffer.h"
 #include "D3D11GraphicDevice.h"
 #include "D3D11GraphicModule.h"
 #include "D3D11PipelineState.h"
@@ -23,7 +23,7 @@ namespace GFXI
 
     GraphicDeviceD3D11::~GraphicDeviceD3D11()
     {
-        CommandQueueD3D11::FreeAllUnusedCommandQueues();
+        CommandBufferD3D11::FreeAllUnusedCommandQueues();
 
         mDeferredContext.Release();
         mImmediateContext.Release();
@@ -35,7 +35,7 @@ namespace GFXI
         const bool kIsUsedForShaders = true;
         const uint32_t  kSampleCount = 1;
         const uint32_t  kSampleQuality = 0;
-        const DXGI_FORMAT kBackbufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        const DXGI_FORMAT kBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc;
         swapChainDesc.Width = windowWidth;
@@ -50,7 +50,7 @@ namespace GFXI
         swapChainDesc.Flags = 0;
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-        swapChainDesc.Format = kBackbufferFormat;
+        swapChainDesc.Format = kBackBufferFormat;
         swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
 
         DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullScreenDesc;
@@ -78,16 +78,16 @@ namespace GFXI
         {
             ///* CreateVertexBuffer SwapChain */
             bool kUsedByShader = true;
-            //mBackbufferRenderTarget = std::make_unique<GfxRenderTarget>(ERenderTargetFormat::UNormRGBA8, usedForshader);
-            //mBackbufferRenderTarget->mTexture2DDesc.Width = mClientWidth;
-            //mBackbufferRenderTarget->mTexture2DDesc.Height = mClientHeight;
+            //mBackBufferRenderTarget = std::make_unique<GfxRenderTarget>(ERenderTargetFormat::UNormRGBA8, usedForshader);
+            //mBackBufferRenderTarget->mTexture2DDesc.Width = mClientWidth;
+            //mBackBufferRenderTarget->mTexture2DDesc.Height = mClientHeight;
 
-            ComPtr<ID3D11Texture2D> outBackbufferTexture = nullptr;
-            HRESULT retGetDefaultBackbufferTexture = swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &outBackbufferTexture);
-            if (SUCCEEDED(retGetDefaultBackbufferTexture))
+            ComPtr<ID3D11Texture2D> outBackBufferTexture = nullptr;
+            HRESULT retGetDefaultBackBufferTexture = swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &outBackBufferTexture);
+            if (SUCCEEDED(retGetDefaultBackBufferTexture))
             {
-                ComPtr<ID3D11RenderTargetView>      defaultBackbufferRTV = nullptr;
-                ComPtr<ID3D11ShaderResourceView>    defaultBackbufferSRV = nullptr;
+                ComPtr<ID3D11RenderTargetView>      defaultBackBufferRTV = nullptr;
+                ComPtr<ID3D11ShaderResourceView>    defaultBackBufferSRV = nullptr;
 
                 D3D11_RENDER_TARGET_VIEW_DESC       renderTargetViewDesc;
                 renderTargetViewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -100,11 +100,11 @@ namespace GFXI
                 shaderResourceViewDesc.Texture2D.MostDetailedMip = 0;
                 shaderResourceViewDesc.Texture2D.MipLevels = -1;
 
-                HRESULT retCreateDefaultBackbufferRTV = mD3D11Device->CreateRenderTargetView(outBackbufferTexture.Get(), &renderTargetViewDesc, &defaultBackbufferRTV);
-                HRESULT retCreateDefaultBackbufferSRV = mD3D11Device->CreateShaderResourceView(outBackbufferTexture.Get(), &shaderResourceViewDesc, &defaultBackbufferSRV);
-                if (SUCCEEDED(retCreateDefaultBackbufferSRV) && SUCCEEDED(retCreateDefaultBackbufferRTV))
+                HRESULT retCreateDefaultBackBufferRTV = mD3D11Device->CreateRenderTargetView(outBackBufferTexture.Get(), &renderTargetViewDesc, &defaultBackBufferRTV);
+                HRESULT retCreateDefaultBackBufferSRV = mD3D11Device->CreateShaderResourceView(outBackBufferTexture.Get(), &shaderResourceViewDesc, &defaultBackBufferSRV);
+                if (SUCCEEDED(retCreateDefaultBackBufferSRV) && SUCCEEDED(retCreateDefaultBackBufferRTV))
                 {
-                    RenderTargetD3D11* backbufferRenderTarget = new RenderTargetD3D11(RenderTargetView::EFormat::R8G8B8A8_UNormInt, swapChainDesc.Width, swapChainDesc.Height, kUsedByShader, outBackbufferTexture.Detach(), defaultBackbufferRTV.Detach(), defaultBackbufferSRV.Detach());
+                    RenderTargetD3D11* backbufferRenderTarget = new RenderTargetD3D11(RenderTargetView::EFormat::R8G8B8A8_UNormInt, swapChainDesc.Width, swapChainDesc.Height, kUsedByShader, outBackBufferTexture.Detach(), defaultBackBufferRTV.Detach(), defaultBackBufferSRV.Detach());
                     return new SwapChainD3D11(swapChain.Detach(), backbufferRenderTarget);
                 }
             }
@@ -630,6 +630,9 @@ namespace GFXI
             break;
         case RenderTargetView::EFormat::R8G8B8A8_UNormInt:
             return { DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM };
+            break;
+        case RenderTargetView::EFormat::B8G8R8A8_UNormInt:
+            return { DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM };
             break;
         }
     };
