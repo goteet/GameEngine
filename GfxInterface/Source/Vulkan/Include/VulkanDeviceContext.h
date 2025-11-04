@@ -8,10 +8,10 @@ namespace GFXI
 {
     struct GraphicDeviceVulkan;
 
-    struct DeviceContextVulkan : public DeferredContext, public BaseDeviceResourceVulkan
+    struct DeferredContextVulkan : public DeferredContext, public BaseDeviceResourceVulkan
     {
-        DeviceContextVulkan(GraphicDeviceVulkan* belongsTo, CommandQueueVulkan cmdQueue);
-        virtual ~DeviceContextVulkan();
+        DeferredContextVulkan(GraphicDeviceVulkan* belongsTo, CommandQueueVulkan cmdQueue);
+        virtual ~DeferredContextVulkan();
         virtual void Release() override;
 
         virtual void SetViewport(const ViewportInfo&) override { };
@@ -35,12 +35,16 @@ namespace GFXI
         virtual void UnmapBuffer(Buffer* buffer) override { };
         virtual void UpdateBuffer(Buffer*, const void* data) override { };
 
-        virtual void            BeginRecordCommands(const RenderingInfo&) override;
+        virtual bool            BeginRecordCommands(const RenderingInfo&) override;
         virtual CommandQueue*   EndRecordCommands(bool bRestoreToDefaultState) override;
+        virtual bool            IsInsideRecording() override { return mInsideRenderPass; }
     private:
-        CommandQueueVulkan mCommandQueue;
+        void CreateCommandPool();
 
+        CommandQueueVulkan  mCommandQueue;
+        VkCommandPool       mVulkanCommandPool = VK_NULL_HANDLE;
+        VkCommandBuffer     mActiveCommandBuffer = VK_NULL_HANDLE;
 
-        VkCommandBuffer mActiveCommandBuffer = VK_NULL_HANDLE;
+        bool mInsideRenderPass = false;
     };
 }

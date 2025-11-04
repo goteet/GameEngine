@@ -2,19 +2,25 @@
 
 namespace GFXI
 {
-    DeviceContextVulkan::DeviceContextVulkan(GraphicDeviceVulkan* belongsTo, CommandQueueVulkan cmdQueue)
+    DeferredContextVulkan::DeferredContextVulkan(GraphicDeviceVulkan* belongsTo, CommandQueueVulkan cmdQueue)
         : BaseDeviceResourceVulkan(belongsTo)
         , mCommandQueue(cmdQueue)
     {
+        CreateCommandPool();
     }
 
-    DeviceContextVulkan::~DeviceContextVulkan()
+    DeferredContextVulkan::~DeferredContextVulkan()
     {
+        if (mVulkanCommandPool != VK_NULL_HANDLE)
+        {
+            vkDestroyCommandPool(GetVulkanDevice(), mVulkanCommandPool, GFX_VK_ALLOCATION_CALLBACK);
+            mVulkanCommandPool = VK_NULL_HANDLE;
+        }
     }
 
-    void DeviceContextVulkan::Release()
+    void DeferredContextVulkan::Release()
     {
-        delete this;
+        //delete this;
     }
 
     struct RenderTargetViewVulkan : public RenderTargetView
@@ -37,10 +43,15 @@ namespace GFXI
         VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE,
         VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE
     };
-    void DeviceContextVulkan::BeginRecordCommands(const RenderingInfo& renderingInfo)
+    bool DeferredContextVulkan::BeginRecordCommands(const RenderingInfo& renderingInfo)
     {
         using RenderTargetDesc = GFXI::DeferredContext::RenderingInfo::RenderTargetDesc;
         using DepthStencilDesc = GFXI::DeferredContext::RenderingInfo::DepthStencilDesc;
+
+        if (mVulkanCommandPool == VK_NULL_HANDLE || mInsideRenderPass)
+        {
+            return false;
+        }
 
         std::vector<VkRenderingAttachmentInfo> colorAttachments;
         for (uint32_t index = 0; index < renderingInfo.NumRenderTargets; index++)
@@ -110,12 +121,48 @@ namespace GFXI
         vulkanRenderingInfo.pStencilAttachment    = &depthStencilAttachment;
 
 
+        VkCommandBufferAllocateInfo commandBufferAllocationInfo;
+        VulkanZeroMemory(commandBufferAllocationInfo);
+        commandBufferAllocationInfo.commandPool = mVulkanCommandPool;
+        commandBufferAllocationInfo.level = VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        commandBufferAllocationInfo.commandBufferCount = 1;
+
+        vkAllocateCommandBuffers(GetVulkanDevice(), &commandBufferAllocationInfo, &mActiveCommandBuffer);
         vkCmdBeginRendering(mActiveCommandBuffer, &vulkanRenderingInfo);
+
+        mInsideRenderPass = true;
+        return true;
     }
 
-    CommandQueue* DeviceContextVulkan::EndRecordCommands(bool bRestoreToDefaultState)
+    CommandQueue* DeferredContextVulkan::EndRecordCommands(bool bRestoreToDefaultState)
     {
-        vkCmdEndRendering(mActiveCommandBuffer);
-        return nullptr;
+        if (mInsideRenderPass)
+        {
+            vkCmdEndRendering(mActiveCommandBuffer);
+            mInsideRenderPass = false;
+
+            return nullptr;
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    void DeferredContextVulkan::CreateCommandPool()
+    {
+        if (mVulkanCommandPool == VK_NULL_HANDLE)
+        {
+            VkCommandPoolCreateInfo commandPoolCreateInfo;
+            VulkanZeroMemory(commandPoolCreateInfo);
+            commandPoolCreateInfo.queueFamilyIndex = mCommandQueue.GetFamilyIndex();
+            commandPoolCreateInfo.flags = VkCommandPoolCreateFlagBits::VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+            VkResult retCreateCommandPool = vkCreateCommandPool(GetVulkanDevice(), &commandPoolCreateInfo, GFX_VK_ALLOCATION_CALLBACK, &mVulkanCommandPool);
+            if (retCreateCommandPool != VkResult::VK_SUCCESS)
+            {
+                //assert(0);
+            }
+        }
     }
 }

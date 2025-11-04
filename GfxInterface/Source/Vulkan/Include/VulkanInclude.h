@@ -44,6 +44,8 @@ MapVulkanStruct(VkFenceCreateInfo,                          VK_STRUCTURE_TYPE_FE
 MapVulkanStruct(VkPresentInfoKHR,                           VK_STRUCTURE_TYPE_PRESENT_INFO_KHR)
 MapVulkanStruct(VkRenderingInfo,                            VK_STRUCTURE_TYPE_RENDERING_INFO)
 MapVulkanStruct(VkRenderingAttachmentInfo,                  VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO)
+MapVulkanStruct(VkCommandPoolCreateInfo,                    VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO)
+MapVulkanStruct(VkCommandBufferAllocateInfo,                VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO)
 
 #undef MapVulkanStruct
 

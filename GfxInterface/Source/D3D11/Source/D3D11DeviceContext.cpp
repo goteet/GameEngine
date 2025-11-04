@@ -365,14 +365,32 @@ namespace GFXI
         D3D11CommandQueue->OnExecute(mContextWrapper.mD3D11Context.Get(), bRestoreToDefaultState);
     }
 
+    bool DeferredContextD3D11::BeginRecordCommands(const RenderingInfo&)
+    {
+        if (mInsideRecording)
+        {
+            return false;
+        }
+        else
+        {
+            mInsideRecording = true;
+            return true;
+        }
+    }
+
     CommandQueue* DeferredContextD3D11::EndRecordCommands(bool bRestoreToDefaultState)
     {
+        mInsideRecording = false;
         ComPtr<ID3D11CommandList> commandList;
         HRESULT retQueueCommandList = mContextWrapper.mD3D11Context->FinishCommandList(!bRestoreToDefaultState, &commandList);
+        
         if (SUCCEEDED(retQueueCommandList))
         {
             return CommandQueueD3D11::GetOrCreateNewCommandQueue(commandList.Detach());
         }
-        return nullptr;
+        else
+        {
+            return nullptr;
+        }
     }
 }

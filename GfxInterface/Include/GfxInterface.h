@@ -585,8 +585,9 @@ namespace GFXI
             RenderTargetDesc*   RenderTargets       = nullptr;
             DepthStencilDesc    DepthStencil;
         };
-        virtual void            BeginRecordCommands(const RenderingInfo&) = 0;
+        virtual bool            BeginRecordCommands(const RenderingInfo&) = 0;
         virtual CommandQueue*   EndRecordCommands(bool bRestoreToDefaultState) = 0;
+        virtual bool            IsInsideRecording() = 0;
     };
 
     struct GfxInterfaceAPI SwapChain : public Object
