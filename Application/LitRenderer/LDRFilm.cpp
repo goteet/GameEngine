@@ -32,13 +32,13 @@ LDRFilm::LDRFilm(int width, int height)
     , CanvasHeight(height)
 {
     int count = CanvasWidth * CanvasHeight;
-    mBackbuffer = new AccumulatedSpectrum[count];
+    mBackBuffer = new AccumulatedSpectrum[count];
     Clear();
 }
 
 LDRFilm::~LDRFilm()
 {
-    SafeDeleteArray(mBackbuffer);
+    SafeDeleteArray(mBackBuffer);
 }
 
 void LDRFilm::Clear()
@@ -48,8 +48,8 @@ void LDRFilm::Clear()
         for (int colIndex = 0; colIndex < CanvasWidth; colIndex++)
         {
             int pixelIndex = colIndex + rowIndex * CanvasWidth;
-            mBackbuffer[pixelIndex].Value.set(Float(0.0), Float(0.0), Float(0.0));
-            mBackbuffer[pixelIndex].Count = 0;
+            mBackBuffer[pixelIndex].Value.set(Float(0.0), Float(0.0), Float(0.0));
+            mBackBuffer[pixelIndex].Count = 0;
         }
     }
 }

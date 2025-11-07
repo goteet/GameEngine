@@ -14,12 +14,12 @@ public:
     LDRFilm(int width, int height);
     ~LDRFilm();
 
-    AccumulatedSpectrum* GetBackbufferPtr() { return mBackbuffer; }
+    AccumulatedSpectrum* GetBackBufferPtr() { return mBackBuffer; }
     const int CanvasWidth;
     const int CanvasHeight;
     void Clear();
     void FlushTo(const AccumulatedSpectrum& Spectrum, uint32_t Row, uint32_t Column, unsigned char* CanvasDataPtr, int linePitch);
 
 private:
-    AccumulatedSpectrum* mBackbuffer = nullptr;
+    AccumulatedSpectrum* mBackBuffer = nullptr;
 };

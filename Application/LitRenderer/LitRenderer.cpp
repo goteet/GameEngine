@@ -366,7 +366,7 @@ void LitRenderer::RotateCamera(const Radian& Yaw, const Radian& Pitch)
 void LitRenderer::ResolveSamples()
 {
     const Sample* Samples = mCameraRaySamples;
-    AccumulatedSpectrum* AccumulatedBufferPtr = mFilm.GetBackbufferPtr();
+    AccumulatedSpectrum* AccumulatedBufferPtr = mFilm.GetBackBufferPtr();
 
     std::vector<Task> PixelIntegrationTasks;
 
