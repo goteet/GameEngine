@@ -18,30 +18,64 @@ HWND hWindow;
 GE::GameEngine* g_GameEngine;
 GE::Scene* g_DefaultScene;
 
+struct size
+{
+    uint32_t width;
+    uint32_t height;
+};
+
+size CalculateWindowSize(bool fullscreen, size canvas)
+{
+    DWORD dwExStyle = WS_EX_APPWINDOW;
+    DWORD dwStyle = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+    if (fullscreen)
+    {
+        dwStyle |= WS_POPUP;
+    }
+    else
+    {
+        dwExStyle |= WS_EX_WINDOWEDGE;
+        dwStyle |= WS_OVERLAPPEDWINDOW;
+    }
+
+    RECT windowRect;
+    windowRect.left = 0;
+    windowRect.top = 0;
+    windowRect.right = canvas.width;
+    windowRect.bottom = canvas.height;
+    ::AdjustWindowRectEx(&windowRect, dwStyle, FALSE, dwExStyle);
+
+    return
+    {
+        static_cast<uint32_t>(windowRect.right - windowRect.left),
+        static_cast<uint32_t>(windowRect.bottom - windowRect.top)
+    };
+}
+
 bool Initialize(HINSTANCE hInstance, int nCmdShow)
 {
-    int windowWidth = 1280;
-    int windowHeight = 720;
+    const bool bUseFullscreen = false;
+    const size CanvasSize = { 1280, 720 };
+    const size WindowSize = CalculateWindowSize(bUseFullscreen, CanvasSize);
 
     HWND hWindow = CreateWindow(AppClassName, AppWindowName, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, 0,
-        windowWidth, windowHeight, NULL, NULL, hInstance, NULL);
+        CW_USEDEFAULT, 0, WindowSize.width, WindowSize.height, NULL, NULL, hInstance, NULL);
 
     if (hWindow)
     {
         ShowWindow(hWindow, nCmdShow);
         UpdateWindow(hWindow);
 
-        GE::GameEngine::CreationConfig Config;
+        using GE::GameEngine;
+
+        GameEngine::CreationConfig Config;
         Config.NativeWindow = hWindow;
         Config.AbsoluteResourceFolderPath = nullptr;
-        Config.IsFullScreen = false;
-        Config.InitialWidth = windowWidth;
-        Config.InitialHeight = windowHeight;
+        Config.IsFullScreen  = false;
+        Config.InitialWidth  = CanvasSize.width;
+        Config.InitialHeight = CanvasSize.height;
 
-        using GE::GameEngine;
-        GameEngine::InitializeResult result = GE::GameEngine::Initialize(Config, g_GameEngine);
-
+        GameEngine::InitializeResult result = GameEngine::Initialize(Config, g_GameEngine);
         return result == GameEngine::InitializeResult::Success;
     }
     return false;
@@ -109,7 +143,10 @@ void InitializeSimpleScene()
 
 bool NeedUpdate() { return false; }
 
-bool Present(HDC) { return true; }
+bool Present(HDC dc)
+{
+    return true;
+}
 
 
 ATOM MyRegisterClass(HINSTANCE hInstance);
@@ -148,9 +185,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             }
         }
 
-        int64_t deltaMilliseconds = mainLoopTimer.ElapsedMilliseconds();
-        mainLoopTimer.Record();
-        g_GameEngine->Update((unsigned int)deltaMilliseconds);
+        if (running)
+        {
+            int64_t deltaMilliseconds = mainLoopTimer.ElapsedMilliseconds();
+            mainLoopTimer.Record();
+            g_GameEngine->Update((unsigned int)deltaMilliseconds);
+        }
 
         if (NeedUpdate())
         {
