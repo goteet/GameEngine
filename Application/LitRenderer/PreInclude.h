@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Foundation/Math/Vector.h>
+#include <Foundation/Math/Matrix.h>
 #include <Foundation/Math/Rotation.h>
 #include <Foundation/Math/Geometry.h>
 #include "TaskGraph.h"
@@ -13,3 +14,5 @@ using Ray = math::ray3d<Float>;
 using Point = math::point3d<Float>;
 using Direction = math::nvector3<Float>;
 using UVW = math::normal_space<Float>;
+using Float4x4 = math::matrix4x4<Float>;
+

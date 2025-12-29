@@ -10,17 +10,11 @@
 
 class SimpleBackCamera
 {
-    struct DegreeClampHelper
-    {
-        DegreeClampHelper(Degree degree)
-            : value(math::clamp(degree.value, Float(1), Float(179))) { }
-        const Float value;
-    };
 public:
-    SimpleBackCamera(Degree verticalFov);
+    SimpleBackCamera(Degree verticalFOV);
     Direction Up = Direction::unit_y();
     Direction Forward = Direction::unit_z();
-    Direction Left = Direction::unit_x();
+    Direction Right = Direction::unit_x();
     Point PositionBak;
     Point Position;
     const Radian HalfVerticalFov;

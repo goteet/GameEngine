@@ -239,24 +239,25 @@ void LitRenderer::InitialSceneTransforms()
 
 void LitRenderer::GenerateCameraRays()
 {
-    const Float PixelSize = Float(1);
-    const Float HalfPixelSize = PixelSize * Float(0.5);
-    Float HalfWidth = mFilm.CanvasWidth * Float(0.5) * PixelSize;
-    Float HalfHeight = mFilm.CanvasHeight * Float(0.5) * PixelSize;
-    //     <---> (half height)
-    //  .  o----. (o=origin)
-    //  |  |  /   Asumed canvas is at origin(0,0,0),
-    //  |  | /    and camera is placed at neg-z-axis,
-    //  .  |/
-    // (z) .      tan(half_fov) = halfHeight / cameraZ.
-    Float CameraZ = HalfHeight / mCamera.HalfVerticalFovTangent;
-    auto CanvasPositionToRay = [this, CameraZ](Float x, Float y) -> math::vector3<Float>
+    /*
+    *      .
+    *     /|
+    *    / |  h
+    *   /  | --- = tan(fov/2) =>  h = z*tan(fov/2) = tan(0.5fov);
+    *  /   |  z
+    * o----+-----> z=1
+    */
+    const Float tan = mCamera.HalfVerticalFovTangent;
+    const Float aspect = Float(1.0) * mFilm.CanvasWidth / mFilm.CanvasHeight;
+    Float4x4 SampleToCamera =
+        Float4x4::scale(tan * aspect, tan, Float(1.0))
+        * Float4x4::translation(Float(-1.0), Float(-1.0), Float(1.0))
+        * Float4x4::scale(Float(2.0) / mFilm.CanvasWidth, Float(2.0) / mFilm.CanvasHeight, Float(1.0))
+        * Float4x4::translation(Float(0.5), Float(0.5), Float(0.0));
+    auto CanvasPositionToRay = [this, &Transform=SampleToCamera](Float x, Float y) -> math::vector3<Float>
     {
-        //vector3<float>(x,y,0) - camera.position;
-        //  x = x - 0;
-        //  y = y - 0;
-        //  z = 0 - camera.position.z
-        return math::vector3<Float>(x * mCamera.Left + y * mCamera.Up + CameraZ * mCamera.Forward + mCamera.Position);
+        Point p = math::transform(Transform, Point(x, y, Float(0)));
+        return Direction(p.x * mCamera.Right + p.y * mCamera.Up + p.z * mCamera.Forward);
     };
 
 
@@ -268,9 +269,8 @@ void LitRenderer::GenerateCameraRays()
         for (int BlockIndexH = 0; BlockIndexH < NumBlockX; BlockIndexH += 1)
         {
             Task GenerateSampleTask = Task::Start(ThreadName::Worker,
-                [this, PixelSize, HalfPixelSize, HalfHeight, HalfWidth, BlockIndexV, BlockIndexH, CanvasPositionToRay](::Task&)
-                {
-
+                [this, BlockIndexV, BlockIndexH, &CanvasPositionToRay](::Task&)
+                {   
                     random<Float> RandomGeneratorPickingPixel;
                     int RowStart = BlockIndexV * BlockSize;
                     int RowEnd = math::min2(RowStart + BlockSize, mFilm.CanvasHeight);
@@ -282,14 +282,11 @@ void LitRenderer::GenerateCameraRays()
                         int RowOffset = RowIndex * mFilm.CanvasWidth;
                         for (int ColIndex = ColStart; ColIndex < ColEnd; ColIndex++)
                         {
-                            const Float pixelCenterX = ColIndex * PixelSize + HalfPixelSize - HalfWidth;
-                            const Float pixelCenterY = RowIndex * PixelSize + HalfPixelSize - HalfHeight;
-
                             Sample& Sample = mCameraRaySamples[ColIndex + RowOffset];
                             Sample.PixelRow = RowIndex;
                             Sample.PixelCol = ColIndex;
                             Sample.Ray.set_origin(mCamera.Position);
-                            Sample.Ray.set_direction(CanvasPositionToRay(pixelCenterX, pixelCenterY));
+                            Sample.Ray.set_direction(CanvasPositionToRay(ColIndex, RowIndex));
 
                             Sample.RecordP1 = mScene->DetectIntersecting(Sample.Ray, nullptr, math::SMALL_NUM<Float>);
                         }
@@ -340,13 +337,13 @@ void LitRenderer::ResetCamera()
     mCamera.Position = mCamera.PositionBak;
     mCamera.Up = Direction::unit_y();
     mCamera.Forward = Direction::unit_z();
-    mCamera.Left = Direction::unit_x();
+    mCamera.Right = Direction::unit_x();
     mCameraDirty = true;
 }
 
 void LitRenderer::MoveCamera(const math::vector3<Float>& Offset)
 {
-    mCamera.Position += Offset.x * mCamera.Left + Offset.y * Direction::unit_y() + Offset.z * mCamera.Forward;
+    mCamera.Position += Offset.x * mCamera.Right + Offset.y * Direction::unit_y() + Offset.z * mCamera.Forward;
     mCameraDirty = true;
 }
 
@@ -355,11 +352,11 @@ void LitRenderer::RotateCamera(const Radian& Yaw, const Radian& Pitch)
     math::quaterniond RotationYaw = math::quaterniond(mCamera.Up, Yaw);
 
     mCamera.Forward = math::rotate(RotationYaw, mCamera.Forward);
-    mCamera.Left = math::cross(mCamera.Up, mCamera.Forward);
+    mCamera.Right = math::cross(mCamera.Up, mCamera.Forward);
 
-    math::quaterniond RotationPitch = math::quaterniond(mCamera.Left, Pitch);
+    math::quaterniond RotationPitch = math::quaterniond(mCamera.Right, Pitch);
     mCamera.Forward = math::rotate(RotationPitch, mCamera.Forward);
-    mCamera.Up = math::cross(mCamera.Forward, mCamera.Left);
+    mCamera.Up = math::cross(mCamera.Forward, mCamera.Right);
     mCameraDirty = true;
 }
 
@@ -419,8 +416,19 @@ void LitRenderer::ResolveSamples()
     ResolveSampleTask = Task::WhenAll(ThreadName::Worker, [](auto) {}, PixelIntegrationTasks);
 }
 
-SimpleBackCamera::SimpleBackCamera(Degree verticalFov)
-    : HalfVerticalFov(DegreeClampHelper(verticalFov).value* Float(0.5))
-    , HalfVerticalFovTangent(math::tan(Degree(DegreeClampHelper(verticalFov).value* Float(0.5))))
+template <
+    uint32_t MIN_FOV_DEGREE = 30,
+    uint32_t MAX_FOV_DEGREE = 160
+> struct LimitedHalfFOV : Degree {
+    LimitedHalfFOV(Degree degree)
+        : Degree(Float(0.5) * math::clamp(degree.value
+            , Float(MIN_FOV_DEGREE)
+            , Float(MAX_FOV_DEGREE))
+        ){ }
+};
+
+SimpleBackCamera::SimpleBackCamera(Degree verticalFOV)
+    : HalfVerticalFov(LimitedHalfFOV<>(verticalFOV))
+    , HalfVerticalFovTangent(math::tan(LimitedHalfFOV<>(verticalFOV)))
     , Position(0, 0, 0)
 { }
