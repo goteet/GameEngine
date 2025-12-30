@@ -11,7 +11,7 @@
 class SimpleBackCamera
 {
 public:
-    SimpleBackCamera(Degree verticalFOV);
+    SimpleBackCamera(Degree verticalFOV, uint32_t filmWidth, uint32_t filmHeight);
     Direction Up = Direction::unit_y();
     Direction Forward = Direction::unit_z();
     Direction Right = Direction::unit_x();
@@ -19,6 +19,12 @@ public:
     Point Position;
     const Radian HalfVerticalFov;
     const Float HalfVerticalFovTangent;
+
+    Ray GenerateCameraRay(uint32_t x, uint32_t y);
+private:
+    const uint32_t mFilmWidth;
+    const uint32_t mFilmHeight;
+    const Float4x4 mSampleToCamera;
 };
 
 class LitRenderer

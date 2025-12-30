@@ -219,7 +219,7 @@ LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canv
     : mCanvasLinePitch(canvasLinePitch)
     , mSystemCanvasDataPtr(canvasDataPtr)
     , mFilm(canvasWidth, canvasHeight)
-    , mCamera(50_degd)
+    , mCamera(50_degd, canvasWidth, canvasHeight)
     , mScene(std::make_unique<SimpleScene>())
 {
     mCamera.Position.set(0, 0, -130);
@@ -239,28 +239,6 @@ void LitRenderer::InitialSceneTransforms()
 
 void LitRenderer::GenerateCameraRays()
 {
-    /*
-    *      .
-    *     /|
-    *    / |  h
-    *   /  | --- = tan(fov/2) =>  h = z*tan(fov/2) = tan(0.5fov);
-    *  /   |  z
-    * o----+-----> z=1
-    */
-    const Float tan = mCamera.HalfVerticalFovTangent;
-    const Float aspect = Float(1.0) * mFilm.CanvasWidth / mFilm.CanvasHeight;
-    Float4x4 SampleToCamera =
-        Float4x4::scale(tan * aspect, tan, Float(1.0))
-        * Float4x4::translation(Float(-1.0), Float(-1.0), Float(1.0))
-        * Float4x4::scale(Float(2.0) / mFilm.CanvasWidth, Float(2.0) / mFilm.CanvasHeight, Float(1.0))
-        * Float4x4::translation(Float(0.5), Float(0.5), Float(0.0));
-    auto CanvasPositionToRay = [this, &Transform=SampleToCamera](Float x, Float y) -> math::vector3<Float>
-    {
-        Point p = math::transform(Transform, Point(x, y, Float(0)));
-        return Direction(p.x * mCamera.Right + p.y * mCamera.Up + p.z * mCamera.Forward);
-    };
-
-
     std::vector<Task> GenerateSampleTasks;
     const int NumBlockX = (mFilm.CanvasWidth + BlockSize - 1) / BlockSize;
     const int NumBlockY = (mFilm.CanvasHeight + BlockSize - 1) / BlockSize;
@@ -269,7 +247,7 @@ void LitRenderer::GenerateCameraRays()
         for (int BlockIndexH = 0; BlockIndexH < NumBlockX; BlockIndexH += 1)
         {
             Task GenerateSampleTask = Task::Start(ThreadName::Worker,
-                [this, BlockIndexV, BlockIndexH, &CanvasPositionToRay](::Task&)
+                [this, BlockIndexV, BlockIndexH, &Camera = mCamera](::Task&)
                 {   
                     random<Float> RandomGeneratorPickingPixel;
                     int RowStart = BlockIndexV * BlockSize;
@@ -285,9 +263,7 @@ void LitRenderer::GenerateCameraRays()
                             Sample& Sample = mCameraRaySamples[ColIndex + RowOffset];
                             Sample.PixelRow = RowIndex;
                             Sample.PixelCol = ColIndex;
-                            Sample.Ray.set_origin(mCamera.Position);
-                            Sample.Ray.set_direction(CanvasPositionToRay(ColIndex, RowIndex));
-
+                            Sample.Ray = Camera.GenerateCameraRay(ColIndex, RowIndex);
                             Sample.RecordP1 = mScene->DetectIntersecting(Sample.Ray, nullptr, math::SMALL_NUM<Float>);
                         }
                     }
@@ -427,8 +403,40 @@ template <
         ){ }
 };
 
-SimpleBackCamera::SimpleBackCamera(Degree verticalFOV)
+Float4x4 CalcSampleToCameraMatrix(uint32_t width, uint32_t height, Float tan)
+{
+    /*
+    *      .
+    *     /|
+    *    / |  h
+    *   /  | --- = tan(fov/2) =>  h = z*tan(fov/2) = tan(0.5fov);
+    *  /   |  z
+    * o----+-----> z=1
+    *
+    */
+    Float aspect = Float(1) * width / height;
+    return Float4x4::scale(tan * aspect, tan, Float(1.0))
+        * Float4x4::translation(Float(-1.0), Float(-1.0), Float(1.0))
+        * Float4x4::scale(Float(2.0) / width, Float(2.0) / height, Float(1.0))
+        * Float4x4::translation(Float(0.5), Float(0.5), Float(0.0));
+}
+
+SimpleBackCamera::SimpleBackCamera(Degree verticalFOV, uint32_t filmWidth, uint32_t filmHeight)
     : HalfVerticalFov(LimitedHalfFOV<>(verticalFOV))
     , HalfVerticalFovTangent(math::tan(LimitedHalfFOV<>(verticalFOV)))
     , Position(0, 0, 0)
-{ }
+    , mFilmWidth(filmWidth), mFilmHeight(filmHeight)
+    , mSampleToCamera(CalcSampleToCameraMatrix(filmWidth, filmHeight, math::tan(LimitedHalfFOV<>(verticalFOV))))
+{
+
+}
+
+Ray SimpleBackCamera::GenerateCameraRay(uint32_t x, uint32_t y)
+{
+    if (x > mFilmWidth)  x = mFilmWidth;
+    if (y > mFilmHeight) y = mFilmHeight;
+
+    Point cameraP = math::transform(mSampleToCamera, Point(x, y, Float(0)));
+    Direction d = cameraP.x * Right + cameraP.y * Up + cameraP.z * Forward;
+    return Ray{ Position, d };
+}
