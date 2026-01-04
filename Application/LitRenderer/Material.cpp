@@ -758,6 +758,18 @@ Float Material::SamplePdf(const Direction& Wo, const Direction& Wi) const {
 
 
 
+Spectrum Material::GetAlbedo()
+{
+    for (const std::unique_ptr<BSDF>& bsdf : mBSDFComponents)
+    {
+        if ((bsdf->BSDFMask & DiffuseMask))
+        {
+            return bsdf->GetAlbedo();
+        }
+    }
+    return Spectrum(Float(1));
+}
+
 std::unique_ptr<Material> Material::CreateMatte(const Spectrum& albedo)
 {
     std::unique_ptr<Material> material = std::make_unique<Material>();

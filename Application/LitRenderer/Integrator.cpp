@@ -310,3 +310,82 @@ Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, cons
 
     return Spectrum::zero();
 }
+
+Direction Refraction(const Direction& V, const Direction& N, Float eta)
+{
+    Float cos1 = dot(V, N);
+    Float cos2sqr = Float(1.0) - eta * eta * (Float(1.0) - cos1 * cos1);
+    if (cos2sqr < Float(0.0))
+        return math::reflection(V, N);
+    return (eta * cos1 - sqrt(cos2sqr)) * N - eta * V;
+}
+
+Spectrum WhittedIntegrator::Evaluate(Scene& scene, const Ray& sampleRay, const SurfaceIntersection& si, int depth)
+{
+    const int MAX_DEPTH = 5;
+    if (depth == MAX_DEPTH)
+    {
+        return Spectrum(Float(1), Float(0), Float(0));
+    }
+    else if (!si)
+    {
+        Float h = (sampleRay.direction().x + 1) * 0.25;
+        Float v = (sampleRay.direction().y + 1) * 0.25;
+        return Spectrum(Float(0), Float(0), Float(0));
+    }
+
+    const Direction& N = si.SurfaceNormal;
+    const Direction V = -sampleRay.direction();
+    Point shadingPoint = sampleRay.calc_offset(si.Distance);
+    Point Ndelta = 0.001 *  N;
+
+    if (si.Object->LightSource != nullptr)
+    {
+        return si.Object->LightSource->Le();
+    }
+
+    switch (si.Object->Material->Type) {
+    case Material::Transparency:
+    {
+        Float n1 = Float(1.0); Float n2 = Float(1.5);// r.geometry.material.IoR;
+        Float eta = si.IsOnSurface ? n1 / n2 : n2 / n1;
+        Ray tRay{ shadingPoint - Ndelta, Refraction(V, N, eta) };
+        Ray rRay{ shadingPoint + Ndelta, math::reflection(V, N) };
+
+        SurfaceIntersection tsi = scene.DetectIntersecting(tRay, nullptr, math::SMALL_NUM<Float>);
+        //SurfaceIntersection rsi = scene.DetectIntersecting(rRay, nullptr, math::SMALL_NUM<Float>);
+
+        Spectrum T = Evaluate(scene, tRay, tsi, depth + 1);
+        Spectrum R = Spectrum();//Evaluate(scene, rRay, rsi, depth + 1);
+
+        
+        Float Kr = Float(0.0);
+        Float Kt = Float(1.0) - Kr;
+        return Kt * T + Kr * R;
+    }
+    default:
+    case Material::Opaque:
+    {
+        Spectrum Diffuse = Spectrum(0);
+        int numLights = scene.GetLightCount();
+        for (int lightIdx = 0; lightIdx < numLights; lightIdx++)
+        {
+            SceneObject* lightObject = scene.GetLightSourceByIndex(lightIdx);
+            Direction L = (lightObject->WorldTransform.Translate - shadingPoint);
+
+            Ray shadowRay{ shadingPoint + Ndelta, L };
+            SurfaceIntersection ssi = scene.DetectIntersecting(shadowRay, nullptr, math::SMALL_NUM<Float>);
+            Float shadow = ssi && ssi.Object->LightSource == nullptr ? Float(1.0) : Float(0.0);
+            Spectrum Kd = si.Object->Material->GetAlbedo();
+            Float NdotV = math::dot(N, V);
+            Diffuse += Kd * (NdotV * (1.0f - shadow));
+        }
+        return Diffuse;
+    }
+    }
+}
+
+Spectrum WhittedIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1)
+{
+    return Evaluate(scene, cameraRay, recordP1, 0);
+}

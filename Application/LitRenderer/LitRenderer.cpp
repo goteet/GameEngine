@@ -9,7 +9,7 @@ static const int BlockSize = 64;
 namespace
 {
     const bool DEBUG = false;
-    const bool DEBUGScene = DEBUG || false;
+    const bool DEBUGScene = DEBUG || true;
     class SimpleScene : public Scene
     {
         virtual void CreateScene(Float aspect, std::vector<SceneObject*>& OutSceneObjects) override
@@ -36,9 +36,21 @@ namespace
             if (DEBUGScene)
             {
                 SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
-                mainSphere->SetRadius(30);
-                mainSphere->SetTranslate(SceneCenterX, SceneCenterY, SceneCenterZ);
+                mainSphere->SetRadius(20);
+                mainSphere->SetTranslate(SceneCenterX, SceneCenterY, SceneCenterZ - Float(10));
+                mainSphere->SetTranslate(SceneCenterX - Float(15), SceneCenterY - Float(20), SceneCenterZ - Float(10));
                 mainSphere->Material = Material::CreateMicrofacetGGX_Debug(Float(0.01), SpecularColor::Gold());
+
+                mainSphere->Material->Type = Material::Transparency;
+
+
+                mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
+                mainSphere->SetRadius(10);
+                //mainSphere->SetTranslate(SceneCenterX, SceneCenterY, SceneCenterZ - Float(10));
+                mainSphere->SetTranslate(SceneCenterX + Float(10), SceneCenterY - Float(30), SceneCenterZ + Float(20));
+                mainSphere->Material = Material::CreateMicrofacetGGX_Debug(Float(0.01), SpecularColor::Gold());
+                
+                mainSphere->Material->Type = Material::Opaque;
             }
             else
             {
@@ -61,11 +73,12 @@ namespace
                     mainSphere->Material = Material::CreatePlastic(Spectrum(Float(0.5)), roughness, Spectrum(1));
                     mainSphere->Material = Material::CreateMicrofacetGGX_Debug(roughness, SpecularColor::Gold());
                     //mainSphere->Material = Material::CreateAshikhminAndShirley(roughness, Spectrum(0.1), SpecularColor::Gold());
+                    mainSphere->Material->Type = (i % 3) == 2 ? Material::Transparency : Material::Opaque;
                 }
             }
 
 
-            if (!DEBUGScene)
+            
             {
                 Spectrum Red(Float(0.75), Float(0.2), Float(0.2));
                 Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
@@ -73,34 +86,58 @@ namespace
                 Spectrum Gray(Float(0.75));
                 Spectrum DarkGray(Float(0.6));
 
-                SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
-                wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
-                wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
-                wallLeft->Material = Material::CreateMatte(Red);
+                if (!DEBUGScene)
+                {
+                    SceneRect* wallLeft = new SceneRect(); OutSceneObjects.push_back(wallLeft);
+                    wallLeft->SetTranslate(SceneLeft, SceneCenterY, SceneCenterZ);
+                    wallLeft->SetExtends(SceneExtendZ, SceneExtendY);
+                    wallLeft->Material = Material::CreateMatte(Red);
 
-                SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
-                wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
-                wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
-                wallRight->SetExtends(SceneExtendZ, SceneExtendY);
-                wallRight->Material = Material::CreateMatte(Blue);
+                    SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
+                    wallRight->SetTranslate(SceneRight, SceneCenterY, SceneCenterZ);
+                    wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
+                    wallRight->SetExtends(SceneExtendZ, SceneExtendY);
+                    wallRight->Material = Material::CreateMatte(Blue);
 
-                SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
-                wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
-                wallTop->SetExtends(SceneExtendZ, SceneExtendX);
-                wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
-                wallTop->Material = Material::CreateMatte(Gray);
+                    SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
+                    wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
+                    wallTop->SetExtends(SceneExtendZ, SceneExtendX);
+                    wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
+                    wallTop->Material = Material::CreateMatte(Gray);
 
-                SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
-                wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
-                wallFar->SetExtends(SceneExtendX, SceneExtendY);
-                wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
-                wallFar->Material = Material::CreateMatte(DarkGray);
+                    SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
+                    wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar);
+                    wallFar->SetExtends(SceneExtendX, SceneExtendY);
+                    wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
+                    wallFar->Material = Material::CreateMatte(DarkGray);
 
-                SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
-                wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
-                wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
-                wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
-                wallBottom->Material = Material::CreateMatte(Green);
+                    SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
+                    wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
+                    wallBottom->SetExtends(SceneExtendZ, SceneExtendX);
+                    wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
+                    wallBottom->Material = Material::CreateMatte(Green);
+                }
+                else
+                {
+
+                    SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
+                    wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar + Float(150));
+                    wallFar->SetExtends(SceneExtendX * 100, SceneExtendY * 100);
+                    wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
+                    wallFar->Material = Material::CreateMatte(Red);
+
+                    SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
+                    wallRight->SetTranslate(SceneRight + Float(10), SceneCenterY, SceneCenterZ);
+                    wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
+                    wallRight->SetExtends(SceneExtendZ * 100, SceneExtendY * 100);
+                    wallRight->Material = Material::CreateMatte(Blue);
+
+                    SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
+                    wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ );
+                    wallBottom->SetExtends(SceneExtendZ * 100, SceneExtendX * 100);
+                    wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
+                    wallBottom->Material = Material::CreateMatte(Green);
+                }
             }
 
             {
@@ -115,7 +152,7 @@ namespace
                 LightDisk->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
             }
 
-
+            if(false)
             {
                 SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
                 LightDisk->SetDualFace(true);
@@ -348,7 +385,7 @@ void LitRenderer::ResolveSamples()
         return;
     }
 
-    const int RenderBlockSize = 2;
+    const int RenderBlockSize = 4;
     const int NumBlockX = (mFilm.CanvasWidth + RenderBlockSize - 1) / RenderBlockSize;
     const int NumBlockY = (mFilm.CanvasHeight + RenderBlockSize - 1) / RenderBlockSize;
     for (int BlockIndexY = (Frame++ + 1) / 2 % 2; BlockIndexY < NumBlockY; BlockIndexY += 2)
@@ -360,7 +397,8 @@ void LitRenderer::ResolveSamples()
                 {
                     PathIntegrator pathIntegrator;
                     DebugIntegrator debugIntegrator;
-                    Integrator& IntegratorRef = DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
+                    WhittedIntegrator whittedIntegrator;
+                    Integrator& IntegratorRef = whittedIntegrator;// DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
 
                     int RowStart = BlockIndexY * BlockSize;
                     int RowEnd = math::min2(RowStart + BlockSize, mFilm.CanvasHeight);
@@ -377,6 +415,8 @@ void LitRenderer::ResolveSamples()
                             const bool bGenerateMore = MaxSampleCount <= 0 || MaxSampleCount > (int)CanvasPixel.Count;
                             if (bGenerateMore)
                             {
+                                //Float NdotL = math::dot(Sample.RecordP1.SurfaceNormal, -Sample.Ray.direction());
+                                //CanvasPixel.Value += Spectrum(NdotL);
                                 CanvasPixel.Value += IntegratorRef.EvaluateLi(*mScene, Sample.Ray, Sample.RecordP1);
                                 CanvasPixel.Count += 1;
 

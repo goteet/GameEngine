@@ -294,15 +294,15 @@ namespace math
         //c = dot(Or-Os,Or-Os) - r^2
         //t = (-b +- sqrt(b^2 - 4ac)) / 2a
         vector_t<value_type, EDim::_3> Or_Os = ray.origin() - center;
-        const vector_t<value_type, EDim::_3> Dr = ray.direction();
-        value_type a = dot(Dr, Dr);
+        const normalized_vector_t<value_type, EDim::_3>& Dr = ray.direction();
+        //value_type a = dot(Dr, Dr); always=1
         value_type b = 2 * dot(Dr, Or_Os);
         value_type c = dot(Or_Os, Or_Os) - radius_sqr;
-        value_type det = b * b - 4 * a * c;
+        value_type det = b * b - 4 * c;
         if (det > value_type(0))
         {
             det = sqrt(det);
-            value_type inv2a = value_type(0.5) / a;
+            value_type inv2a = value_type(0.5);
             t0 = (-b - det) * inv2a;
             t1 = (-b + det) * inv2a;
             if (t1 < error)
@@ -321,7 +321,7 @@ namespace math
         }
         else
         {
-            t0 = t1 = -b * value_type(0.5) / a;
+            t0 = t1 = -b * value_type(0.5);
 
             return t0 > error ? intersection::tangent : intersection::none;
         }

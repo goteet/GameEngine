@@ -106,6 +106,8 @@ struct BSDF
     const uint32_t BSDFMask;
     Float Weight = Float(1);
 
+    virtual Spectrum GetAlbedo() { return Spectrum(Float(1)); }
+
     BSDF(const std::string& debugName, uint32_t mask) : DebugName(debugName), BSDFMask(mask) { }
     virtual ~BSDF() { }
     virtual bool SampleFCosOverPdf(Float u[3], const Direction& Wo, BSDFSample& oBSDFSample) const = 0;
@@ -116,6 +118,11 @@ struct BSDF
 
 struct Material
 {
+    enum { Transparency, Opaque };
+    int Type = Opaque;
+
+    Spectrum GetAlbedo();
+
     static std::unique_ptr<Material> CreateMatte(const Spectrum& albedo = Spectrum::one());
     static std::unique_ptr<Material> CreateMatte(const Spectrum& albedo, Radian sigma);
     static std::unique_ptr<Material> CreatePlastic(const Spectrum& albedo, Float roughness, const Spectrum& Rs = Spectrum::one());
@@ -138,6 +145,7 @@ private:
 
 struct Lambertian : public BSDF
 {
+
     Spectrum Albedo = Spectrum::one();
 
     Lambertian() : BSDF("Lambertian", BSDFMask::DiffuseMask) { }
@@ -146,6 +154,8 @@ struct Lambertian : public BSDF
     virtual Direction SampleWi(Float u[3],  const Direction& Wo) const override;
     virtual Spectrum f(const Direction& Wo, const Direction& Wi) const override;
     virtual Float pdf(const Direction& Wo, const Direction& Wi) const override;
+
+    virtual Spectrum GetAlbedo() { return Albedo; }
 };
 
 struct OrenNayar : public BSDF
