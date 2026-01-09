@@ -446,7 +446,7 @@ Spectrum DistributionIntegrator::Evaluate(Scene& scene, const Ray& sampleRay, co
         Ray rRay{ shadingPoint + Ndelta, rdir };
         SurfaceIntersection rsi = scene.DetectIntersecting(rRay, nullptr, math::SMALL_NUM<Float>);
         Float NdotR = dot(rdir, N);
-        Spectrum R = Evaluate(scene, rRay, rsi, depth + 1);
+        Spectrum R = Evaluate(scene, rRay, rsi, depth + 1) * NdotR;
         
         Spectrum D = Spectrum(0);
         int numLights = scene.GetLightCount();

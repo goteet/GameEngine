@@ -484,7 +484,9 @@ Ray SimpleBackCamera::GenerateCameraRay(uint32_t x, uint32_t y)
     if (x > mFilmWidth)  x = mFilmWidth;
     if (y > mFilmHeight) y = mFilmHeight;
 
-    Point cameraP = math::transform(mSampleToCamera, Point(x, y, Float(0)));
+    Float jitterX = random<Float>::range(0.49);
+    Float jitterY = random<Float>::range(0.49);
+    Point cameraP = math::transform(mSampleToCamera, Point(x + jitterX, y + jitterY, Float(0)));
     Direction d = cameraP.x * Right + cameraP.y * Up + cameraP.z * Forward;
     return Ray{ Position, d };
 }
