@@ -40,3 +40,11 @@ public:
     virtual Spectrum EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1) override;
 
 };
+
+class DistributionIntegrator : public Integrator {
+    Spectrum Evaluate(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1, int depth);
+public:
+    virtual Spectrum EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1) override;
+
+};
+

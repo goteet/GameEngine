@@ -373,6 +373,17 @@ void LitRenderer::RotateCamera(const Radian& Yaw, const Radian& Pitch)
     mCameraDirty = true;
 }
 
+template<typename Integrator>
+struct IntegratorForwarder
+{
+    Integrator _Integrator;
+
+    template<class... Args>
+    Spectrum Evaluate(Args&&...args)
+    {
+        return _Integrator.EvaluateLi(std::forward<Args>(args)...);
+    }
+};
 void LitRenderer::ResolveSamples()
 {
     const Sample* Samples = mCameraRaySamples;
@@ -395,10 +406,7 @@ void LitRenderer::ResolveSamples()
             Task EvaluateLiTask = Task::Start(ThreadName::Worker,
                 [this, BlockSize = RenderBlockSize, MaxSampleCount = MaxSampleCount, BlockIndexY, BlockIndexX, AccumulatedBufferPtr, Samples](::Task&)
                 {
-                    PathIntegrator pathIntegrator;
-                    DebugIntegrator debugIntegrator;
-                    WhittedIntegrator whittedIntegrator;
-                    Integrator& IntegratorRef = whittedIntegrator;// DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
+                    IntegratorForwarder<DistributionIntegrator> IntegratorRef;// DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
 
                     int RowStart = BlockIndexY * BlockSize;
                     int RowEnd = math::min2(RowStart + BlockSize, mFilm.CanvasHeight);
@@ -417,7 +425,7 @@ void LitRenderer::ResolveSamples()
                             {
                                 //Float NdotL = math::dot(Sample.RecordP1.SurfaceNormal, -Sample.Ray.direction());
                                 //CanvasPixel.Value += Spectrum(NdotL);
-                                CanvasPixel.Value += IntegratorRef.EvaluateLi(*mScene, Sample.Ray, Sample.RecordP1);
+                                CanvasPixel.Value += IntegratorRef.Evaluate(*mScene, Sample.Ray, Sample.RecordP1);
                                 CanvasPixel.Count += 1;
 
                                 mFilm.FlushTo(CanvasPixel, RowIndex, ColIndex, this->mSystemCanvasDataPtr, mCanvasLinePitch);
