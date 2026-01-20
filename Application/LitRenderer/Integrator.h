@@ -42,9 +42,15 @@ public:
 };
 
 class DistributionIntegrator : public Integrator {
-    Spectrum Evaluate(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1, int depth);
+    virtual Spectrum Evaluate(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1, int depth);
 public:
     virtual Spectrum EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1) override;
-
 };
 
+class SimplePathIntegrator : public DistributionIntegrator {
+    virtual Spectrum Evaluate(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1, int depth) override;
+};
+
+class SimpleDiffuseIntegrator : public DistributionIntegrator {
+    virtual Spectrum Evaluate(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1, int depth) override;
+};

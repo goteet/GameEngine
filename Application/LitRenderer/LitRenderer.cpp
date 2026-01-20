@@ -406,7 +406,7 @@ void LitRenderer::ResolveSamples()
             Task EvaluateLiTask = Task::Start(ThreadName::Worker,
                 [this, BlockSize = RenderBlockSize, MaxSampleCount = MaxSampleCount, BlockIndexY, BlockIndexX, AccumulatedBufferPtr, Samples](::Task&)
                 {
-                    IntegratorForwarder<DistributionIntegrator> IntegratorRef;// DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
+                    IntegratorForwarder<SimpleDiffuseIntegrator> IntegratorRef;// DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
 
                     int RowStart = BlockIndexY * BlockSize;
                     int RowEnd = math::min2(RowStart + BlockSize, mFilm.CanvasHeight);
