@@ -12,6 +12,7 @@ using Radian = math::radian<Float>;
 using Degree = math::degree<Float>;
 using Ray = math::ray3d<Float>;
 using Point = math::point3d<Float>;
+using Vector = math::vector3<Float>;
 using Direction = math::nvector3<Float>;
 using UVW = math::normal_space<Float>;
 using Float4x4 = math::matrix4x4<Float>;

@@ -55,12 +55,13 @@ struct SceneObject
     virtual ~SceneObject() { }
     virtual void UpdateWorldTransform();
     virtual SurfaceIntersection IntersectWithRay(const Ray& ray, Float error) const = 0;
+    virtual Point GetWorldCenter() const = 0;
     void SetTranslate(Float x, Float y, Float z) { WorldTransform.Translate.set(x, y, z); }
     void SetRotation(const math::quaternion<Float>& q) { WorldTransform.Rotation = q; }
     Direction WorldToLocalNormal(const Direction& direction) const;
     Direction LocalToWorldNormal(const Direction& direction) const;
-    virtual Point SampleRandomPoint(Float epsilon[3]) const { return Point::zero(); }
-    virtual Float SamplePdf(const SurfaceIntersection& hr, const Ray& ray) const { return Float(0); }
+    virtual Point SampleRandomPoint(const Point& x, const SurfaceIntersection& si, Float u[3]) const { return Point::zero(); }
+    virtual Float SamplePdf(const Point& x, const SurfaceIntersection& hr, const Ray& ray) const { return Float(0); }
     virtual bool IsDualface() const { return false; }
     Transform WorldTransform;
     std::unique_ptr<Material> Material;
@@ -73,7 +74,11 @@ struct SceneSphere : SceneObject
     SceneSphere() : mSphere(Point(), 1) { }
     virtual void UpdateWorldTransform() override;
     virtual SurfaceIntersection IntersectWithRay(const Ray& ray, Float error) const override;
+    virtual Point GetWorldCenter() const override { return mWorldCenter; }
     void SetRadius(Float radius) { mSphere.set_radius(radius); }
+    Float GetRadius() const { return mSphere.radius(); }
+    virtual Point SampleRandomPoint(const Point& x, const SurfaceIntersection& si, Float u[3]) const override;
+    virtual Float SamplePdf(const Point& x, const SurfaceIntersection& hr, const Ray& ray) const override;
 private:
     math::sphere<Float> mSphere;
     Point mWorldCenter;
@@ -87,10 +92,11 @@ struct SceneRect : SceneObject
         math::vector2<Float>::one()) { }
     virtual void UpdateWorldTransform() override;
     virtual SurfaceIntersection IntersectWithRay(const Ray& ray, Float error) const override;
+    virtual Point GetWorldCenter() const override { return mWorldPosition; }
     void SetExtends(Float x, Float y) { Rect.set_extends(x, y); }
     void SetDualFace(bool dual) { mDualFace = dual; }
-    virtual Point SampleRandomPoint(Float epsilon[3]) const override;
-    virtual Float SamplePdf(const SurfaceIntersection& hr, const Ray& ray) const override;
+    virtual Point SampleRandomPoint(const Point& x, const SurfaceIntersection& si, Float u[3]) const override;
+    virtual Float SamplePdf(const Point& x, const SurfaceIntersection& si, const Ray& ray) const override;
     virtual bool IsDualface() const override { return mDualFace; }
 private:
     bool mDualFace = false;
@@ -105,6 +111,7 @@ struct SceneDisk : SceneObject
     SceneDisk() : Disk(Point(), Direction::unit_x(), Float(1)) { }
     virtual void UpdateWorldTransform() override;
     virtual SurfaceIntersection IntersectWithRay(const Ray& ray, Float error) const override;
+    virtual Point GetWorldCenter() const override { return mWorldPosition; }
     void SetRadius(Float r) { Disk.set_radius(r); }
     void SetDualFace(bool dual) { mDualFace = dual; }
     virtual bool IsDualface() const override { return mDualFace; }
@@ -120,6 +127,7 @@ struct SceneCube : SceneObject
     SceneCube() : Cube(Point(), math::vector3<Float>::one()) { }
     virtual void UpdateWorldTransform() override;
     virtual SurfaceIntersection IntersectWithRay(const Ray& ray, Float error) const override;
+    virtual Point GetWorldCenter() const override { return mWorldPosition; }
     void SetExtends(Float x, Float y, Float z) { Cube.set_extends(x, y, z); }
 private:
     math::cube<Float> Cube;

@@ -119,13 +119,18 @@ namespace
                 }
                 else
                 {
-
+                    SceneRect* wallTop = new SceneRect(); OutSceneObjects.push_back(wallTop);
+                    wallTop->SetTranslate(SceneCenterX, SceneTop, SceneCenterZ);
+                    wallTop->SetExtends(SceneExtendZ * 100, SceneExtendX * 100);
+                    wallTop->SetRotation(math::make_rotation_z_axis<Float>(-90_degd));
+                    wallTop->Material = Material::CreateMatte(Gray);
+                    
                     SceneRect* wallFar = new SceneRect(); OutSceneObjects.push_back(wallFar);
                     wallFar->SetTranslate(SceneCenterX, SceneCenterY, SceneFar + Float(150));
                     wallFar->SetExtends(SceneExtendX * 100, SceneExtendY * 100);
                     wallFar->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
                     wallFar->Material = Material::CreateMatte(Red);
-
+                    
                     SceneRect* wallRight = new SceneRect(); OutSceneObjects.push_back(wallRight);
                     wallRight->SetTranslate(SceneRight + Float(10), SceneCenterY, SceneCenterZ);
                     wallRight->SetRotation(math::make_rotation_y_axis<Float>(180_degd));
@@ -144,7 +149,6 @@ namespace
                 SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
                 LightDisk->SetDualFace(true);
                 LightDisk->SetTranslate(SceneCenterX, SceneTop - Float(0.01), SceneCenterZ - Float(10));
-                //LightDisk->SetRadius(50);
                 LightDisk->SetExtends(25, 25);
                 LightDisk->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
                 Float Intensity = 1.0;
@@ -160,6 +164,86 @@ namespace
                 LightDisk->SetExtends(SceneSize * 1.5, SceneSize);
                 LightDisk->SetRotation(math::make_rotation_y_axis<Float>(90_degd));
                 Float Intensity = 2.5;
+                LightDisk->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
+            }
+        }
+    };
+
+    class DirectLightScene : public Scene
+    {
+        const bool bUseSphericalLight = true;
+        virtual void CreateScene(Float aspect, std::vector<SceneObject*>& OutSceneObjects) override
+        {
+            const Float SceneSize = 60;
+            const Float SceneNear = -30;
+            const Float SceneFar = 30;
+            const Float SceneBottom = -SceneSize;
+            const Float SceneTop = SceneSize;
+            const Float SceneLeft = -SceneSize * aspect;
+            const Float SceneRight = SceneSize * aspect;
+
+            const Float SceneCenterX = (SceneLeft + SceneRight) * Float(0.5);
+            const Float SceneCenterY = (SceneBottom + SceneTop) * Float(0.5);
+            const Float SceneCenterZ = (SceneNear + SceneFar) * Float(0.5);
+            const Float SceneExtendX = (SceneRight - SceneLeft) * Float(0.5);
+            const Float SceneExtendY = (SceneTop - SceneBottom) * Float(0.5);
+            const Float SceneExtendZ = (SceneFar - SceneNear) * Float(0.5);
+
+            const Float SceneDistance = 5;
+            const Float SmallObjectSize = 8;
+            const Float BigObjectSize = SmallObjectSize * Float(1.75);
+
+            if (bUseSphericalLight)
+            {
+                SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
+                mainSphere->SetRadius(20);
+                mainSphere->SetTranslate(SceneCenterX, SceneCenterY - mainSphere->GetRadius(), SceneCenterZ - Float(10));
+                mainSphere->Material = Material::CreateMicrofacetGGX_Debug(Float(0.01), SpecularColor::Gold());
+                
+                mainSphere->Material->Type = Material::Opaque;
+            }
+            else
+            {
+                SceneSphere* mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
+                mainSphere->SetRadius(20);
+                mainSphere->SetTranslate(SceneCenterX - Float(15), SceneCenterY - Float(20), SceneCenterZ - Float(10));
+                mainSphere->Material = Material::CreateMicrofacetGGX_Debug(Float(0.01), SpecularColor::Gold());
+                mainSphere->Material->Type = Material::Opaque;
+
+                mainSphere = new SceneSphere(); OutSceneObjects.push_back(mainSphere);
+                mainSphere->SetRadius(10);
+                mainSphere->SetTranslate(SceneCenterX + Float(10), SceneCenterY - Float(30), SceneCenterZ + Float(20));
+                mainSphere->Material = Material::CreateMicrofacetGGX_Debug(Float(0.01), SpecularColor::Gold());
+
+                mainSphere->Material->Type = Material::Opaque;
+            }
+
+            Spectrum Green(Float(0.2), Float(0.75), Float(0.2));
+            {
+                SceneRect* wallBottom = new SceneRect(); OutSceneObjects.push_back(wallBottom);
+                wallBottom->SetTranslate(SceneCenterX, SceneBottom, SceneCenterZ);
+                wallBottom->SetExtends(SceneExtendZ * 100, SceneExtendX * 100);
+                wallBottom->SetRotation(math::make_rotation_z_axis<Float>(90_degd));
+                wallBottom->Material = Material::CreateMatte(Green);
+            }
+
+            if (bUseSphericalLight)
+            {
+                SceneSphere* LightSphere = new SceneSphere(); OutSceneObjects.push_back(LightSphere);
+                LightSphere->SetRadius(20);
+                LightSphere->SetTranslate(SceneCenterX, SceneCenterY + LightSphere->GetRadius(), SceneCenterZ);
+                Float Intensity = 1.0;
+                LightSphere->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
+            }
+            else
+            {
+                SceneRect* LightDisk = new SceneRect(); OutSceneObjects.push_back(LightDisk);
+                LightDisk->SetDualFace(true);
+                LightDisk->SetTranslate(SceneCenterX, SceneTop - Float(0.01), SceneCenterZ - Float(10));
+                LightDisk->SetExtends(25, 25);
+                LightDisk->SetRotation(math::make_rotation_x_axis<Float>(60_degd) * math::make_rotation_z_axis<Float>(90_degd));
+                Float Intensity = 1.0;
+
                 LightDisk->LightSource = std::make_unique<LightSource>(Intensity, Intensity, Intensity);
             }
         }
@@ -250,6 +334,7 @@ namespace
         }
     };
 
+
 }
 
 LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canvasHeight, int canvasLinePitch)
@@ -257,7 +342,7 @@ LitRenderer::LitRenderer(unsigned char* canvasDataPtr, int canvasWidth, int canv
     , mSystemCanvasDataPtr(canvasDataPtr)
     , mFilm(canvasWidth, canvasHeight)
     , mCamera(50_degd, canvasWidth, canvasHeight)
-    , mScene(std::make_unique<SimpleScene>())
+    , mScene(std::make_unique<DirectLightScene>())
 {
     mCamera.Position.set(0, 0, -130);
     mScene->Create(Float(canvasWidth) / Float(canvasHeight));
@@ -406,8 +491,9 @@ void LitRenderer::ResolveSamples()
             Task EvaluateLiTask = Task::Start(ThreadName::Worker,
                 [this, BlockSize = RenderBlockSize, MaxSampleCount = MaxSampleCount, BlockIndexY, BlockIndexX, AccumulatedBufferPtr, Samples](::Task&)
                 {
-                    IntegratorForwarder<SimpleDiffuseIntegrator> IntegratorRef;// DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
-
+                    //IntegratorForwarder<SimpleDiffuseIntegrator> IntegratorRef = DEBUG ? (Integrator&)debugIntegrator : (Integrator&)pathIntegrator;
+                    //IntegratorForwarder<DirectLightIntegrator> IntegratorRef;
+                    IntegratorForwarder<SimpleDiffuseIntegrator> IntegratorRef;
                     int RowStart = BlockIndexY * BlockSize;
                     int RowEnd = math::min2(RowStart + BlockSize, mFilm.CanvasHeight);
                     int ColStart = BlockIndexX * BlockSize;

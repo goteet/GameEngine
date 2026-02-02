@@ -50,16 +50,16 @@ void SceneSphere::UpdateWorldTransform()
     mWorldCenter = WorldTransform.TransformPoint(mSphere.center());
 }
 
-Point SceneRect::SampleRandomPoint(Float epsilon[3]) const
+Point SceneRect::SampleRandomPoint(const Point& x, const SurfaceIntersection& si, Float u[3]) const
 {
-    Float e1 = (Float(2) * epsilon[1] - Float(1)) * Rect.width();
-    Float e2 = (Float(2) * epsilon[2] - Float(1)) * Rect.height();
+    Float e1 = (Float(2) * u[1] - Float(1)) * Rect.width();
+    Float e2 = (Float(2) * u[2] - Float(1)) * Rect.height();
 
     Direction Bitangent = math::cross(mWorldNormal, mWorldTangent);
     return Point(mWorldPosition + e1 * mWorldTangent + e2 * Bitangent);
 }
 
-Float SceneRect::SamplePdf(const SurfaceIntersection& hr, const Ray& ray) const
+Float SceneRect::SamplePdf(const Point& x, const SurfaceIntersection& hr, const Ray& ray) const
 {
     if (hr.Object != this)
     {
@@ -91,7 +91,7 @@ SurfaceIntersection SceneSphere::IntersectWithRay(const Ray& ray, Float error) c
 {
     Float t0, t1;
     bool isOnSurface = true;
-    math::intersection result = math::intersect_sphere(ray, mWorldCenter, mSphere.radius_sqr(), error, t0, t1);
+    math::intersection result = math::intersect_sphere(ray, GetWorldCenter(), mSphere.radius_sqr(), error, t0, t1);
     if (result == math::intersection::none)
     {
         return SurfaceIntersection();
@@ -103,7 +103,7 @@ SurfaceIntersection SceneSphere::IntersectWithRay(const Ray& ray, Float error) c
     }
 
     Point intersectPosition = ray.calc_offset(t0);
-    Direction surfaceNormal = intersectPosition - mWorldCenter;
+    Direction surfaceNormal = intersectPosition - GetWorldCenter();
 
     Direction localNormal = WorldToLocalNormal(surfaceNormal);
     //{dPx/dPhi, dPy/dPhi, dPz/dPhi}; 
@@ -119,6 +119,53 @@ SurfaceIntersection SceneSphere::IntersectWithRay(const Ray& ray, Float error) c
     return SurfaceIntersection(const_cast<SceneSphere*>(this), isOnSurface,
         (isOnSurface ? surfaceNormal : -surfaceNormal),
         (isOnSurface ? surfaceTangent : -surfaceTangent), t0);
+}
+
+Point SceneSphere::SampleRandomPoint(const Point& x, const SurfaceIntersection& si, Float u[3]) const
+{
+    Float distanceSqr = math::magnitude_sqr(x - GetWorldCenter());
+    Float sinAlpha = math::square(GetRadius()) / distanceSqr;
+    Float cosAlpha = sqrt(1 - math::square(sinAlpha));
+
+    Float cosTheta = Float(1) - u[0] * (1 - cosAlpha);
+    Float sinTheta = sqrt(Float(1) - math::square(cosTheta));
+    Radian phi = Radian{ math::TWO_PI<Float> * u[1] };
+    Float sinPhi = math::sin(phi);
+    Float cosPhi = math::cos(phi);
+    Direction omega{ sinTheta * cosPhi, sinTheta * sinPhi, cosTheta };
+
+    Direction N = GetWorldCenter() - x;
+    Direction T = math::almost_same(N, si.SurfaceNormal)
+        ? si.SurfaceTangent
+        : math::cross(N, si.SurfaceNormal);
+    UVW uvw{ N, T };
+    omega = uvw.local_2_world(omega);
+    Ray ray{ x, omega };
+
+    SurfaceIntersection lsi = IntersectWithRay(ray, math::EPSILON<Float>);
+    return ray.calc_offset(lsi.Distance);
+}
+
+Float SceneSphere::SamplePdf(const Point& shadingPoint, const SurfaceIntersection& hr, const Ray& ray) const
+{
+    if (hr.Object != this)
+    {
+        return Float(0);
+    }
+
+    const Direction Wo = -ray.direction();
+    const Direction& N = hr.SurfaceNormal;
+    Float cosThetaPrime = math::dot(N, Wo);
+    if (cosThetaPrime <= math::SMALL_NUM<Float>)
+    {
+        return Float(0);
+    }
+
+    Float distance = magnitude(GetWorldCenter() - shadingPoint);
+    Float sinAlpha = GetRadius() / distance;
+    Float cosAlpha = sqrt(1 - math::square(sinAlpha));
+
+    return Float(1) / (math::TWO_PI<Float> * (1 - cosAlpha));
 }
 
 void SceneRect::UpdateWorldTransform()
@@ -303,6 +350,6 @@ Float Scene::SampleLightPdf(const Ray& ray)
     }
 
     return (result.Object != nullptr)
-        ? result.Object->SamplePdf(result, ray) / Float(mSceneLights.size())
+        ? result.Object->SamplePdf(Point(), result, ray) / Float(mSceneLights.size())
         : Float(0);
 }

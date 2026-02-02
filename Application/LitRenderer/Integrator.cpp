@@ -24,7 +24,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
     Ray viewRay = cameraRay;
 
     // First hit, on P1
-    SurfaceIntersection hitRecord = recordP1;
+    SurfaceIntersection si = recordP1;
 
     struct MISRecord
     {
@@ -44,9 +44,9 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
         bool IsMirrorReflection = false;
     } lastMISRecord;
 
-    for (int bounce = 0; hitRecord && bounce < MaxBounces && !math::near_zero(beta); ++bounce)
+    for (int bounce = 0; si && bounce < MaxBounces && !math::near_zero(beta); ++bounce)
     {
-        const SceneObject& surface = *hitRecord.Object;
+        const SceneObject& surface = *si.Object;
         if (surface.LightSource != nullptr)
         {
             //Note:
@@ -70,15 +70,15 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
             mUniformSamplers[2].value()
         };
 
-        const Direction& T = hitRecord.SurfaceTangent;
-        const Direction& N = hitRecord.SurfaceNormal;
+        const Direction& T = si.SurfaceTangent;
+        const Direction& N = si.SurfaceNormal;
         const UVW uvw(N, T);
 
         //Multiple Importance Sampling
         {
             const std::unique_ptr<Material>& material = surface.Material;
             const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
-            const Float biasedDistance = math::max2<Float>(hitRecord.Distance, Float(0));
+            const Float biasedDistance = math::max2<Float>(si.Distance, Float(0));
             const Point Pi = viewRay.calc_offset(biasedDistance);
             const Direction Wo = uvw.world_2_local(-viewRay.direction());
 
@@ -89,9 +89,9 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
             if (!lastMISRecord.IsMirrorReflection)
             {
                 SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
-                if (lightSource != nullptr && lightSource != hitRecord.Object)
+                if (lightSource != nullptr && lightSource != si.Object)
                 {
-                    const Point Pi_1 = lightSource->SampleRandomPoint(u);
+                    const Point Pi_1 = lightSource->SampleRandomPoint(Pi, si, u);
                     const Ray lightRay(Pi, Pi_1);
 
                     SurfaceIntersection recordPi_1 = scene.DetectIntersecting(lightRay, nullptr, math::SMALL_NUM<Float>);
@@ -153,7 +153,7 @@ Spectrum PathIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const Su
         }
 
         // Find next path ends with Pi+1
-        hitRecord = scene.DetectIntersecting(viewRay, nullptr, math::SMALL_NUM<Float>);
+        si = scene.DetectIntersecting(viewRay, nullptr, math::SMALL_NUM<Float>);
     }
 
     return Lo;
@@ -167,9 +167,9 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
         return kBackgroundColor;
     }
 
-    const SurfaceIntersection& hitRecord = recordP1;
+    const SurfaceIntersection& si = recordP1;
     const Ray& viewRay = cameraRay;
-    const SceneObject& surface = *hitRecord.Object;
+    const SceneObject& surface = *si.Object;
 
     if (surface.LightSource != nullptr)
     {
@@ -185,14 +185,14 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
             mUniformSamplers[2].value()
         };
 
-        const Direction& T = hitRecord.SurfaceTangent;
-        const Direction& N = hitRecord.SurfaceNormal;
+        const Direction& T = si.SurfaceTangent;
+        const Direction& N = si.SurfaceNormal;
         const UVW uvw(N, T);
 
         const std::unique_ptr<Material>& material = surface.Material;
         if (material)
         {
-            const Float biasedDistance = math::max2<Float>(hitRecord.Distance, Float(0));
+            const Float biasedDistance = math::max2<Float>(si.Distance, Float(0));
             const Point P_i = viewRay.calc_offset(biasedDistance);
             const BSDF& bsdf = *material->GetRandomBSDFComponent(u[0]);
             const Direction Wo = uvw.world_2_local(-viewRay.direction());
@@ -223,12 +223,12 @@ Spectrum DebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const S
 
 Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1)
 {
-    const SurfaceIntersection& hitRecord = recordP1;
-    if (hitRecord)
+    const SurfaceIntersection& si = recordP1;
+    if (si)
     {
         const Ray& viewRay = cameraRay;
 
-        const SceneObject& surface = *hitRecord.Object;
+        const SceneObject& surface = *si.Object;
         if (surface.LightSource != nullptr)
         {
             Spectrum Le = surface.LightSource->Le();
@@ -238,7 +238,7 @@ Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, cons
         {
             Spectrum Weights = Spectrum::zero();
 
-            const Float biasedDistance = math::saturate(hitRecord.Distance);
+            const Float biasedDistance = math::saturate(si.Distance);
             const Point P_i = viewRay.calc_offset(biasedDistance);
             Float u[3] =
             {
@@ -247,8 +247,8 @@ Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, cons
                 mUniformSamplers[2].value()
             };
 
-            const Direction& T = hitRecord.SurfaceTangent;
-            const Direction& N = hitRecord.SurfaceNormal;
+            const Direction& T = si.SurfaceTangent;
+            const Direction& N = si.SurfaceNormal;
             const UVW uvw(N, T);
             const Direction Wo = uvw.world_2_local(-viewRay.direction());
 
@@ -261,7 +261,7 @@ Spectrum MISDebugIntegrator::EvaluateLi(Scene& scene, const Ray& cameraRay, cons
                 SceneObject* lightSource = scene.UniformSampleLightSource(u[0]);
                 if (lightSource != nullptr)
                 {
-                    Point P_i_1 = lightSource->SampleRandomPoint(u);
+                    Point P_i_1 = lightSource->SampleRandomPoint(P_i, si, u);
                     Ray lightRay(P_i, P_i_1);
                     const Direction Wi_light = -lightRay.direction();
                     const Direction Wi = uvw.world_2_local(lightRay.direction());
@@ -467,7 +467,7 @@ Spectrum DistributionIntegrator::Evaluate(Scene& scene, const Ray& sampleRay, co
         {
             SceneObject* lightObject = scene.GetLightSourceByIndex(lightIdx);
             Float u[3] = { random<Float>::value(),random<Float>::value(),random<Float>::value() };
-            Point lightSourceSamplingPoint = lightObject->SampleRandomPoint(u);
+            Point lightSourceSamplingPoint = lightObject->SampleRandomPoint(shadingPoint, si, u);
             Direction ldir = (lightSourceSamplingPoint - shadingPoint);
             Ray shadowRay{ shadingPoint + Ndelta, ldir };
             SurfaceIntersection ssi = scene.DetectIntersecting(shadowRay, nullptr, math::SMALL_NUM<Float>);
@@ -561,7 +561,7 @@ Spectrum SimplePathIntegrator::Evaluate(Scene& scene, const Ray& sampleRay, cons
             {
                 SceneObject* lightObject = scene.GetLightSourceByIndex(lightIdx);
                 Float u[3] = { random<Float>::value(),random<Float>::value(),random<Float>::value() };
-                Point lightSourceSamplingPoint = lightObject->SampleRandomPoint(u);
+                Point lightSourceSamplingPoint = lightObject->SampleRandomPoint(shadingPoint, si, u);
                 Direction ldir = (lightSourceSamplingPoint - shadingPoint);
                 Ray shadowRay{ shadingPoint + Ndelta, ldir };
                 SurfaceIntersection ssi = scene.DetectIntersecting(shadowRay, nullptr, math::SMALL_NUM<Float>);
@@ -589,7 +589,7 @@ Direction RandomUniformDirection()
 
     Float costheta = u1;
     Float sintheta = sqrt(1 - u1 * u1);
-    Radian phi = Radian(math::PI<Float> * u2 * Float(2));
+    Radian phi = Radian(math::TWO_PI<Float> * u2);
     Float cosphi = math::cos(phi);
     Float sinphi = math::sin(phi);
 
@@ -603,7 +603,7 @@ Direction RandomCosineWeightedDirection()
 
     Float costheta = sqrt(u1);
     Float sintheta = sqrt(1 - u1);
-    Radian phi = Radian(math::PI<Float> * u2 * Float(2));
+    Radian phi = Radian(math::TWO_PI<Float> * u2);
     Float cosphi = math::cos(phi);
     Float sinphi = math::sin(phi);
 
@@ -635,10 +635,6 @@ Spectrum SimpleDiffuseIntegrator::Evaluate(Scene& scene, const Ray& sampleRay, c
         return si.Object->LightSource->Le();
     }
 
-    Spectrum D = Spectrum(0);
-    int numLights = scene.GetLightCount();
-    int randomLightIndex = static_cast<int>(random<Float>::value() * numLights);
-
     const UVW uvw(N, T);
     Direction dr = bUseConsineWeighted
         ? RandomCosineWeightedDirection()
@@ -654,7 +650,87 @@ Spectrum SimpleDiffuseIntegrator::Evaluate(Scene& scene, const Ray& sampleRay, c
     Spectrum Albedo = si.Object->Material->GetAlbedo();
 
     Float weight = bUseConsineWeighted
-        ? (Float(1) * math::PI<Float>)
-        : (Float(2) * math::PI<Float> * NdotR);
+        ? (math::PI<Float>)
+        : (math::TWO_PI<Float> * NdotR);
     return weight * Albedo * R;
+}
+
+
+
+Spectrum DirectLightIntegrator::Evaluate(Scene& scene, const Ray& sampleRay, const SurfaceIntersection& si, int depth)
+{
+    const int MAX_DEPTH = 5;
+    if (!si || depth == MAX_DEPTH)
+    {
+        return Spectrum(Float(0), Float(0), Float(0));
+    }
+
+    const Direction& N = si.SurfaceNormal;
+    const Direction& T = si.SurfaceTangent;
+    const Direction V = -sampleRay.direction();
+    Point shadingPoint = sampleRay.calc_offset(si.Distance);
+    Point Ndelta = 0.001 * N;
+
+    if (si.Object->LightSource != nullptr)
+    {
+        return si.Object->LightSource->Le();
+    }
+
+    Spectrum D = Spectrum(0);
+    int numLights = scene.GetLightCount();
+    int randomLightIndex = static_cast<int>(random<Float>::value() * numLights);
+
+    Float pdfLights = Float(1) / numLights;
+
+    SceneObject* lightObject = scene.GetLightSourceByIndex(randomLightIndex);
+
+    Float u[3] =
+    {
+        random<Float>::value(),
+        random<Float>::value(),
+        random<Float>::value()
+    };
+
+    Point lightSamplePoint = lightObject->SampleRandomPoint(shadingPoint, si, u);
+    Ray lRay = Ray{ shadingPoint, lightSamplePoint };
+    //Direction lightSampleDirection = lightObject->SampleRandomDirection(shadingPoint, si, u);
+    //Ray lRay = Ray{ shadingPoint - Ndelta, lightSampleDirection };
+
+    const Direction Wi = lRay.direction();
+    Float cosTheta = math::dot(N, Wi);
+
+    if (cosTheta < Float(0))
+    {
+        return Spectrum(0, 0, 0);
+    }
+    else
+    {
+        SurfaceIntersection lsi = scene.DetectIntersecting(lRay, si.Object, math::SMALL_NUM<Float>);
+        SurfaceIntersection lsil = lightObject->IntersectWithRay(lRay, math::SMALL_NUM<Float>);
+        Float lpDistance2 = lsil.Distance * lsil.Distance;
+        Float ltDistance2 = lsi.Distance * lsi.Distance;
+
+        if (!lsi)
+        {
+           return Spectrum(0, 0, 0);
+        }
+        else if (lsi.Object != lightObject || abs(lpDistance2 - ltDistance2) < math::EPSILON<Float>)
+        {
+            Spectrum L = Evaluate(scene, lRay, lsi, depth + 1);
+            Spectrum Albedo = si.Object->Material->GetAlbedo();
+            Float pdfLightSource = lightObject->SamplePdf(shadingPoint, lsi, lRay);
+            Float invPdf = pdfLightSource > Float(0) ? Float(1.0) / (pdfLightSource * pdfLights) : Float(1);
+
+            return Albedo * L * cosTheta * invPdf;
+        }
+        else
+        {
+            Spectrum Le = lightObject->LightSource->Le();
+            Spectrum Albedo = si.Object->Material->GetAlbedo();
+            Float pdfLightSource = lightObject->SamplePdf(shadingPoint, lsi, lRay);
+            Float invPdf = Float(1.0) / (pdfLightSource * pdfLights);
+
+            return Albedo * Le * cosTheta * invPdf;
+        }
+    }
 }

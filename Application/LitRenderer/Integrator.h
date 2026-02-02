@@ -54,3 +54,7 @@ class SimplePathIntegrator : public DistributionIntegrator {
 class SimpleDiffuseIntegrator : public DistributionIntegrator {
     virtual Spectrum Evaluate(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1, int depth) override;
 };
+
+class DirectLightIntegrator : public DistributionIntegrator {
+    virtual Spectrum Evaluate(Scene& scene, const Ray& cameraRay, const SurfaceIntersection& recordP1, int depth) override;
+};
